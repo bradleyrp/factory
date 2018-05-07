@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+from __future__ import print_function
+import os,sys
+
+# import ortho with wildcard because we control everything here
+expose = {
+	'cli':['get_targets','run_program'],
+	'dev':['tracebacker'],
+	'bash':['command_check'],
+	'misc':['listify','treeview','str_types','say'],
+	'config':['set_config','setlist','unset','read_config','write_config'],
+	'environments':['manage'],}
+
+# use `python -c "import ortho"` to bootstrap the makefile
+if (__file__!='ortho/__init__.py' or not os.path.isdir('ortho')): 
+	sys.exit(1)
+elif not os.path.isfile('makefile'):
+	import shutil
+	shutil.copy('./ortho/makefile.bak','./makefile')
+	sys.exit(0)
+else: pass
+
+def prepare_print(override=False):
+	"""
+	Prepare a special override print function.
+	"""
+	# python 2/3 builtins
+	try: import __builtin__ as builtins
+	except ImportError: import builtins
+	# use custom print function everywhere
+	if builtins.__dict__['print'].__name__!='print_stylized':
+		# every script must import print_function from __future__ or syntax error
+		# hold the standard print
+		_print = print
+		def print_stylized(*args,**kwargs):
+			"""Custom print function."""
+			key_leads = ['status','warning','error','note','usage']
+			if len(args)>0 and args[0] in key_leads:
+				return _print('[%s]'%args[0].upper(),*args[1:])
+			else: return _print(*args,**kwargs)
+		# export custom print function before other imports
+		builtins.print = print_stylized
+
+# special printing happens before imports
+prepare_print()
+
+# skip imports and exit if we only want the environment
+import json,sys
+if os.environ.get('ENV_PROBE',False):
+	if not os.path.isfile('config.json'): sys.exit()
+	conf = json.load(open('config.json','r'))
+	env_cmd = conf.get('activate_env','')
+	outgoing = 'environment: %s'%env_cmd
+	ready_check = conf.get('env_ready',{})
+	if env_cmd and not ready_check: print(outgoing)
+	elif env_cmd and ready_check:
+		for k,v in ready_check.items():
+			if v!=os.environ.get(k,None): 
+				print(outgoing)
+	# return to makefile
+	sys.exit(0)
+
+import pprint,importlib
+
+# import automatically
+for key in expose.keys(): mod = importlib.import_module('.%s'%key,package='ortho')
+
+# hardcoded configuration location
+config_fn = 'config.json'
+# hardcoded default
+default_config = {}
+
+# read the configuration here
+conf = config.read_config(config_fn,default=default_config)
+
+# distribute configuration to submodules
+for key in ['conf','config_fn']:
+	for mod in expose: globals()[mod].__dict__[key] = globals()[key]
+
+# expose utility functions
+_ortho_keys = list(set([i for j in [v for k,v in expose.items()] for i in j]))
+for mod,ups in expose.items():
+	# note the utility functions for screening later
+	globals()[mod].__dict__['_ortho_keys'] = _ortho_keys
+	for up in ups: globals()[up] = globals()[mod].__dict__[up]
