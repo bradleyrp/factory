@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env PYTHONDONTWRITEBYTECODE=1 python
 
 """
 ORTHO
@@ -12,9 +12,11 @@ from .dev import tracebacker
 from .misc import str_types
 from .config import set_config,setlist,unset,config,set_hash
 from .environments import manage
+from .bootstrap import bootstrap
+from .imports import importer,glean_functions
 
 # any functions from ortho exposed to CLI must be noted here and imported above
-expose_funcs = {'set_config','setlist','unset','set_hash','manage','config'}
+expose_funcs = {'set_config','setlist','unset','set_hash','manage','config','bootstrap'}
 expose_aliases = {'set_config':'set'}
 
 # collect functions once
@@ -34,29 +36,17 @@ def collect_functions():
 	from .config import set_config,setlist,unset
 	# accrue functions over sources sequentially
 	for source in sources:
-		# if source is a script
-		if os.path.isfile(source):
-			try: mod = importlib.import_module(os.path.splitext(source)[0])
+		if os.path.isfile(source) or os.path.isdir(source):
+			try: mod = importer(source)
 			# if importing requires env then it is not ready when we get makefile targets
-			except:
-				# trick to get function names from a script without importing
-				#! note that this does not consider __all__ properly
-				import ast
-				with open(source) as fp:
-					code = fp.read()
-					tree = ast.parse(code)
-				function_gleaned = [i.name for i in tree.body if i.__class__.__name__=='FunctionDef']
-				funcs.update(**dict([(i,str(source)) for i in function_gleaned]))
+			except: funcs.update(**glean_functions(source))
 			else:
-				incoming = dict([(k,v) for k,v in mod.__dict__.items() if callable(v)])
+				incoming = dict([(k,v) for k,v in mod.items() if callable(v)])
 				# remove items if they are not in all
-				mod_all = mod.__dict__.get('__all__',[])
+				mod_all = mod.get('__all__',[])
 				if mod_all: incoming_exposed = dict([(k,v) for k,v in incoming.items() if k in mod_all])
 				else: incoming_exposed = incoming
 				funcs.update(**incoming_exposed)
-		# if source is a directory
-		elif os.path.isdir(source):
-			raise Exception('development')
 		else: raise Exception('cannot locate code source %s'%source)
 	# note which core functions are exposed so we can filter the rest
 	global _ortho_keys_exposed
@@ -69,11 +59,10 @@ def get_targets():
 	Announce available function names.
 	"""
 	global _ortho_keys # from __init__.py
-	if not funcs: 
-		print('collecting functions!')
-		collect_functions()
+	if not funcs: collect_functions()
 	targets = funcs
 	# filter out utility functions from ortho
+	print(funcs)
 	target_names = list(set(targets.keys())-(set(_ortho_keys)-_ortho_keys_exposed))
 	print("make targets: %s"%(' '.join(sorted(target_names))))
 
@@ -134,8 +123,9 @@ def run_program(_do_debug=False):
 		print('error','the function `%s` from `%s` was only inferred and not imported. '
 			'this is commonly due to a failure to import the module '
 			'because you do not have the right environment'%(funcname,funcs[funcname]))
-		print('status','to investigate the problem we will now import the module so you can see the error')
-		try: importlib.import_module(funcs[funcname])
+		print('status','to investigate the problem we will now import the module so you can see the error. '
+			'importing %s'%funcs[funcname])
+		try: mod = importer(funcs[funcname])
 		except Exception as e: 
 			tracebacker(e)
 			print('error','to continue you can correct the script. '

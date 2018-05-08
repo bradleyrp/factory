@@ -8,6 +8,7 @@ Simple configuration manager.
 from __future__ import print_function
 import os,json,re
 from .misc import treeview,str_types
+from .bootstrap import bootstrap
 
 def abspath(path):
 	"""Get the right path."""
@@ -21,7 +22,21 @@ def read_config(source=None,default=None):
 	found = next((loc for loc in locations if os.path.isfile(loc)),None)
 	if not found and default==None: raise Exception('cannot find file "%s"'%source)
 	elif not found and default!=None: 
+		# when new users run make for the first time and create the config.json it also runs bootstrap.py
+		# ... to set up any other paths from the dependent module
+		boot = bootstrap(post=False)
+		if type(boot)==dict:
+			if 'default' not in boot and 'post' not in boot: 
+				raise Exception('bootstrap.py must contain function bootstrap_default or bootstrap_post')
+			elif 'default' in boot: default.update(**boot.get('default',{}))
+		# we write the config once even if bootstrap writes it again
 		write_config(config=default,source=locations[0])
+		#!!!!!!!!!
+		if False:
+			if type(boot)==dict and 'post' in boot: 
+				import time
+				time.sleep(3)
+				boot['post']()
 		return default
 	else: 
 		with open(found,'r') as fp: 

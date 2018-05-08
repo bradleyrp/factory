@@ -38,7 +38,7 @@ TARGETS:=$(shell ${SHELL_CHECK_TARGETS} | \
 	perl -ne 'print $$1 if /^.*?make targets\:\s*(.+)/')
 
 # request env from config
-SHELL_CHECK_ENV:=(ENV_PROBE=True $(python) $(python_flags) -B -c "import ortho")
+SHELL_CHECK_ENV:=(ENV_PROBE=True $(python) $(python_flags) -c "import ortho")
 ENV_CMD:=$(shell ${SHELL_CHECK_ENV} | \
 	perl -ne 'print $$1 if /^.*?environment\:\s*(.+)/')
 

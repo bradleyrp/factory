@@ -78,7 +78,9 @@ def treeview(data,style=None):
 	if not style: style = conf.get('tree_style','unicode')
 	if style=='unicode': return asciitree(data)
 	elif style=='json': return print(json.dumps(data))
-	elif style=='pprint': return pprint.pprint(data)
+	elif style=='pprint': 
+		import pprint
+		return pprint.pprint(data)
 	else: raise Exception('invalid style %s'%style)
 
 def say(text,*flags):
