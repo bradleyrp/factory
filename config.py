@@ -10,6 +10,10 @@ import os,json,re
 from .misc import treeview,str_types
 from .bootstrap import bootstrap
 
+# exported in from __init__.py (defined for linting)
+conf = {}
+config_fn = None
+
 def abspath(path):
 	"""Get the right path."""
 	return os.path.abspath(os.path.expanduser(path))
@@ -65,7 +69,7 @@ def interpret_command_text(raw):
 		elif re.match('^(N|n)one$',val): result = None
 		#! may be redundant with the eval command above
 		elif re.match('^[0-9]+$',val): result = int(val)
-		elif re.match('^[0-9]*\.[0-9]*$',val): result = float(val)
+		elif re.match(r"^[0-9]*\.[0-9]*$",val): result = float(val)
 		else: result = val
 	else: result = val
 	return result
@@ -137,6 +141,6 @@ def set_hash(*args,**kwargs):
 	pairwise = dict(zip(pairs[::2],pairs[1::2]))
 	pairwise.update(**kwargs)
 	for key,val in pairwise.items():
-		pairwise[key] = interpret_command_text(val)
+	 	pairwise[key] = interpret_command_text(val)
 	conf[name] = pairwise
 	write_config(conf)
