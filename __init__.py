@@ -10,7 +10,7 @@ expose = {
 	'cli':['get_targets','run_program'],
 	'config':['set_config','setlist','unset','read_config','write_config'],
 	'dev':['tracebacker'],
-	'environments':['manage'],
+	'environments':['env'],
 	'misc':['listify','treeview','str_types','say'],}
 
 # use `python -c "import ortho"` to bootstrap the makefile
@@ -77,6 +77,7 @@ config_fn = 'config.json'
 default_config = {}
 
 # read the configuration here
+# pylint: disable=undefined-variable
 conf = config.read_config(config_fn,default=default_config)
 
 # distribute configuration to submodules

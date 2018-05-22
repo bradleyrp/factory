@@ -11,12 +11,12 @@ import os,sys,re,importlib,inspect
 from .dev import tracebacker
 from .misc import str_types
 from .config import set_config,setlist,unset,config,set_hash
-from .environments import manage
+from .environments import env
 from .bootstrap import bootstrap
 from .imports import importer,glean_functions
 
 # any functions from ortho exposed to CLI must be noted here and imported above
-expose_funcs = {'set_config','setlist','unset','set_hash','manage','config','bootstrap'}
+expose_funcs = {'set_config','setlist','unset','set_hash','env','config','bootstrap'}
 expose_aliases = {'set_config':'set'}
 
 # collect functions once
