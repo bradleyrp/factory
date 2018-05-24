@@ -12,20 +12,12 @@ import os,sys,re,importlib,inspect
 from .dev import tracebacker
 from .misc import str_types
 from .config import set_config,setlist,unset,config,set_hash
-<<<<<<< HEAD
 from .environments import env
-=======
-from .environments import manage
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 from .bootstrap import bootstrap
 from .imports import importer,glean_functions
 
 # any functions from ortho exposed to CLI must be noted here and imported above
-<<<<<<< HEAD
 expose_funcs = {'set_config','setlist','unset','set_hash','env','config','bootstrap'}
-=======
-expose_funcs = {'set_config','setlist','unset','set_hash','manage','config','bootstrap'}
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 expose_aliases = {'set_config':'set'}
 
 # collect functions once
@@ -46,34 +38,14 @@ def collect_functions(verbose=False):
 	# accrue functions over sources sequentially
 	for source in sources:
 		if os.path.isfile(source) or os.path.isdir(source):
-<<<<<<< HEAD
 			try: mod = importer(source)
 			# if importing requires env then it is not ready when we get makefile targets
 			except: funcs.update(**glean_functions(source))
-=======
-			try: 
-				if verbose: print('status','importing source %s'%source)
-				mod = importer(source,verbose=verbose)
-			# if importing requires env then it is not ready when we get makefile targets
-			except Exception as e:
-				# debug imports during dev with `ortho.get_targets(verbose=True)`
-				if verbose: print('exception',e)
-				if os.path.isdir(source):
-					raise Exception('failed to import %s '%source+
-						'and cannot glean functions because it is not a file')
-				else: funcs.update(**glean_functions(source))
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 			else:
 				incoming = dict([(k,v) for k,v in mod.items() if callable(v)])
 				# remove items if they are not in all
 				mod_all = mod.get('__all__',[])
-<<<<<<< HEAD
 				if mod_all: incoming_exposed = dict([(k,v) for k,v in incoming.items() if k in mod_all])
-=======
-				# also allow __all__ to be temporarily blanked during development
-				if '__all__' in mod or mod_all: 
-					incoming_exposed = dict([(k,v) for k,v in incoming.items() if k in mod_all])
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 				else: incoming_exposed = incoming
 				if verbose: print('status','trimming source %s to __all__=%s'%(
 					source,incoming_exposed.keys()))
@@ -91,11 +63,7 @@ def get_targets(verbose=False):
 	Note that any printing that happens during the make call to get_targets is hidden by make.
 	"""
 	global _ortho_keys # from __init__.py
-<<<<<<< HEAD
 	if not funcs: collect_functions()
-=======
-	if not funcs: collect_functions(verbose=verbose)
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 	targets = funcs
 	# filter out utility functions from ortho
 	print(funcs)
