@@ -42,7 +42,8 @@ def prepare_print(override=False):
 		_print = print
 		def print_stylized(*args,**kwargs):
 			"""Custom print function."""
-			key_leads = ['status','warning','error','note','usage','exception','except','question','run']
+			key_leads = ['status','warning','error','note','usage',
+				'exception','except','question','run','tail','watch']
 			if len(args)>0 and args[0] in key_leads:
 				return _print('[%s]'%args[0].upper(),*args[1:])
 			else: return _print(*args,**kwargs)
