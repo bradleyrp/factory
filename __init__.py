@@ -11,7 +11,7 @@ expose = {
 	'config':['set_config','setlist','unset','read_config','write_config'],
 	'data':['check_repeated_keys'],
 	'dev':['tracebacker'],
-	'environments':['manage'],
+	'environments':['env'],
 	'imports':['importer'],
 	'misc':['listify','treeview','str_types','say'],}
 

@@ -1,11 +1,7 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-<<<<<<< HEAD
-import os,sys
-=======
 import os,sys,re,importlib
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 
 def strip_builtins(mod):
 	"""
@@ -24,25 +20,12 @@ def strip_builtins(mod):
 	# .. so instead we pass along a copy of the relevant functions for the caller
 	return dict([(key,obj[key]) for key in keys])
 
-<<<<<<< HEAD
 def remote_import_script(source):
-=======
-def remote_import_script(source,distribute=None):
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 	"""
 	Import the functions in a single script.
 	This code is cross-compatible with python2.7-3.6 and we use it because there is basically no way to do 
 	this from the standard library.
 	"""
-<<<<<<< HEAD
-	mod = {}
-	with open(source) as f:
-		code = compile(f.read(),source,'exec')
-		exec(code,globals(),mod)
-	return mod
-
-def remote_import_module(source):
-=======
 	if distribute: raise Exception('dev')
 	mod = {}
 	with open(source) as f:
@@ -72,7 +55,6 @@ def distribute_to_module(mod,distribute):
 					setattr(mod.__dict__[key],varname,var)
 
 def remote_import_module(source,distribute=None):
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 	"""
 	Remotely import a module.
 	Note that we call this from the importer after trying the standard importlib.import_module.
@@ -84,10 +66,6 @@ def remote_import_module(source,distribute=None):
 	# manipulate paths for remote import
 	original_path = list(sys.path)
 	sys.path.insert(0,os.path.dirname(source))
-<<<<<<< HEAD
-	import importlib
-	mod = importlib.import_module(os.path.basename(source),package=os.path.dirname(source))
-=======
 	#try: 
 	mod = importlib.import_module(os.path.basename(source),package=os.path.dirname(source))
 	#except ValueError as e:
@@ -99,18 +77,10 @@ def remote_import_module(source,distribute=None):
 			#!!! figure out alternative
 		else: raise Exception(e)
 	if distribute: distribute_to_module(mod,distribute)
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 	sys.path = list(original_path)
 	# we return modules as dictionaries
 	return strip_builtins(mod)
 
-<<<<<<< HEAD
-def importer(source,verbose=False):
-	"""
-	Route import requests according to type.
-	We always return the module dictionary because the fallback remote_import_script must run exec.
-	Testing notes:
-=======
 def import_strict(fn,dn,verbose=False):
 	"""Standard importer with no exceptions for importing the local script.py."""
 	if verbose: print('note','importing from %s, %s'%(dn,fn))
@@ -127,40 +97,16 @@ def importer(source,verbose=False,distribute=None,strict=False):
 	to include scripts at any location using the commands flag in the config managed by ortho.conf which can
 	be useful in some edge cases.
 	!! Testing notes:
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 	- import a local script directly with import_module
 	- import a local script manually using exec
 	- import a local module with import_module
 	- import a remote module by manipulating and resetting the path
-<<<<<<< HEAD
-		
-=======
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 	"""
 	source_full = os.path.expanduser(os.path.abspath(source))
 	# get paths for standard import method
 	if os.path.isfile(source_full): 
 		fn,dn = os.path.splitext(os.path.basename(source_full))[0],os.path.dirname(source_full)
 	else: fn,dn = os.path.basename(source_full),os.path.dirname(source_full)
-<<<<<<< HEAD
-	# standard import method
-	try:
-		if verbose: print('status','standard import for %s'%source)
-		import importlib
-		mod = importlib.import_module(fn,package=dn)
-		# always return the module as a dictionary
-		return strip_builtins(mod)
-	except: 
-		if verbose: print('warning','standard import failed')
-		# import the script remotely if import_module fails above
-		if os.path.isfile(source_full): 
-			if verbose: print('status','remote_import_script for %s'%source)
-			return remote_import_script(source_full)
-		# import the module remotely
-		else: 
-			if verbose: print('status','remote_import_module for %s'%source)
-			return remote_import_module(source_full)
-=======
 	if strict: return import_strict(fn,dn,verbose=verbose)
 	# standard import method
 	try:
@@ -197,7 +143,6 @@ def importer(source,verbose=False,distribute=None,strict=False):
 			if verbose: print('status','remote_import_module for %s'%source)
 			return remote_import_module(source_full,distribute=distribute)
 		else: raise Exception('cannot find %s'%source)
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 
 def glean_functions(source):
 	"""

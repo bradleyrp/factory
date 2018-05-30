@@ -9,13 +9,10 @@ from __future__ import print_function
 import os,json,re
 from .misc import treeview,str_types
 from .bootstrap import bootstrap
-<<<<<<< HEAD
 
 # exported in from __init__.py (defined for linting)
 conf = {}
 config_fn = None
-=======
->>>>>>> 3a34d39c903bc43c6d66011edf534b0ebcd27c10
 
 def abspath(path):
 	"""Get the right path."""
