@@ -6,7 +6,7 @@ Simple configuration manager.
 """
 
 from __future__ import print_function
-import os,json,re
+import os,json,re,sys
 from .misc import treeview,str_types
 from .bootstrap import bootstrap
 

@@ -4,6 +4,7 @@ from __future__ import print_function
 import os,sys
 
 # import ortho with wildcard because we control everything here
+# note that CLI functions are set in cli.py
 expose = {
 	'bash':['command_check'],
 	'bootstrap':['bootstrap'],
@@ -11,7 +12,7 @@ expose = {
 	'config':['set_config','setlist','unset','read_config','write_config'],
 	'data':['check_repeated_keys'],
 	'dev':['tracebacker'],
-	'environments':['env'],
+	'environments':['environ','env_list'],
 	'imports':['importer'],
 	'misc':['listify','treeview','str_types','say'],}
 
@@ -93,3 +94,14 @@ for mod,ups in expose.items():
 	# note the utility functions for screening later
 	globals()[mod].__dict__['_ortho_keys'] = _ortho_keys
 	for up in ups: globals()[up] = globals()[mod].__dict__[up]
+
+# if the tee flag is set then we dump stdout and stderr to a file
+tee_fn = conf.get('tee',False)
+if tee_fn:
+	#! we could move the log aside here
+	if os.path.isfile(tee_fn): os.remove(tee_fn)
+	from .bash import TeeMultiplexer
+	stdout_prev = sys.stdout
+	sys.stdout = TeeMultiplexer(stdout_prev,open(tee_fn,'a'))
+	stderr_prev = sys.stderr
+	sys.stderr = TeeMultiplexer(stdout_prev,open(tee_fn,'a'))

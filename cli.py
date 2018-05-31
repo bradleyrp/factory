@@ -12,12 +12,12 @@ import os,sys,re,importlib,inspect
 from .dev import tracebacker
 from .misc import str_types
 from .config import set_config,setlist,unset,config,set_hash
-from .environments import env
+from .environments import environ,env_list
 from .bootstrap import bootstrap
 from .imports import importer,glean_functions
 
 # any functions from ortho exposed to CLI must be noted here and imported above
-expose_funcs = {'set_config','setlist','unset','set_hash','env','config','bootstrap'}
+expose_funcs = {'set_config','setlist','unset','set_hash','environ','config','bootstrap','env_list'}
 expose_aliases = {'set_config':'set'}
 
 # collect functions once
@@ -28,12 +28,11 @@ def collect_functions(verbose=False):
 	"""
 	Collect available functions.
 	"""
-	global conf # from __init__.py
 	global funcs
 	funcs = {}
 	# start with the basic utility functions specified at the top
 	funcs = dict([(expose_aliases.get(k,k),globals()[k]) for k in expose_funcs])
-	sources = conf.get('commands',[])
+	sources = conf.get('commands',[])  # pylint: disable=undefined-variable
 	from .config import set_config,setlist,unset
 	# accrue functions over sources sequentially
 	for source in sources:
@@ -62,12 +61,12 @@ def get_targets(verbose=False):
 	Announce available function names.
 	Note that any printing that happens during the make call to get_targets is hidden by make.
 	"""
-	global _ortho_keys # from __init__.py
 	if not funcs: collect_functions()
 	targets = funcs
 	# filter out utility functions from ortho
 	print(funcs)
-	target_names = list(set(targets.keys())-(set(_ortho_keys)-_ortho_keys_exposed))
+	target_names = list(set(targets.keys())-
+		(set(_ortho_keys)-_ortho_keys_exposed))  # pylint: disable=undefined-variable
 	print("make targets: %s"%(' '.join(sorted(target_names))))
 
 def run_program(_do_debug=False):

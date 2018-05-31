@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
+from __future__ import unicode_literals
 import os,sys,subprocess
+# queue and threading for reader for bash function with scrolling
+import threading
+if (sys.version_info > (3, 0)): import queue  # pylint: disable=import-error
+else: import Queue as queue
 
 def command_check(command):
 	"""Run a command and see if it completes with returncode zero."""
@@ -15,12 +20,11 @@ def command_check(command):
 		print('warning','caught exception on command_check: %s'%e)
 		return False
 
-import Queue,threading
-
 def reader(pipe,queue):
+	"""Target for threading for scrolling BASH function below."""
 	try:
 		with pipe:
-			for line in iter(pipe.readline, b''):
+			for line in iter(pipe.readline,b''):
 				queue.put((pipe, line))
 	finally: queue.put(None)
 
@@ -41,22 +45,20 @@ def bash(command,log=None,cwd=None,inpipe=None,show=False,scroll=True):
 		kwargs = dict(cwd=cwd,shell=True,executable='/bin/bash')
 		proc = subprocess.Popen(command,**kwargs)
 		stdout,stderr = proc.communicate()
+	# log to file and print to screen using the reader function above
 	elif log and scroll:
-		# via: https://stackoverflow.com/questions/31833897/python-read-from-subprocess-stdout-and-stderr-separately-while-preserving-order
+		# via: https://stackoverflow.com/questions/31833897/
+		# .... python-read-from-subprocess-stdout-and-stderr-separately-while-preserving-order
 		proc = subprocess.Popen(command,cwd=cwd,shell=True,executable='/bin/bash',
 			stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
-		if False:
-			with open(log,'ab') as file:
-				for line in p.stdout: # b'\n'-separated lines
-					sys.stdout.buffer.write(line) # pass bytes
-					file.write(line)
-		qu = Queue.Queue()
+		qu = queue.Queue()
 		threading.Thread(target=reader,args=[proc.stdout,qu]).start()
 		threading.Thread(target=reader,args=[proc.stderr,qu]).start()
 		with open(log,'ab') as fp:
 			for _ in range(2):
 				for _,line in iter(qu.get,None):
-					print(u'\r'+'[TAIL]','%s: %s'%(log,line),end='')
+					# maybe one-line refresh method in py3: print(u'\r'+'[LOG]','%s: %s'%(log,line),end='')
+					print('[LOG] %s: %s'%(log,line.decode()),end='')
 					fp.write(line)
 	else:
 		output = open(log,'w')
@@ -73,7 +75,27 @@ def bash(command,log=None,cwd=None,inpipe=None,show=False,scroll=True):
 	if proc.returncode: 
 		if log: raise Exception('bash error, see %s'%log)
 		else: 
-			extra = '\n'.join([i for i in [stdout,stderr] if i])
-			raise Exception('bash error with returncode %d. stdout: "%s"\nstderr: "%s"'%(proc.returncode,
-				stdout,stderr))
+			print('error','stdout:')
+			print(stdout)
+			print('error','stderr:')
+			print(stderr)
+			raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
 	return None if scroll else {'stdout':stdout,'stderr':stderr}
+
+class TeeMultiplexer:
+	"""
+	Send stdout to file via: `stdout_prev = sys.stdout;sys.stdout = tee(stdout_prev,open('log','w'))`
+	You must set the tee flag in config.json to write this file.
+	"""
+	# via: http://shallowsky.com/blog/programming/python-tee.html
+	def __init__(self,_fd1,_fd2):
+		self.fd1,self.fd2 = _fd1,_fd2
+	def __del__(self):
+		if self.fd1 != sys.stdout and self.fd1 != sys.stderr : self.fd1.close()
+		if self.fd2 != sys.stdout and self.fd2 != sys.stderr : self.fd2.close()
+	def write(self,text):
+		self.fd1.write(text)
+		self.fd2.write(text)
+	def flush(self):
+		self.fd1.flush()
+		self.fd2.flush()

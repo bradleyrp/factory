@@ -34,6 +34,7 @@ RUN_ARGS:=$(filter-out $(protected_targets),$(RUN_ARGS_UNFILTER))
 #! getting targets requires one full loop with imports
 #? speed things up by using a header of some kind, or ast?
 SHELL_CHECK_TARGETS:=$(python) $(python_flags) -c "import ortho;ortho.get_targets()"
+#! probably avoid making an "env" function because problems
 TARGETS:=$(shell ${SHELL_CHECK_TARGETS} | \
 	perl -ne 'print $$1 if /^.*?make targets\:\s*(.+)/')
 

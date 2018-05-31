@@ -3,10 +3,19 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 from .bash import bash
-import sys,os
+from .config import write_config,read_config
+import sys,os,datetime,time
 
-#! the docs for the bash script below should include a link to the bootstrap docs
-#! update the example in the bash script below
+__doc__ = """
+ENVIRONMENT MANAGER
+Read the `envs` key from the config.json (or use a default) to construct or refresh an environment.
+Designed to be used with the default anaconda instructions below. We read `reqs_conda.yaml` to build
+the environment but the name and python version are set in the instructions below.
+
+Possible unit test:
+rm -rf config.json env logs/* && python=python3 make && \
+python=python3 make env conda_py2 && python=python3 make debug
+"""
 
 """
 ALTERNATE FACTORY INSTALLATION
@@ -32,6 +41,8 @@ read -d '' incoming << EOF
 		'installer':'./Miniconda3-latest-Linux-x86_64.sh',
 		'vmd':'./vmd-1.9.1.bin.LINUXAMD64.opengl.tar',
 		},
+	'name':'py2',
+	#! complete the entry here. see default_envs below
 	},
 }
 
@@ -40,6 +51,102 @@ EOF
 incoming=$(echo $incoming | sed -e 's/ //g')
 make set envs=\"$incoming\"
 """
+
+# default environments if they are absent from config.json
+default_envs = dict([
+	('conda_py%d'%v,{
+		'where':'env',
+		'style':'anaconda',
+		'sources':{
+			'installer':'./miniconda.sh',
+			'reqs':'reqs.yaml',},
+		'name':'py%d'%v,
+		'python_version':2,
+		'install_commands':[
+			"this = dict(sources_installer=self.sources['installer'],where=self.where)",
+			"bash('bash %(sources_installer)s -b -p %(where)s'%this,log='logs/log-anaconda-env')",
+			"bash('source env/bin/activate && conda update -y conda',log='logs/log-conda-update')",
+			"bash('source env/bin/activate && conda create "+
+				"python=%(version)s -y -n %(name)s'%dict(name=self.name,version=self.python_version),"+
+				"log='logs/log-create-%s'%self.name)",
+			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
+				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",
+			"bash('make set activate_env=\"env/bin/activate %s\"'%self.name)",],
+		'refresh_commands':[
+			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
+				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",],}
+	# provide python 2 and python 3 environment options
+	) for v in [2,3]])
+
+class Factory:
+	def __init__(self,*args,**kwargs):
+		if kwargs: raise Exception('unprocess kwargs %s'%kwargs)
+		self.conf = conf # pylint: disable=undefined-variable
+		self.envs = self.conf.get('envs',default_envs)
+		self.logs_space()
+		if not self.envs: raise Exception('no environments yet!')
+		if not args:
+			if kwargs.get('all',False):
+				# no arguments and the all kwargs runs through all environments
+				for name,detail in self.envs.items(): self.validate(name,detail)
+			else: print('warning','use `make env_list` to see available environments and use '
+				'`make env <name>` to install or refresh one or `make env all=True` for all')
+		else: 
+			# only make environments for the arguments
+			for arg in args:
+				if arg not in self.envs: raise Exception('cannot find env %s'%arg)
+				else: self.validate(arg,self.envs[arg])
+	def logs_space(self):
+		"""Logs are always written to the same place."""
+		if not os.path.isdir('logs'): os.mkdir('logs')
+	def validate(self,name,detail):
+		"""
+		Check or create an environment.
+		Environment data comes from only one place in the `envs` key of the config.json file however it can 
+		be placed there by a bootstrap.py with a default configuration or a BASH script described above.
+		The only requirement is that it has the following keys: where, sources, style, and install_commands.
+		The install commands are exec'd in place in this function. The default envs are set above.
+		"""
+		self.install_commands = detail.get('install_commands',[])
+		self.sources = detail.get('sources',{})
+		# all top level keys are part of self
+		self.__dict__.update(**detail)
+		if 'sources' not in self.__dict__: self.sources = []
+		missing_keys = [i for i in ['install_commands'] if i not in self.__dict__]
+		if any(missing_keys): raise Exception('environment definition is missing %s'%missing_keys)
+		# check if the environment is installed yet
+		is_installed = self.conf.get('installed',{}).get(name,None)
+		if not is_installed:
+			print('status','running commands to install the environment')
+			# check sources to preempt an anaconda error
+			for source_name,source_fn in self.sources.items():
+				if not os.path.isfile(source_fn):
+					raise Exception('cannot find source "%s" requested by env %s: %s'%(
+						source_name,name,source_fn))
+			# use exec to loop over commands. note that the install_commands can use the where,sources,style,
+			# ... etc which are set above by default from the detail. note that the default configuration
+			# ... above provides an example for using self-referential syntax
+			for cmd in self.install_commands: 
+				print('run','`%s`'%cmd)
+				exec(cmd)
+		# if the environment is already installed we simply run refresh commands
+		else:
+			# note that the installed instructions override the envs instructions when we do a refresh
+			# ... in case you want to change the reqs file later on
+			self.__dict__.update(**is_installed)
+			#! note that we need a better way to edit a nested dictionary. if you want to update the reqs 
+			#! ... file you need to edit a nested config.json,installed,<name>,sources,reqs
+			print('status','refreshing preexisting environment %s'%self.name) # pylint: disable=no-member
+			for cmd in self.conf['installed'][name].get('refresh_commands',[]):
+				print('run','`%s`'%cmd)
+				exec(cmd)
+		# log that this environment has been installed
+		self.conf = read_config()
+		if 'installed' not in self.conf: self.conf['installed'] = {}
+		ts = datetime.datetime.fromtimestamp(time.time()).strftime('%Y.%m.%d.%H%M')
+		detail['timestamp'] = ts
+		self.conf['installed'][name] = detail
+		write_config(self.conf)
 
 #!? previous set of codes for some kind of avoiding ~/.local method?
 """
@@ -55,94 +162,13 @@ with open(os.path.join(env_etc_conda,'deactivate.d','env_vars.sh'),'w') as fp:
 	fp.write('#!/bin/sh\nunset PYTHONNOUSERSITE\n')
 """
 
-# default environments if they are absent from config.json
-default_envs = {
-	'conda_py2':{
-		'where':'env',
-		'style':'anaconda',
-		'sources':{
-			'installer':'./Miniconda3-latest-Linux-x86_64.sh',
-			'vmd':'./vmd-1.9.1.bin.LINUXAMD64.opengl.tar',
-			'reqs':'reqs_conda.yaml',},
-		'name':'py2',
-		'python_version':2,
-		'install_commands':[
-			"this = dict(sources_installer=self.sources['installer'],where=self.where)",
-			"bash('bash %(sources_installer)s -b -p %(where)s'%this,log='logs/log-anaconda-env')",
-			"bash('source env/bin/activate && conda update -y conda',log='logs/log-conda-update')",
-			"bash('source env/bin/activate && conda create "+
-				"python=%(version)s -y -n %(name)s'%dict(name=self.name,version=self.python_version),"+
-				"log='logs/log-create-%s'%self.name)",
-			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",
-			"bash('make set activate_env=\"env/bin/activate %s\"'%self.name)",],
-		'refresh_commands':[
-			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",],},}
-
-class Factory:
-	def __init__(self,*args,**kwargs):
-		self.conf = conf # pylint: disable=undefined-variable
-		self.envs = self.conf.get('envs',default_envs)
-		self.logs_space()
-		if not self.envs: raise Exception('no environments yet!')
-		for name,detail in self.envs.items(): self.validate(name,detail)
-	def logs_space(self):
-		"""Logs are always written to the same place."""
-		if not os.path.isdir('logs'): os.mkdir('logs')
-	def validate(self,name,detail):
-		"""
-		Check or create an environment.
-		Environment data comes from only one place in the `envs` key of the config.json file however it can 
-		be placed there by a bootstrap.py with a default configuration or a BASH script described above.
-		The only requirement is that it has the following keys: where, sources, style, and install_commands.
-		The install commands are exec'd in place in this function. The default envs are set above.
-		"""
-		self.install_commands = detail.pop('install_commands',[])
-		self.sources = detail.pop('sources',{})
-		# all top level keys are part of self
-		self.__dict__.update(**detail)
-		if 'sources' not in self.__dict__: self.sources = []
-		missing_keys = [i for i in ['install_commands'] if i not in self.__dict__]
-		if any(missing_keys): raise Exception('environment definition is missing %s'%missing_keys)
-		print('status','running commands to install the environment')
-		# check sources to preempt an anaconda error
-		for source_name,source_fn in self.sources.items():
-			if not os.path.isfile(source_fn):
-				raise Exception('cannot find source "%s" requested by env %s: %s'%(
-					source_name,name,source_fn))
-		# use exec to loop over commands. note that the install_commands can use the where, sources, style,
-		# ... etc which are set above by default from the detail. note that the default configuration above
-		# ... provides an example for using self-referential syntax
-		for cmd in self.install_commands: 
-			print('run','`%s`'%cmd)
-			exec(cmd)
-
-def env(*args,**kwargs): 
+def environ(*args,**kwargs): 
 	"""The env command instantiates a Factory."""
 	Factory(*args,**kwargs)
 
-if False:
-	def setup_anaconda_refresh(self):
-		if self.use_python2:
-			#! note that anaconda may have deprecated use of env/envs/py2/bin/activate
-			self.loader_commands['env_activate'] = 'env/bin/activate py2'
-			self.source_cmd = 'source env/bin/activate py2'
-		#---we consult a conda YAML file and a PIP text list to install packages
-		#---default values are built into the class above but they can be overridden
-		config = read_config()
-		reqs_conda = config.get('reqs_conda',self.reqs_conda)
-		reqs_pip = config.get('reqs_pip',self.reqs_pip)
-		if type(reqs_conda)!=list: reqs_conda = [reqs_conda]
-		if type(reqs_pip)!=list: reqs_pip = [reqs_pip]
-		#---install from the conda requirements list followed by pip (for packages not available on conda)
-		for fn in reqs_conda:
-			print('[STATUS] installing packages via conda from %s'%fn)
-			#---we tell conda to ignore local user site-packages because version errors
-			bash(self.source_cmd+' && conda env update --file %s'%fn,
-				log='logs/log-anaconda-conda-%s'%os.path.basename(fn))
-		for fn in reqs_pip:
-			print('[STATUS] installing packages via pip from %s'%fn)
-			bash(self.source_cmd+' && pip install -r %s'%fn,
-				log='logs/log-anaconda-conda-%s'%os.path.basename(fn))
-
+def env_list():
+	from .misc import treeview
+	conf_this = conf # pylint: disable=undefined-variable
+	treeview(conf_this.get('envs',default_envs))
+	print('note','The following dictionaries are instructions for building environments. '
+		'You can build a new environment by running `make env <name>`. See environments.py for more docs.')

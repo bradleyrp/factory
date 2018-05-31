@@ -20,7 +20,7 @@ def strip_builtins(mod):
 	# .. so instead we pass along a copy of the relevant functions for the caller
 	return dict([(key,obj[key]) for key in keys])
 
-def remote_import_script(source):
+def remote_import_script(source,distribute=None):
 	"""
 	Import the functions in a single script.
 	This code is cross-compatible with python2.7-3.6 and we use it because there is basically no way to do 
@@ -66,16 +66,8 @@ def remote_import_module(source,distribute=None):
 	# manipulate paths for remote import
 	original_path = list(sys.path)
 	sys.path.insert(0,os.path.dirname(source))
-	#try: 
+	# removed a try/except message that handled the old "attempted relative import beyond toplevel" issue
 	mod = importlib.import_module(os.path.basename(source),package=os.path.dirname(source))
-	#except ValueError as e:
-	if False:
-		if str(e)=='Attempted relative import beyond toplevel package':
-			raise Exception(('attempted relative import beyond toplevel package '
-				'for "%s" which typically occurs when you try to access a parent (i.e. amx) module '
-				'function from inside a submodule. we recommend ???')%source)
-			#!!! figure out alternative
-		else: raise Exception(e)
 	if distribute: distribute_to_module(mod,distribute)
 	sys.path = list(original_path)
 	# we return modules as dictionaries
