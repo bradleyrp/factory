@@ -90,7 +90,7 @@ class Factory:
 				# no arguments and the all kwargs runs through all environments
 				for name,detail in self.envs.items(): self.validate(name,detail)
 			else: print('warning','use `make env_list` to see available environments and use '
-				'`make env <name>` to install or refresh one or `make env all=True` for all')
+				'`make environ <name>` to install or refresh one or `make environ all=True` for all')
 		else: 
 			# only make environments for the arguments
 			for arg in args:
