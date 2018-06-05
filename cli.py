@@ -64,7 +64,6 @@ def get_targets(verbose=False):
 	if not funcs: collect_functions()
 	targets = funcs
 	# filter out utility functions from ortho
-	print(funcs)
 	target_names = list(set(targets.keys())-
 		(set(_ortho_keys)-_ortho_keys_exposed))  # pylint: disable=undefined-variable
 	print("make targets: %s"%(' '.join(sorted(target_names))))

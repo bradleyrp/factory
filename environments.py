@@ -172,3 +172,25 @@ def env_list():
 	treeview(conf_this.get('envs',default_envs))
 	print('note','The following dictionaries are instructions for building environments. '
 		'You can build a new environment by running `make env <name>`. See environments.py for more docs.')
+
+extension_styles = {
+	'distutils':{'spot'},}
+
+def register_extension(name,style,**kwargs):
+	"""Register an extension module that was installed locally."""
+	if 'extensions' not in conf: conf['extensions'] = {}
+	if extension_styles[style]!=set(kwargs.keys()):
+		raise Exception('cannot match style "%s" in available extension styles: %s'%(style,extension_styles))
+	conf['extensions'][name] = kwargs
+	write_config(conf)
+
+def load_extension(name):
+	"""Load an extension module."""
+	target = conf.get('extensions',{}).get(name,None)
+	if not target: raise Exception('cannot find target "%s" in the config.json extensions'%name)
+	matches = [k for k,v in extension_styles.items() if v==set(target.keys())]
+	if len(matches)==0: raise Exception('cannot match extension "%s": %s'%(name,target))
+	elif len(matches)>1: raise Exception('redundant matches for "%s" %s'%(name,target))
+	else: style = matches[0]
+	if style=='distutils': sys.path.insert(0,target['spot'])
+	else: raise Exception('incomplete extension load')
