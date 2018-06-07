@@ -82,6 +82,8 @@ def bash(command,log=None,cwd=None,inpipe=None,show=False,scroll=True):
 				print('error','stderr:')
 				print(stderr.decode('utf-8').strip('\n'))
 			raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
+	proc.stdout.close()
+	proc.stderr.close()
 	return None if scroll else {'stdout':stdout,'stderr':stderr}
 
 class TeeMultiplexer:
