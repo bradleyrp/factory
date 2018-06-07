@@ -119,10 +119,10 @@ def unset(*args):
 		else: print('[WARNING] cannot unset %s because it is absent'%arg)
 	write_config(config)
 
-def config():
+def config(text=False):
 	"""Print the configuration."""
 	global conf,config_fn # from __init__.py
-	treeview({config_fn:conf})
+	treeview({config_fn:conf},style={False:'unicode',True:'pprint'}[text])
 
 def set_hash(*args,**kwargs):
 	"""
