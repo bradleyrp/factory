@@ -6,6 +6,9 @@ from .bash import bash
 from .config import write_config,read_config
 import sys,os,datetime,time
 
+global conf # pylint: disable=undefined-variable
+conf = {}
+
 __doc__ = """
 ENVIRONMENT MANAGER
 Read the `envs` key from the config.json (or use a default) to construct or refresh an environment.
@@ -61,27 +64,33 @@ default_envs = dict([
 			'installer':'./miniconda.sh',
 			'reqs':'reqs.yaml',},
 		'name':'py%d'%v,
+		'update':False,
 		'python_version':2,
 		'install_commands':[
-			"this = dict(sources_installer=self.sources['installer'],where=self.where)",
-			"bash('bash %(sources_installer)s -b -p %(where)s'%this,log='logs/log-anaconda-env')",
-			"bash('source env/bin/activate && conda update -y conda',log='logs/log-conda-update')",
-			"bash('source env/bin/activate && conda create "+
-				"python=%(version)s -y -n %(name)s'%dict(name=self.name,version=self.python_version),"+
+			"this = dict(sources_installer=self.sources['installer'],where=self.where,"+
+				"extra=' -u' if self.update else '')",
+			"bash('bash %(sources_installer)s -b -p %(where)s%(extra)s'%this,log='logs/log-anaconda-env')",
+			"bash('source %s && conda update -y conda'%os.path.join(self.where,'bin','activate'),"+
+				"log='logs/log-conda-update')",
+			"bash('source %(where_env)s && conda create "+
+				"python=%(version)s -y -n %(name)s'%dict(name=self.name,version=self.python_version,"+
+				"where_env=os.path.join(self.where,'bin','activate')),"+
 				"log='logs/log-create-%s'%self.name)",
-			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",
-			"bash('make set activate_env=\"env/bin/activate %s\"'%self.name)",],
+			"bash('source %(where_env)s py2 && conda env update --file %(reqs)s'%"+
+				"dict(reqs=self.sources['reqs'],where_env=os.path.join(self.where,'bin','activate')),"+
+				"log='logs/log-conda-refresh')",
+			"bash('make set activate_env=\"%s %s\"'%(os.path.join(self.where,'bin','activate'),self.name))",],
 		'refresh_commands':[
-			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",],}
+			"bash('source %(where_env)s py2 && conda env update --file %(reqs)s'%"+
+				"dict(reqs=self.sources['reqs'],where_env=os.path.join(self.where,'bin','activate')),"+
+				"log='logs/log-conda-refresh')",],}
 	# provide python 2 and python 3 environment options
 	) for v in [2,3]])
 
 class Factory:
 	def __init__(self,*args,**kwargs):
 		if kwargs: raise Exception('unprocess kwargs %s'%kwargs)
-		self.conf = conf # pylint: disable=undefined-variable
+		self.conf = conf
 		self.envs = self.conf.get('envs',default_envs)
 		self.logs_space()
 		if not self.envs: raise Exception('no environments yet!')
@@ -166,10 +175,10 @@ def environ(*args,**kwargs):
 	"""The env command instantiates a Factory."""
 	Factory(*args,**kwargs)
 
-def env_list():
+def env_list(text=False):
 	from .misc import treeview
-	conf_this = conf # pylint: disable=undefined-variable
-	treeview(conf_this.get('envs',default_envs))
+	conf_this = conf
+	treeview(conf_this.get('envs',default_envs),style={False:'unicode',True:'pprint'}[text])
 	print('note','The following dictionaries are instructions for building environments. '
 		'You can build a new environment by running `make env <name>`. See environments.py for more docs.')
 
