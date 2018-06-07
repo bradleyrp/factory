@@ -5,16 +5,17 @@ import os,sys
 
 # import ortho with wildcard because we control everything here
 # note that CLI functions are set in cli.py
+#! needs cluster/backrun function
 expose = {
 	'bash':['command_check','bash'],
 	'bootstrap':['bootstrap'],
 	'cli':['get_targets','run_program'],
-	'cluster':['backrun'],
 	'config':['set_config','setlist','unset','read_config','write_config'],
 	'data':['check_repeated_keys'],
 	'dev':['tracebacker'],
 	'environments':['environ','env_list','register_extension','load_extension'],
 	'imports':['importer'],
+	'unittester':['unittester'],
 	'misc':['listify','treeview','str_types','say'],}
 
 # use `python -c "import ortho"` to bootstrap the makefile
