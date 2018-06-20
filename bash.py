@@ -58,7 +58,7 @@ def bash(command,log=None,cwd=None,inpipe=None,show=False,scroll=True):
 			for _ in range(2):
 				for _,line in iter(qu.get,None):
 					# maybe one-line refresh method in py3: print(u'\r'+'[LOG]','%s: %s'%(log,line),end='')
-					print('[LOG] %s: %s'%(log,line.decode()),end='')
+					print('[LOG] %s: %s'%(log,line.decode('utf-8')),end='')
 					fp.write(line)
 	else:
 		output = open(log,'w')
@@ -69,17 +69,21 @@ def bash(command,log=None,cwd=None,inpipe=None,show=False,scroll=True):
 		if not inpipe: stdout,stderr = proc.communicate()
 		else: stdout,stderr = proc.communicate(input=inpipe)
 	if not scroll and stderr: 
-		print('error','stdout: %s'%stdout)
-		print('error','stderr: %s'%stderr)
+		if stdout: print('error','stdout: %s'%stdout.decode('utf-8').strip('\n'))
+		if stderr: print('error','stderr: %s'%stderr.decode('utf-8').strip('\n'))
 		raise Exception('bash returned error state')
 	if proc.returncode: 
 		if log: raise Exception('bash error, see %s'%log)
 		else: 
-			print('error','stdout:')
-			print(stdout)
-			print('error','stderr:')
-			print(stderr)
+			if stdout:
+				print('error','stdout:')
+				print(stdout.decode('utf-8').strip('\n'))
+			if stderr:
+				print('error','stderr:')
+				print(stderr.decode('utf-8').strip('\n'))
 			raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
+	proc.stdout.close()
+	proc.stderr.close()
 	return None if scroll else {'stdout':stdout,'stderr':stderr}
 
 class TeeMultiplexer:

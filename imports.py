@@ -26,8 +26,9 @@ def remote_import_script(source,distribute=None):
 	This code is cross-compatible with python2.7-3.6 and we use it because there is basically no way to do 
 	this from the standard library.
 	"""
-	if distribute: raise Exception('dev')
 	mod = {}
+	#! is this working? if distribute: raise Exception('dev')
+	if distribute: mod.update(**distribute)
 	with open(source) as f:
 		code = compile(f.read(),source,'exec')
 		exec(code,mod,mod)
@@ -94,6 +95,9 @@ def importer(source,verbose=False,distribute=None,strict=False):
 	- import a local module with import_module
 	- import a remote module by manipulating and resetting the path
 	"""
+	if not distribute: distribute = {}
+	# include __file__ which is otherwise absent when we import this way
+	distribute['__file__'] = source 
 	source_full = os.path.expanduser(os.path.abspath(source))
 	# get paths for standard import method
 	if os.path.isfile(source_full): 
