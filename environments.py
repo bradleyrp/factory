@@ -61,20 +61,26 @@ default_envs = dict([
 			'installer':'./miniconda.sh',
 			'reqs':'reqs.yaml',},
 		'name':'py%d'%v,
-		'python_version':2,
+		'update':False,
+		'python_version':v,
 		'install_commands':[
-			"this = dict(sources_installer=self.sources['installer'],where=self.where)",
-			"bash('bash %(sources_installer)s -b -p %(where)s'%this,log='logs/log-anaconda-env')",
-			"bash('source env/bin/activate && conda update -y conda',log='logs/log-conda-update')",
-			"bash('source env/bin/activate && conda create "+
-				"python=%(version)s -y -n %(name)s'%dict(name=self.name,version=self.python_version),"+
+			"this = dict(sources_installer=self.sources['installer'],where=self.where,"+
+				"extra=' -u' if self.update else '')",
+			"bash('bash %(sources_installer)s -b -p %(where)s%(extra)s'%this,log='logs/log-anaconda-env')",
+			"bash('source %s && conda update -y conda'%os.path.join(self.where,'bin','activate'),"+
+				"log='logs/log-conda-update')",
+			"bash('source %(where_env)s && conda create "+
+				"python=%(version)s -y -n %(name)s'%dict(name=self.name,version=self.python_version,"+
+				"where_env=os.path.join(self.where,'bin','activate')),"+
 				"log='logs/log-create-%s'%self.name)",
-			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",
-			"bash('make set activate_env=\"env/bin/activate %s\"'%self.name)",],
+			"bash('source %(where_env)s py2 && conda env update --file %(reqs)s'%"+
+				"dict(reqs=self.sources['reqs'],where_env=os.path.join(self.where,'bin','activate')),"+
+				"log='logs/log-conda-refresh')",
+			"bash('make set activate_env=\"%s %s\"'%(os.path.join(self.where,'bin','activate'),self.name))",],
 		'refresh_commands':[
-			"bash('source env/bin/activate py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs']),log='logs/log-conda-refresh')",],}
+			"bash('source %(where_env)s py2 && conda env update --file %(reqs)s'%"+
+				"dict(reqs=self.sources['reqs'],where_env=os.path.join(self.where,'bin','activate')),"+
+				"log='logs/log-conda-refresh')",],}
 	# provide python 2 and python 3 environment options
 	) for v in [2,3]])
 
@@ -92,7 +98,6 @@ class Factory:
 			else: print('warning','use `make env list` to see available environments and use '
 				'`make env <name>` to install or refresh one or `make env all=True` for all')
 		else: 
-			print(args)
 			# only make environments for the arguments
 			for arg in args:
 				if arg not in self.envs: raise Exception('cannot find env %s'%arg)
@@ -175,3 +180,25 @@ def env_list():
 	treeview(conf_this.get('envs',default_envs))
 	print('note','The following dictionaries are instructions for building environments. '
 		'You can build a new environment by running `make env <name>`. See environments.py for more docs.')
+
+extension_styles = {
+	'distutils':{'spot'},}
+
+def register_extension(name,style,**kwargs):
+	"""Register an extension module that was installed locally."""
+	if 'extensions' not in conf: conf['extensions'] = {}
+	if extension_styles[style]!=set(kwargs.keys()):
+		raise Exception('cannot match style "%s" in available extension styles: %s'%(style,extension_styles))
+	conf['extensions'][name] = kwargs
+	write_config(conf)
+
+def load_extension(name):
+	"""Load an extension module."""
+	target = conf.get('extensions',{}).get(name,None)
+	if not target: raise Exception('cannot find target "%s" in the config.json extensions'%name)
+	matches = [k for k,v in extension_styles.items() if v==set(target.keys())]
+	if len(matches)==0: raise Exception('cannot match extension "%s": %s'%(name,target))
+	elif len(matches)>1: raise Exception('redundant matches for "%s" %s'%(name,target))
+	else: style = matches[0]
+	if style=='distutils': sys.path.insert(0,target['spot'])
+	else: raise Exception('incomplete extension load')

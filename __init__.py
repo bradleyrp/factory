@@ -6,15 +6,17 @@ import os,sys
 # import ortho with wildcard because we control everything here
 # note that CLI functions are set in cli.py
 expose = {
-	'bash':['command_check'],
+	'bash':['command_check','bash'],
 	'bootstrap':['bootstrap'],
 	'cli':['get_targets','run_program'],
 	'config':['set_config','setlist','unset','read_config','write_config'],
 	'data':['check_repeated_keys'],
 	'dev':['tracebacker'],
-	'environments':['environ'],
+	'environments':['environ','env_list','register_extension','load_extension'],
 	'imports':['importer'],
-	'misc':['listify','treeview','str_types','say'],}
+	'unittester':['unittester'],
+	'misc':['listify','treeview','str_types','say'],
+	'reexec':['iteratively_execute','interact']}
 
 # use `python -c "import ortho"` to bootstrap the makefile
 if (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.isdir('ortho')): 
@@ -105,3 +107,11 @@ if tee_fn:
 	sys.stdout = TeeMultiplexer(stdout_prev,open(tee_fn,'a'))
 	stderr_prev = sys.stderr
 	sys.stderr = TeeMultiplexer(stdout_prev,open(tee_fn,'a'))
+
+### LEGACY FUNCTIONS
+
+# manual method for checking strings, without six. use `type(a) in str_types`
+# note that it might be better to use six.string_types and isinstance
+str_types = [str,unicode] if sys.version_info<(3,0) else [str]
+# shorthand for full path even if you use tilde
+def abspath(path): return os.path.abspath(os.path.expanduser(path))
