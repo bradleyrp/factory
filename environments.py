@@ -175,10 +175,10 @@ def environ(*args,**kwargs):
 	elif args==('list',): env_list()
 	else: Factory(*args,**kwargs)
 
-def env_list():
+def env_list(text=False):
 	from .misc import treeview
-	conf_this = conf # pylint: disable=undefined-variable
-	treeview(conf_this.get('envs',default_envs))
+        conf_this = conf # pylint: disable=undefined-variable
+	treeview(conf_this.get('envs',default_envs),style={False:'unicode',True:'pprint'}[text])
 	print('note','The following dictionaries are instructions for building environments. '
 		'You can build a new environment by running `make env <name>`. See environments.py for more docs.')
 
