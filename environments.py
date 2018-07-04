@@ -89,9 +89,10 @@ class Factory:
 			if kwargs.get('all',False):
 				# no arguments and the all kwargs runs through all environments
 				for name,detail in self.envs.items(): self.validate(name,detail)
-			else: print('warning','use `make env_list` to see available environments and use '
+			else: print('warning','use `make env list` to see available environments and use '
 				'`make env <name>` to install or refresh one or `make env all=True` for all')
 		else: 
+			print(args)
 			# only make environments for the arguments
 			for arg in args:
 				if arg not in self.envs: raise Exception('cannot find env %s'%arg)
@@ -164,7 +165,9 @@ with open(os.path.join(env_etc_conda,'deactivate.d','env_vars.sh'),'w') as fp:
 
 def environ(*args,**kwargs): 
 	"""The env command instantiates a Factory."""
-	Factory(*args,**kwargs)
+	if 'list' in args and len(args)>1: raise Exception('cannot run `make env list` with extra arguments')
+	elif args==('list',): env_list()
+	else: Factory(*args,**kwargs)
 
 def env_list():
 	from .misc import treeview
