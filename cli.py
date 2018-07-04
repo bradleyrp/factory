@@ -16,10 +16,11 @@ from .environments import environ,env_list
 from .bootstrap import bootstrap
 from .imports import importer,glean_functions
 from .unittester import unittester
+from .reexec import interact
 
 # any functions from ortho exposed to CLI must be noted here and imported above
 expose_funcs = {'set_config','setlist','unset','set_hash','environ','config','bootstrap','env_list',
-	'unittester'}
+	'unittester','interact'}
 expose_aliases = {'set_config':'set'}
 
 # collect functions once
