@@ -127,7 +127,8 @@ class Factory:
 			# check sources to preempt an anaconda error
 			for source_name,source_fn in self.sources.items():
 				if not os.path.isfile(source_fn):
-					raise Exception('cannot find source "%s" requested by env %s: %s'%(
+					raise Exception(('we need an additional requirement. '+
+						'cannot find source "%s" requested by env %s: %s')%(
 						source_name,name,source_fn))
 			# use exec to loop over commands. note that the install_commands can use the where,sources,style,
 			# ... etc which are set above by default from the detail. note that the default configuration
