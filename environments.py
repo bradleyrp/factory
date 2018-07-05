@@ -73,13 +73,15 @@ default_envs = dict([
 				"python=%(version)s -y -n %(name)s'%dict(name=self.name,version=self.python_version,"+
 				"where_env=os.path.join(self.where,'bin','activate')),"+
 				"log='logs/log-create-%s'%self.name)",
-			"bash('source %(where_env)s py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs'],where_env=os.path.join(self.where,'bin','activate')),"+
+			"bash('source %(where_env)s %(name)s && conda env update --file %(reqs)s'%"+
+				"dict(name=self.name,reqs=self.sources['reqs'],where_env=os.path.join("+
+				"self.where,'bin','activate')),"+
 				"log='logs/log-conda-refresh')",
 			"bash('make set activate_env=\"%s %s\"'%(os.path.join(self.where,'bin','activate'),self.name))",],
 		'refresh_commands':[
-			"bash('source %(where_env)s py2 && conda env update --file %(reqs)s'%"+
-				"dict(reqs=self.sources['reqs'],where_env=os.path.join(self.where,'bin','activate')),"+
+			"bash('source %(where_env)s %(name)s && conda env update --file %(reqs)s'%"+
+				"dict(name=self.name,reqs=self.sources['reqs'],where_env=os.path.join("+
+				"self.where,'bin','activate')),"+
 				"log='logs/log-conda-refresh')",],}
 	# provide python 2 and python 3 environment options
 	) for v in [2,3]])
