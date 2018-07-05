@@ -174,7 +174,7 @@ with open(os.path.join(env_etc_conda,'deactivate.d','env_vars.sh'),'w') as fp:
 def environ(*args,**kwargs): 
 	"""The env command instantiates a Factory."""
 	if 'list' in args and len(args)>1: raise Exception('cannot run `make env list` with extra arguments')
-	elif args==('list',): env_list()
+	elif args==('list',): env_list(**kwargs)
 	else: Factory(*args,**kwargs)
 
 def env_list(text=False):
