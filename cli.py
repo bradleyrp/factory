@@ -20,7 +20,7 @@ from .reexec import interact
 
 # any functions from ortho exposed to CLI must be noted here and imported above
 expose_funcs = {'set_config','setlist','unset','set_hash','environ',
-	'config','bootstrap','interact','unittester'}
+	'config','bootstrap','interact','unittester','import_check','locate'}
 expose_aliases = {'set_config':'set','environ':'env'}
 
 # collect functions once
