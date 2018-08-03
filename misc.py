@@ -10,6 +10,9 @@ import os,sys,re,json
 # recommended string checking is via isinstance(u'string',basestring)
 basestring = string_types = str_types = (str,unicode) if sys.version_info<(3,0) else (str,)
 
+#! use of str_types expects list. resolve later in unittester.py
+str_types = list(string_types)
+
 def listify(x): 
 	"""Turn a string or a list into a list."""
 	if type(x)==str: return [x]
