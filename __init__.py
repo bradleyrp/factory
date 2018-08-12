@@ -18,7 +18,7 @@ expose = {
 	'dev':['tracebacker'],
 	'environments':['environ','env_list','register_extension','load_extension'],
 	'imports':['importer'],
-	'unittester':['unittester'],
+	'unit_tester':['unit_tester'],
 	'misc':['listify','treeview','str_types','string_types','say'],
 	'reexec':['iteratively_execute','interact']}
 
