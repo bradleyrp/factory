@@ -17,10 +17,11 @@ from .bootstrap import bootstrap
 from .imports import importer,glean_functions
 from .unit_tester import unit_tester
 from .reexec import interact
+from .docs import build_docs
 
 # any functions from ortho exposed to CLI must be noted here and imported above
 expose_funcs = {'set_config','setlist','set_list','unset','set_dict','environ',
-	'config','bootstrap','interact','unit_tester','import_check','locate','targets'}
+	'config','bootstrap','interact','unit_tester','import_check','locate','targets','build_docs'}
 expose_aliases = {'set_config':'set','environ':'env'}
 
 # collect functions once
