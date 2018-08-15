@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 
+"""
+ORTHO MODULE DOCSTRING
+"""
+
 from __future__ import print_function
 import os,sys
+_init_keys = globals().keys()
 
 # note that CLI functions are set in cli.py
 # import ortho with wildcard because we control everything here
@@ -10,15 +15,11 @@ import os,sys
 #! cannot do e.g. import ortho.submodule if the submodule is not below
 expose = {
 	'bash':['command_check','bash'],
-	'bootstrap':['bootstrap'],
 	'cli':['get_targets','run_program'],
-	# expose these functions because they use config_fn (not necessarily conf)
 	'config':['set_config','setlist','set_list','set_dict','unset','read_config','write_config'],
-	'data':['check_repeated_keys'],
 	'dev':['tracebacker'],
-	'environments':['environ','env_list','register_extension','load_extension'],
+	'data':['check_repeated_keys'],
 	'imports':['importer'],
-	'unittester':['unittester'],
 	'misc':['listify','treeview','str_types','string_types','say'],
 	'reexec':['iteratively_execute','interact']}
 
@@ -38,6 +39,10 @@ else: pass
 def prepare_print(override=False):
 	"""
 	Prepare a special override print function.
+	This decorator stylizes print statements so that printing a tuple that begins with words like `status` 
+	will cause print to prepend `[STATUS]` to each line. This makes the output somewhat more readable but
+	otherwise does not affect printing. We use builtins to distribute the function. Any code which imports
+	`print_function` from `__future__` gets the stylized print function.
 	"""
 	# python 2/3 builtins
 	try: import __builtin__ as builtins
@@ -50,7 +55,7 @@ def prepare_print(override=False):
 		def print_stylized(*args,**kwargs):
 			"""Custom print function."""
 			key_leads = ['status','warning','error','note','usage',
-				'exception','except','question','run','tail','watch']
+				'exception','except','question','run','tail','watch','bash']
 			if len(args)>0 and args[0] in key_leads:
 				return _print('[%s]'%args[0].upper(),*args[1:])
 			else: return _print(*args,**kwargs)
@@ -114,8 +119,16 @@ if tee_fn:
 
 ### LEGACY FUNCTIONS
 
-# shorthand for full path even if you use tilde
-def abspath(path): return os.path.abspath(os.path.expanduser(path))
+def abspath(path): 
+	"""Legacy wrapper for resolving absolute paths that may contain tilde."""
+	return os.path.abspath(os.path.expanduser(path))
 
-#!? clean up stray variables
- 
+# clean up the namespace
+retain_keys = set(['prepare_print','abspath','conf'])
+added = (set(globals().keys())-set(_init_keys)
+	-set([i for j in expose.values() for i in j])
+	-set(expose.keys())
+	-retain_keys)
+for key in added: del globals()[key]
+del globals()['key']
+del globals()['added']

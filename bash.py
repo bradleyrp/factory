@@ -28,11 +28,14 @@ def reader(pipe,queue):
 				queue.put((pipe, line))
 	finally: queue.put(None)
 
-def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None):
+def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,announce=False):
 	"""
 	Run a bash command.
 	Development note: tee functionality would be useful however you cannot use pipes with subprocess here.
 	"""
+	if announce: 
+		print('status',
+			'ortho.bash%s runs command: %s'%(' (at %s)'%cwd if cwd else '',str(command)))
 	merge_stdout_stderr = False
 	if not cwd: cwd = './'
 	if log == None: 
@@ -54,12 +57,12 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None):
 			if scroll:
 				empty = '' if sys.version_info<3 else b''
 				#! universal_newlines?
-				for line in iter(proc.stdout.readline,''):
-					sys.stdout.write((tag if tag else '')+line)
+				for line in iter(proc.stdout.readline,empty):
+					sys.stdout.write((tag if tag else '')+line.decode('utf-8'))
 					sys.stdout.flush()
 				proc.wait()
 				if proc.returncode:
-					raise Exception('see above for error. BASH returned %d'%proc.returncode)
+					raise Exception('see above for error. bash return code %d'%proc.returncode)
 			# no scroll waits for output and then checks it below
 			else: stdout,stderr = proc.communicate()
 	# log to file and print to screen using the reader function above

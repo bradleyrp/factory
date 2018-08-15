@@ -3,29 +3,32 @@
 """
 ORTHO
 Makefile interFACE (makeface) command-line interface
-Note that you should debug with `python -c "import ortho;ortho.get_targets(verbose=True,strict=True)"`
+Note that you should debug with `python -uBttc "import ortho;ortho.get_targets(verbose=True,strict=True)"`
 """
 
 from __future__ import print_function
 
 import os,sys,re,importlib,inspect
 from .dev import tracebacker
-from .misc import str_types,locate
+from .misc import str_types,locate,treeview
 from .config import set_config,setlist,set_list,unset,config,set_dict
 from .environments import environ
 from .bootstrap import bootstrap
 from .imports import importer,glean_functions
-from .unittester import unittester
+from .unit_tester import unit_tester
 from .reexec import interact
+from .documentation import build_docs
 
 # any functions from ortho exposed to CLI must be noted here and imported above
 expose_funcs = {'set_config','setlist','set_list','unset','set_dict','environ',
-	'config','bootstrap','interact','unittester','import_check','locate'}
+	'config','bootstrap','interact','unit_tester','import_check','locate','targets','build_docs'}
 expose_aliases = {'set_config':'set','environ':'env'}
 
 # collect functions once
 global funcs,_ortho_keys_exposed
 funcs = None
+
+message_debug_suggestion =  'python -uBttc "import ortho;ortho.get_targets(verbose=True,strict=True)"'
 
 def collect_functions(verbose=False,strict=False):
 	"""
@@ -83,7 +86,7 @@ def import_check():
 	print('status','see logs above for import details')
 	print('status','imported functions: %s'%funcs.keys())
 
-def get_targets(verbose=False,strict=False):
+def get_targets(verbose=False,strict=False,silent=False):
 	"""
 	Announce available function names.
 	Note that any printing that happens during the make call to get_targets is hidden by make.
@@ -93,7 +96,8 @@ def get_targets(verbose=False,strict=False):
 	# filter out utility functions from ortho
 	target_names = list(set(targets.keys())-
 		(set(_ortho_keys)-_ortho_keys_exposed))  # pylint: disable=undefined-variable
-	print("make targets: %s"%(' '.join(sorted(target_names))))
+	if not silent: print("make targets: %s"%(' '.join(sorted(target_names))))
+	return target_names
 
 def run_program(_do_debug=False):
 	"""
@@ -125,7 +129,12 @@ def run_program(_do_debug=False):
 			kwargs[parname] = parval
 		else:
 			if sys.version_info<(3,3): 
-				#! the following will be removed by python 3.6
+				#! the following getargspec will be removed by python 3.6
+				if isinstance(funcs[funcname],str_types):
+					raise Exception('run_program received a string instead of a function, indicating that '+
+						'we have gleaned function without importing them. this indicates an error in that '+
+						'script. the script is: "%s". try the following command to debug:\n%s'%(
+							funcs[funcname],message_debug_suggestion))
 				argspec = inspect.getargspec(funcs[funcname])
 				argspec_args = argspec.args
 			else:
@@ -180,3 +189,8 @@ def run_program(_do_debug=False):
 	except KeyboardInterrupt:
 		print('warning','caught KeyboardInterrupt during traceback')
 		sys.exit(1)
+
+def targets():
+	"""Print the make  targets."""
+	targets = get_targets(silent=True)
+	treeview(dict(targets=sorted(targets)))
