@@ -16,6 +16,6 @@ To use ``ortho`` you can access the :ref:`standard tools <standard-tools>` direc
    ortho.reexec
    ortho.imports
    ortho.environments
-   ortho.docs
+   ortho.documentation
    ortho.dictionary
    

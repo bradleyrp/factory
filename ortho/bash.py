@@ -28,16 +28,23 @@ def reader(pipe,queue):
 				queue.put((pipe, line))
 	finally: queue.put(None)
 
-def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,announce=False):
+def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
+	announce=False,local=False):
 	"""
 	Run a bash command.
 	Development note: tee functionality would be useful however you cannot use pipes with subprocess here.
+	Vital note: log is relative to the current location and not the cwd.
 	"""
 	if announce: 
 		print('status',
 			'ortho.bash%s runs command: %s'%(' (at %s)'%cwd if cwd else '',str(command)))
 	merge_stdout_stderr = False
-	if not cwd: cwd = './'
+	if local: cwd_local = str(cwd)
+	if not cwd or local: cwd = '.'
+	if local: 
+		if log: log = os.path.relpath(log,cwd_local)
+		pwd = os.getcwd()
+		os.chdir(cwd_local)
 	if log == None: 
 		# no present need to separate stdout and stderr so note the pipe below
 		merge_stdout_stderr = True
@@ -112,6 +119,7 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,announce=Fal
 			raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
 	proc.stdout.close()
 	if not merge_stdout_stderr: proc.stderr.close()
+	if local: os.chdir(pwd)
 	return None if scroll else {'stdout':stdout,'stderr':stderr}
 
 class TeeMultiplexer:

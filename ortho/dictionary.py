@@ -151,6 +151,12 @@ class MultiDict(DotDict):
 			self._key_map_checker(this)
 			dict.update(self,**this)
 		else: dict.update(self,*args,**kwargs)
+	def __dir__(self):
+		#! needs tested
+		return [i for i in dict.keys(self) 
+			if not isinstance(i,str_types) or not i.startswith('_')]
+	def keys(self): return self.__dir__()
+	def __len__(self): return len(self.__dir__())
 
 class TestMultiDict(unittest.TestCase):
 	"""
