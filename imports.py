@@ -38,12 +38,12 @@ def distribute_to_module(mod,distribute):
 	"""
 	Distribute a builtin-esque variable to a module and to one level of its submodules.
 	Development note: 
-		This method distributes variables to the top level of a module but no deeper. The automacs
-		magic_importer method will go one step further and use some conservative inference on sys.modules to 
-		distribute the variables to all submodules automatically. However, it would be slightly more elegant 
-		to recursively collect modules and distribute automatically without using sys.modules (or worse,
-		builtins). If a recursive method is developed, the `distribute_down` method can be removed from the
-		automacs magic importer.
+	This method distributes variables to the top level of a module but no deeper. The automacs
+	magic_importer method will go one step further and use some conservative inference on sys.modules to 
+	distribute the variables to all submodules automatically. However, it would be slightly more elegant 
+	to recursively collect modules and distribute automatically without using sys.modules (or worse,
+	builtins). If a recursive method is developed, the `distribute_down` method can be removed from the
+	automacs magic importer.
 	"""
 	# distribute to the top level
 	for key,val in distribute.items(): setattr(mod,key,val)
