@@ -22,7 +22,8 @@ expose = {
 	'config':['set_config','setlist','set_list','set_dict','unset','read_config','write_config'],
 	'dev':['tracebacker'],
 	#! 'docs':['build_docs'],
-	#! 'environments':['environ','env_list','register_extension','load_extension'],
+	# environments must get conf hence it must be here
+	'environments':['environ','env_list','register_extension','load_extension'],
 	'imports':['importer'],
 	#! 'unit_tester':['unit_tester'],
 	'misc':['listify','treeview','str_types','string_types','say'],
