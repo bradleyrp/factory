@@ -1,0 +1,8 @@
+.pipeline_up_to_date
+calc
+config.json
+docs_*
+env
+logs
+pack
+*.pyc
