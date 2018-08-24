@@ -1,0 +1,22 @@
+channels:
+  - conda-forge
+dependencies:
+  - pyyaml
+  - numpy
+  - scipy
+  - matplotlib
+  - ipdb # requires conda-forge in channels. others may use forge
+  - django
+  - sphinx
+  - numpydoc
+  - pylint # for VSCode
+  - pil # for omnicalc
+  - pip:
+    - mysql-python # for MARCC admin work
+      # note that mysql is tempermental on macos
+      # you may need to do:
+      #   brew install mysql
+      #   brew unlink mysql
+      #   sed -i -e 's/libs="$libs -l "/libs="$libs -lmysqlclient -lssl -lcrypto"/g' /usr/local/bin/mysql_config
+      #   brew install mysql-connector-c
+    - ansible # for MARCC admin work
