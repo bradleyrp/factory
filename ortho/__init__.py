@@ -18,6 +18,8 @@ expose = {
 	'cli':['get_targets','run_program'],
 	'config':['set_config','setlist','set_list','set_dict','unset','read_config','write_config'],
 	'dev':['tracebacker'],
+	# environments must get conf hence it must be here
+	'environments':['environ','env_list','register_extension','load_extension'],
 	'data':['check_repeated_keys'],
 	'imports':['importer'],
 	'unit_tester':['unit_tester'],
