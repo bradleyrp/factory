@@ -172,6 +172,15 @@ def set_dict(*args,**kwargs):
 	conf[name] = pairwise
 	write_config(conf)
 
+def config_fold(fn,key):
+	"""Update the config dictionary with a python script."""
+	#! python 2 vs 3 compatibility
+	incoming = {}
+	execfile(fn,incoming)
+	if key not in incoming: raise Exception('key must exist in file')
+	delveset(conf,key,value=incoming[key])
+	write_config(conf)
+
 def look():
 	"""Drop into a debugger with the conf available."""
 	try: 

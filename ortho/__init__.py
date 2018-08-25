@@ -16,7 +16,8 @@ _init_keys = globals().keys()
 expose = {
 	'bash':['command_check','bash'],
 	'cli':['get_targets','run_program'],
-	'config':['set_config','setlist','set_list','set_dict','unset','read_config','write_config'],
+	'config':['set_config','setlist','set_list','set_dict','unset','read_config','write_config',
+		'config_fold'],
 	'dev':['tracebacker'],
 	# environments must get conf hence it must be here
 	'environments':['environ','env_list','register_extension','load_extension'],

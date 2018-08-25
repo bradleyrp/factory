@@ -8,7 +8,7 @@ import re,tempfile,os
 import datetime as dt
 import uuid
 
-__all__ = ['tester','test_clean','test_help']
+__all__ = ['tester','test_clean','test_help','docker_clean']
 
 ### TOOLS
 
@@ -188,3 +188,6 @@ def test_help():
 	print('make tester source=deploy_v1.yaml name=simple_docker')
 	print('rm -rf test-no1 && make tester source=deploy_v1.yaml name=no1')
 
+def docker_clean():
+	os.system('docker rm $(docker ps -a -q)')
+	os.system('docker rmi $(docker images -f "dangling=true" -q)')
