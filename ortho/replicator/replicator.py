@@ -8,7 +8,7 @@ import re,tempfile,os
 import datetime as dt
 import uuid
 
-__all__ = ['tester','test_clean','test_help','docker_clean']
+__all__ = ['repl','test_clean','test_help','docker_clean']
 
 ### TOOLS
 
@@ -103,14 +103,14 @@ class DockerFileMaker(Handler):
 
 class ReplicatorGuide(Handler):
 	taxonomy = {
-		'simple':{'script'},
+		'simple':{'base':{'script'},'opts':{'site'}},
 		'simple_docker':{'base':{'script','dockerfile','tag'},'opts':{'site'}},}
 
-	def simple(self,script):
+	def simple(self,script,site=None):
 		"""
 		Execute a script.
 		"""
-		spot = SpotLocal()
+		spot = SpotLocal(site=site)
 		run = Runner(script=script,fn='script.sh',cwd=spot.path)
 
 	def simple_docker(self,script,dockerfile,tag,site=None):
@@ -167,7 +167,7 @@ def replicator_read_yaml(source,name=None):
 def test_clean():
 	os.system(' rm -rf repl_*')
 
-def tester(**kwargs):
+def repl(**kwargs):
 	"""
 	Run a test.
 	Disambiguates incoming test format and sends it to the right reader.
