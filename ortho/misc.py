@@ -136,4 +136,4 @@ def locate(keyword):
 	directory structure.
 	"""
 	os.system((r'find . -name "*.py" -not -path "./env/*" '+
-		r'| xargs egrep -i --color=always "(def|class) \w*%s\w*")'%keyword)
+		r'| xargs egrep -i --color=always "(def|class) \w*%s\w*")'%keyword))
