@@ -68,8 +68,8 @@ $(checkfile): touchup
 # make without arguments
 default: $(checkfile)
 
-# route to targets
-$(TARGETS): $(checkfile)
+# route (only) the controller function to checkfile so it runs
+$(controller_function): $(checkfile)
 # if the target is in a special exclude list then we skip the environment and run directly
 ifneq ($(filter $(word 1,$(RUN_ARGS)),$(ENV_EXCLUDES)),)
 	@/bin/echo "[STATUS] executing special function $(word 1,$(RUN_ARGS)) without environment"
