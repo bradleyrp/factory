@@ -1,0 +1,146 @@
+### REFERENCE
+
+dockerfiles:
+  copy_run_script: |
+    COPY script.sh script.sh
+    CMD ["bash","script.sh"]
+  stretch: |
+    FROM debian:stretch
+  debian start: |
+    ARG DEBIAN_FRONTEND=noninteractive
+    RUN apt-get update
+    RUN apt-get install -y git make wget 
+    RUN apt-get install -y git vim
+    RUN apt-get install -y python python-dev
+  debian_mysql: |
+    RUN apt-get install -y mysql-server default-libmysqlclient-dev
+  debian_compilers: |
+    RUN apt-get install -y cmake
+    RUN apt-get install -y build-essential
+  make_user:
+    # formats for subs: key, val, python function, builtin function
+    subs: #
+      user: rpb
+      uid: 501
+      user_passwd: secret
+      gid: 20
+      gname: staff
+    text: |
+      RUN getent group %(gid)s > /dev/null 2>&1 || (groupmod -g %(gid)d %(gname)s)
+      RUN useradd -m -u %(uid)d -g %(gid)d %(user)s
+      RUN echo '%(user)s:%(user_passwd)s' | chpasswd
+      USER %(user)s
+      WORKDIR /home/%(user)s
+
+### RETIRED, WORKING
+
+no1:
+  site: test-no1
+  tag: test-no1
+  dockerfile:
+    sequence:
+      - stretch
+      - debian_start
+      - make_user
+      - copy_run_script
+  script: |
+    set -e
+    git clone http://github.com/bradleyrp/factory factory
+    cd factory
+    make
+    make env conda_py2
+  #! gave up here because confusion of which miniconda. still need to sort out where the linux factory site is. note also that setting up a factory on macos inside a working macos factory is kind of redundant
+
+### TESTS
+
+simple test:
+  script: |
+    echo "Hello, World!"
+    echo "This is a simple bash script."
+
+simple docker:
+  script: |
+    echo "Hello, World!"
+    echo "This is in a docker. Let's look at root:"
+    ls /
+  tag: test_build_simple_docker
+  dockerfile:
+    sequence:
+      - stretch
+      - debian_start
+      - copy_run_script
+
+# via: make repl source=deploy_v1.yaml name=deploy_linux_factory
+
+deploy_linux_factory:
+  persist: true
+  # use the macos disk image utility to make a case-insensitive volume
+  site: /Volumes/site-nix/site-factory-linux
+  script: |
+    # this script can repeat to confirm the installation
+    git clone https://github.com/bradleyrp/factory factory
+    cd factory
+    git pull
+    if [ ! -f Miniconda3-latest-Linux-x86_64.sh ]; then 
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      ln -s Miniconda3-latest-Linux-x86_64.sh miniconda.sh
+    fi
+    # bootstrap the config
+    make
+    # make the environment or update if reqs.yaml has changed
+    make env conda_py2
+  rebuild: false
+  dockerfile:
+    sequence:
+      - stretch
+      - debian_start
+      - debian_mysql
+      - make_user
+    addendum:
+      #! needs shell substitution
+      - WORKDIR /home/rpb/extern
+  compose:
+    version: '3'
+    services:
+      # use: docker-compose run visit
+      visit:
+        build:
+          context: '.'
+        volumes:
+            - ./:/home/rpb/extern
+        stdin_open: true
+        tty: true
+        command: ['/bin/bash']
+      # use: docker-compose up deploy
+      deploy:
+        entrypoint: ['/bin/bash','script.sh']
+        build:
+          context: '.'
+        volumes:
+            - ./:/home/rpb/extern
+  command: docker-compose up deploy
+
+deploy_linux_factory_visit:
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run visit
+    rebuild: false
+
+deploy_linux_factory_rebuild:
+  via: deploy_linux_factory
+  overrides:
+    rebuild: true
+
+no2:
+  site: test-no2
+  script: |
+    set -e
+    git clone https://github.com/biophyscode/automacs -b ortho test
+    cd test
+    make 
+    make gromacs_config local
+    make setup all
+    #! bug: note that `make go protein` fails in this context but not typically
+    make prep protein
+    python -u script.py
+
