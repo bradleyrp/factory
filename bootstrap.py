@@ -13,6 +13,7 @@ default_configuration = {
 	'user_creds':'password',
 	'automacs':{'address':'http://github.com/biophyscode/automacs','branch':'ortho'},
 	'omnicalc':{'address':'http://github.com/biophyscode/omnicalc'},
+	'locks':['lock.queue'],
 	'docs':{'list':{
 		'factory':{'source':'manager/docs_source','build':'docs_factory'},
 		'ortho':{'source':'ortho/docs_source','build':'docs_ortho'}}}}
