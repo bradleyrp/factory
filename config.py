@@ -37,12 +37,6 @@ def read_config(source=None,default=None):
 			elif 'default' in boot: default.update(**boot.get('default',{}))
 		# we write the config once even if bootstrap writes it again
 		write_config(config=default,source=locations[0])
-		#!!!!!!!!!
-		if False:
-			if type(boot)==dict and 'post' in boot: 
-				import time
-				time.sleep(3)
-				boot['post']()
 		return default
 	else: 
 		with open(found,'r') as fp: 
