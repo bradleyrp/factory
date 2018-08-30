@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 from __future__ import unicode_literals
-import os,sys,subprocess
+import os,sys,subprocess,io,time
 # queue and threading for reader for bash function with scrolling
 import threading
 if (sys.version_info > (3, 0)): import queue  # pylint: disable=import-error
@@ -72,13 +72,25 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 					raise Exception('see above for error. bash return code %d'%proc.returncode)
 			# no scroll waits for output and then checks it below
 			else: stdout,stderr = proc.communicate()
+	# alternative scroll method via https://stackoverflow.com/questions/18421757
+	# special scroll is useful for some cases where buffered output was necessary
+	elif log and scroll=='special':
+		with io.open(log,'wb') as writer, io.open(log,'rb',1) as reader:
+		    proc = subprocess.Popen(command,stdout=writer,cwd=cwd,shell=True)
+		    while proc.poll() is None:
+		        sys.stdout.write(reader.read())
+		        time.sleep(0.5)
+		    # Read the remaining
+		    sys.stdout.write(reader.read())
 	# log to file and print to screen using the reader function above
 	elif log and scroll:
 		# via: https://stackoverflow.com/questions/31833897/
-		# see alternate without threading: https://stackoverflow.com/questions/18421757
 		# note that this method also works if you remove output to a file
 		#   however I was not able to figure out how to identify which stream was which during iter
 		#! needs tested in Python 3
+		#! note that this was failing with `make go protein` in automacs inside
+		#!   the replicator. it worked with `make prep protein && python -u ./script.py`
+		#!   and without the unbuffered output it just dumps it at the end
 		proc = subprocess.Popen(command,cwd=cwd,shell=True,executable='/bin/bash',
 			stdout=subprocess.PIPE,stderr=subprocess.PIPE,bufsize=1)
 		qu = queue.Queue()
@@ -117,8 +129,9 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 				print('error','stderr:')
 				print(stderr.decode('utf-8').strip('\n'))
 			raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
-	proc.stdout.close()
-	if not merge_stdout_stderr: proc.stderr.close()
+	if scroll==True: 
+		proc.stdout.close()
+		if not merge_stdout_stderr: proc.stderr.close()
 	if local: os.chdir(pwd)
 	return None if scroll else {'stdout':stdout,'stderr':stderr}
 
@@ -139,3 +152,15 @@ class TeeMultiplexer:
 	def flush(self):
 		self.fd1.flush()
 		self.fd2.flush()
+
+def bash_basic(cmd,cwd,log=None):
+	"""
+	Simplest wrapper around bash which uses os.system. 
+	Note that the bash utility above is fully featured but sometimes produces weird output.
+	For example, use in the replicator caught weird characters from ipdb even when it was not used.
+	This function uses os.system which creates a subshell and hence uses a consequence-free cd command
+	to move to the right spot, and tee to pipe output.
+	Note that the log file for this function is local to the cwd, in contrast to the standard bash above.
+	"""
+	if log: os.system('cd %s && %s | tee %s 2>&1'%(cwd,cmd,log))
+	else: os.system('cd %s && %s'%(cwd,cmd))
