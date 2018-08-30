@@ -39,6 +39,5 @@ def bootstrap(post=True,refresh=False):
 		conf = read_config()
 		conf.update(**outgoing.get('default',{}))
 		write_config(conf)
-		import ipdb;ipdb.set_trace()
 		return
 	return outgoing
