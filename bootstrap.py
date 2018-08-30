@@ -8,7 +8,7 @@ BOOTSTRAP the FACTORY configuration
 
 # default configuration is written to config.json on first make
 default_configuration = {
-	'commands':['manager/factory.py','ortho/replicator/replicator.py'],
+	'commands':['manager/factory.py','ortho/replicator/replicator.py','ortho/queue'],
 	'docks_config':'ortho/replicator/docker_config.py',
 	'user_creds':'password',
 	'automacs':{'address':'http://github.com/biophyscode/automacs','branch':'ortho'},
