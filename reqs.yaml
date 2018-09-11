@@ -10,3 +10,4 @@ dependencies:
   - sphinx
   - numpydoc
   - pil # for omnicalc
+  - notebook # for factory
