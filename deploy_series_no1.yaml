@@ -8,15 +8,22 @@ dockerfiles:
     FROM debian:stretch
   debian start: |
     ARG DEBIAN_FRONTEND=noninteractive
-    RUN apt-get update
-    RUN apt-get install -y git make wget 
-    RUN apt-get install -y git vim
+    RUN apt-get update --fix-missing
+    RUN apt-get install -y git make wget vim screen
+    RUN apt-get install -y procps
     RUN apt-get install -y python python-dev
+    ENV PYTHONIOENCODING UTF-8
   debian_mysql: |
     RUN apt-get install -y mysql-server default-libmysqlclient-dev
   debian_compilers: |
     RUN apt-get install -y cmake
     RUN apt-get install -y build-essential
+  debian_expose_ports: |
+    EXPOSE 22
+    EXPOSE 8000
+    EXPOSE 8888
+  debian_shell_bash: |
+    SHELL ["/bin/bash", "--login", "-c"]
   make_user:
     # formats for subs: key, val, python function, builtin function
     subs: #
@@ -32,50 +39,11 @@ dockerfiles:
       USER %(user)s
       WORKDIR /home/%(user)s
 
-### RETIRED, WORKING
-
-no1:
-  site: test-no1
-  tag: test-no1
-  dockerfile:
-    sequence:
-      - stretch
-      - debian_start
-      - make_user
-      - copy_run_script
-  script: |
-    set -e
-    git clone http://github.com/bradleyrp/factory factory
-    cd factory
-    make
-    make env conda_py2
-  #! gave up here because confusion of which miniconda. still need to sort out where the linux factory site is. note also that setting up a factory on macos inside a working macos factory is kind of redundant
-
-### TESTS
-
-simple test:
-  script: |
-    echo "Hello, World!"
-    echo "This is a simple bash script."
-
-simple docker:
-  script: |
-    echo "Hello, World!"
-    echo "This is in a docker. Let's look at root:"
-    ls /
-  tag: test_build_simple_docker
-  dockerfile:
-    sequence:
-      - stretch
-      - debian_start
-      - copy_run_script
-
-# via: make repl source=deploy_v1.yaml name=deploy_linux_factory
-
 deploy_linux_factory:
   persist: true
   # use the macos disk image utility to make a case-insensitive volume
   site: /Volumes/site-nix/site-factory-linux
+  # note that redeployment always reruns the conda env update command
   script: |
     # this script can repeat to confirm the installation
     git clone https://github.com/bradleyrp/factory factory
@@ -95,6 +63,8 @@ deploy_linux_factory:
       - stretch
       - debian_start
       - debian_mysql
+      - debian_shell_bash
+      - debian_expose_ports
       - make_user
     addendum:
       #! needs shell substitution
@@ -111,6 +81,12 @@ deploy_linux_factory:
         stdin_open: true
         tty: true
         command: ['/bin/bash']
+        ports:
+          # host:container
+          - "8020:8000"
+          - "8021:8888"
+          - "8022:22"
+        network_mode: host 
       # use: docker-compose up deploy
       deploy:
         entrypoint: ['/bin/bash','script.sh']
@@ -123,13 +99,17 @@ deploy_linux_factory:
 deploy_linux_factory_visit:
   via: deploy_linux_factory
   overrides:
-    command: docker-compose run visit
+    command: docker-compose run --service-ports visit
     rebuild: false
 
 deploy_linux_factory_rebuild:
+  # docker-compose does not rebuild on Dockerfile changes so you have to ask
   via: deploy_linux_factory
   overrides:
     rebuild: true
+
+### LOCAL/NATIVE tests
+### these tests run inside the parent factory
 
 no2:
   site: test-no2
@@ -143,4 +123,16 @@ no2:
     #! bug: note that `make go protein` fails in this context but not typically
     make prep protein
     python -u script.py
+
+no2_prep:
+  site: test-no2
+  script: |
+    set -e
+    git clone https://github.com/biophyscode/automacs -b ortho test
+    cd test
+    make 
+    make gromacs_config local
+    make setup all
+    make set activate_env="../../env/bin/activate py2"
+    echo "ready to run: 'make go protein' at $(pwd)"
 
