@@ -75,10 +75,10 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 	# alternative scroll method via https://stackoverflow.com/questions/18421757
 	# special scroll is useful for some cases where buffered output was necessary
 	elif log and scroll=='special':
-		with io.open(log,'wb') as writer, io.open(log,'rb',1) as reader:
-		    proc = subprocess.Popen(command,stdout=writer,cwd=cwd,shell=True)
+		with io.open(log,'wb') as writes, io.open(log,'rb',1) as reads:
+		    proc = subprocess.Popen(command,stdout=writes,cwd=cwd,shell=True)
 		    while proc.poll() is None:
-		        sys.stdout.write(reader.read())
+		        sys.stdout.write(reads.read())
 		        time.sleep(0.5)
 		    # Read the remaining
 		    sys.stdout.write(reader.read())

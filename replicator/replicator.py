@@ -3,8 +3,8 @@
 #from __future__ import print_function
 from ortho.requires import requires_python
 from ortho.dictionary import MultiDict
-from ortho import bash
-import re,tempfile,os
+from ortho.bash import bash_basic
+import re,tempfile,os,copy
 import datetime as dt
 import uuid
 
@@ -15,8 +15,9 @@ __all__ = ['repl','test_clean','test_help','docker_clean']
 class SpotLocal:
 	"""Make a local directory."""
 	#! needs cleanup option
-	def __init__(self,site=None):
+	def __init__(self,site=None,persist=False):
 		"""Make a local folder."""
+		if persist and site==None: raise Exception('the persist flag is meaningless without site')
 		if not site:
 			ts = dt.datetime.now().strftime('%Y%m%d%H%M') 
 			code = uuid.uuid4().hex[:2].upper()
@@ -24,7 +25,9 @@ class SpotLocal:
 			os.mkdir('./%s'%self.path)
 		else: 
 			self.path = site
-			os.mkdir(site)
+			if persist and os.path.isdir(self.path): 
+				print('status','found persistent spot: %s'%self.path)
+			else: os.mkdir(site)
 
 class Runner:
 	"""Execute a file with Bash."""
@@ -34,13 +37,6 @@ class Runner:
 		self.log = kwargs.pop('log','log')
 		self.fn = kwargs.pop('fn')
 		self.path_full = self.script_fn = os.path.join(self.cwd,self.fn)
-		self.local_bash = kwargs.pop('local_bash',False)
-		if False:
-			self.path = os.path.basename(path)
-			self.cwd = os.path.dirname(path)
-			self.log = log
-			self.subs = dict(path=self.path)
-			self.cmd = kwargs.pop('cmd','bash %(path)s')%self.subs
 		self.subs = dict(path=self.script_fn,fn=self.fn)
 		self.cmd = kwargs.pop('cmd','bash %(fn)s')%self.subs
 		if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
@@ -48,7 +44,7 @@ class Runner:
 	def run(self):
 		if self.script:
 			with open(self.path_full,'w') as fp: fp.write(self.script)
-		bash(self.cmd,cwd=self.cwd,log=os.path.join(self.cwd,self.log),local=self.local_bash)
+		bash_basic(self.cmd,cwd=self.cwd,log=self.log)
 
 class Handler:
 	taxonomy = {}
@@ -56,7 +52,8 @@ class Handler:
 		matches = [name for name,keys in self.taxonomy.items() if (
 			(isinstance(keys,set) and keys==set(args)) or 
 			(isinstance(keys,dict) and set(keys.keys())=={'base','opts'} 
-				and set(args)>=keys['base']))]
+				and set(args)>=keys['base']
+				and set(args)-keys['base']<=keys['opts']))]
 		if len(matches)==0: 
 			raise Exception('cannot classify instructions with keys: %s'%list(args))
 		elif len(matches)>1: 
@@ -88,11 +85,13 @@ class DockerFileChunk(Handler):
 
 class DockerFileMaker(Handler):
 	taxonomy = {
-		'sequence':{'sequence'},}
-	def sequence(self,sequence):
+		'sequence':{'base':{'sequence'},'opts':{'addendum'}},}
+	def sequence(self,sequence,addendum=None):
 		"""Assemble a sequence of dockerfiles."""
 		index = MultiDict(base=self.meta['dockerfiles'].dockerfiles,underscores=True)
 		self.dockerfile = '\n'.join([self.refine(index[i]) for i in sequence])
+		if addendum: 
+			for i in addendum: self.dockerfile += "\n%s"%i
 	def refine(self,this):
 		"""Refine the Dockerfiles."""
 		if isinstance(this,dict): 
@@ -103,22 +102,26 @@ class DockerFileMaker(Handler):
 
 class ReplicatorGuide(Handler):
 	taxonomy = {
-		'simple':{'base':{'script'},'opts':{'site'}},
-		'simple_docker':{'base':{'script','dockerfile','tag'},'opts':{'site'}},}
+		'simple':{'base':{'script'},'opts':{'site','persist'}},
+		'simple_docker':{'base':{'script','dockerfile','tag'},'opts':{'site','persist'}},
+		'docker_compose':{
+			'base':{'script','dockerfile','site','compose','command'},
+			'opts':{'persist','rebuild'}},
+		'via':{'via','overrides'},}
 
-	def simple(self,script,site=None):
+	def simple(self,script,site=None,persist=False):
 		"""
 		Execute a script.
 		"""
-		spot = SpotLocal(site=site)
+		spot = SpotLocal(site=site,persist=persist)
 		run = Runner(script=script,fn='script.sh',cwd=spot.path)
 
-	def simple_docker(self,script,dockerfile,tag,site=None):
+	def simple_docker(self,script,dockerfile,tag,site=None,persist=False):
 		"""
 		Run a script in a docker container.
 		"""
 		dfm = DockerFileMaker(meta=self.meta,**dockerfile)
-		spot = SpotLocal(site=site)
+		spot = SpotLocal(site=site,persist=persist)
 		with open(os.path.join(spot.path,'Dockerfile'),'w') as fp: 
 			fp.write(dfm.dockerfile)
 		script_build = '\n'.join([
@@ -132,6 +135,36 @@ class ReplicatorGuide(Handler):
 			#! note that this name needs to match the COPY command in Docker
 			cwd=spot.path,fn='script.sh',log='log-run',
 			cmd='docker run %s'%tag)#+' %(path)s')
+
+	@requires_python('yaml')
+	def docker_compose(self,script,compose,dockerfile,site,
+		command,persist=True,rebuild=True):
+		"""
+		Prepare a docker-compose folder and run a command in the docker.
+		"""
+		import yaml
+		dfm = DockerFileMaker(meta=self.meta,**dockerfile)
+		spot = SpotLocal(site=site,persist=persist)
+		with open(os.path.join(spot.path,'Dockerfile'),'w') as fp: 
+			fp.write(dfm.dockerfile)
+		with open(os.path.join(spot.path,'docker-compose.yml'),'w') as fp:
+			fp.write(yaml.dump(compose))
+		with open(os.path.join(spot.path,'script.sh'),'w') as fp: 
+			fp.write(script)
+		if rebuild: bash_basic('docker-compose build',cwd=spot.path)
+		# no need to log this since it manipulates a presumably persistent set of files
+		bash_basic(command,cwd=spot.path)
+
+	def via(self,via,overrides):
+		"""
+		Run a replicate with a modification. Extremely useful for DRY.
+		"""
+		if via not in self.meta['complete']: 
+			raise Exception('reference to replicate %s is missing'%via)
+		fname = self.classify(*self.meta['complete'][via].keys())
+		outgoing = copy.deepcopy(self.meta['complete'][via])
+		outgoing.update(**overrides)
+		getattr(self,fname)(**outgoing)
 
 ### READERS
 
@@ -159,7 +192,10 @@ def replicator_read_yaml(source,name=None):
 		print('status','found one instruction in source %s: %s'%(source,test_name))
 	elif name:test_name = name
 	else: raise Exception('source %s is empty'%source)
+	if test_name not in instruct: 
+		raise Exception('cannot find replicate %s'%test_name)
 	test_detail = instruct[test_name]
+	reference['complete'] = instruct
 	return dict(name=test_name,detail=test_detail,meta=reference)
 
 ### INTERFACE
