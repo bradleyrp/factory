@@ -37,12 +37,12 @@ Dictionary
 
 :py:meth:`ortho.MultiDict <ortho.dictionary.MultiDict>`
 
-Docs
-~~~~
+Documentation
+~~~~~~~~~~~~~
 
 Build the docs with:
 
-:py:meth:`make build_docs <ortho.docs.build_docs>`
+:py:meth:`make build_docs <ortho.documentation.build_docs>`
 
 Environments
 ~~~~~~~~~~~~
