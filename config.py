@@ -37,12 +37,6 @@ def read_config(source=None,default=None):
 			elif 'default' in boot: default.update(**boot.get('default',{}))
 		# we write the config once even if bootstrap writes it again
 		write_config(config=default,source=locations[0])
-		#!!!!!!!!!
-		if False:
-			if type(boot)==dict and 'post' in boot: 
-				import time
-				time.sleep(3)
-				boot['post']()
 		return default
 	else: 
 		with open(found,'r') as fp: 
@@ -170,6 +164,15 @@ def set_dict(*args,**kwargs):
 	for key,val in pairwise.items():
 	 	pairwise[key] = interpret_command_text(val)
 	conf[name] = pairwise
+	write_config(conf)
+
+def config_fold(fn,key):
+	"""Update the config dictionary with a python script."""
+	#! python 2 vs 3 compatibility
+	incoming = {}
+	execfile(fn,incoming)
+	if key not in incoming: raise Exception('key must exist in file')
+	delveset(conf,key,value=incoming[key])
 	write_config(conf)
 
 def look():

@@ -2,7 +2,7 @@
 
 __all__ = ['bootstrap']
 
-def bootstrap(post=True):
+def bootstrap(post=True,refresh=False):
 	"""
 	This function runs setup commands from `bootstrap.py`.
 	It is automatically interpreted from read_config if config.json is absent. If `config.json` is missing
@@ -29,4 +29,15 @@ def bootstrap(post=True):
 	#! this is somewhat arbitrary. we may wish to reconfigure on make bootstrap using the default
 	if post and has_bootstrap_post: mod.bootstrap_post()
 	# read_config only collects post and runs it after setting up default configuration
+	# note that this function returns to read_config for making the config if one is absent
+	#   however you may also use it to push changes from bootstrap.py to an existing config.json
+	#   by running `make bootstrap refresh` after updating bootstrap.py
+	if refresh:
+		if not os.path.isfile(config_fn):
+			raise Exception('cannot refresh from bootstrap because %s is missing'%config_fn)
+		from ortho import read_config,write_config
+		conf = read_config()
+		conf.update(**outgoing.get('default',{}))
+		write_config(conf)
+		return
 	return outgoing

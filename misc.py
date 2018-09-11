@@ -136,5 +136,5 @@ def locate(keyword):
 	The ``locate`` function is useful for finding functions which may be found in many parts of the automacs
 	directory structure.
 	"""
-	# use case insensitive grep with the -i flag below
-	os.system(r'find ./ -name "*.py" | xargs egrep -i --color=always "(def|class) \w*%s\w*"'%keyword)
+	os.system((r'find . -name "*.py" -not -path "./env/*" '+
+		r'| xargs egrep -i --color=always "(def|class) \w*%s\w*"')%keyword)
