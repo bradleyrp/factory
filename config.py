@@ -37,12 +37,6 @@ def read_config(source=None,default=None):
 			elif 'default' in boot: default.update(**boot.get('default',{}))
 		# we write the config once even if bootstrap writes it again
 		write_config(config=default,source=locations[0])
-		#!!!!!!!!!
-		if False:
-			if type(boot)==dict and 'post' in boot: 
-				import time
-				time.sleep(3)
-				boot['post']()
 		return default
 	else: 
 		with open(found,'r') as fp: 
@@ -82,7 +76,7 @@ def set_config(*args,**kwargs):
 	This function routes ``make set` calls so they update flags using a couple different syntaxes.
 	We make a couple of design choices to ensure a clear grammar: a
 	1. a single argument sets a boolean True (use unset to remove the parameter and as a style convention, 
-		always assume that something is False by default, or use kwargs to specify False)
+	always assume that something is False by default, or use kwargs to specify False)
 	2. pairs of arguments are interpreted as key,value pairs
 	3. everything here assumes each key has one value. if you want to add to a list, use ``setlist``
 	"""
@@ -134,20 +128,20 @@ def set_dict(*args,**kwargs):
 	"""
 	Add a dictionary hash to the configuration.
 	Note that sending a pythonic hash through makefile otherwise requires the following clumsy syntax
-		which uses escaped quotes and quotes to escape makefile parsing and protect the insides:
-			make set env_ready=\""{'CONDA_PREFIX':'/Users/rpb/worker/factory/env/envs/py2'}"\"
+	which uses escaped quotes and quotes to escape makefile parsing and protect the insides:
+	make set env_ready=\""{'CONDA_PREFIX':'/Users/rpb/worker/factory/env/envs/py2'}"\"
 	The standard method names the hash with the first argument and the rest are key,value pairs.
 	The standard method also accepts kwargs which override any args.
 	We use interpret_command_text to allow Pythonic inputs.
 	Note that the Makefile is extremely limited on incoming data, hence you must be careful to use the double
-		quote escape method described above. The Makefile does not tolerate colons or slashes without this
-		protection. We also cannot necessarily pipe e.g. JSON into Python with the special Makefile. Hence the
-		protected pythonic strings give us full, if not necessarily elegant, control over the config from 
-		BASH. Casual users can still manipulate the config easily. More complicated BASH manipulation should
-		be scripted, or ideally, placed in a Python script which just uses read_config and write_config.
+	quote escape method described above. The Makefile does not tolerate colons or slashes without this
+	protection. We also cannot necessarily pipe e.g. JSON into Python with the special Makefile. Hence the
+	protected pythonic strings give us full, if not necessarily elegant, control over the config from 
+	BASH. Casual users can still manipulate the config easily. More complicated BASH manipulation should
+	be scripted, or ideally, placed in a Python script which just uses read_config and write_config.
 	The alternative mode allows you to specify a path to the child node (empty nested dicts are created 
-		otherwise) and a value to store there. In combination with the protected Pythonic input trick above,
-		this allows complete control of the arbitrarily nested dict stored in config.json.
+	otherwise) and a value to store there. In combination with the protected Pythonic input trick above,
+	this allows complete control of the arbitrarily nested dict stored in config.json.
 	See ortho/devnotes.txt for more details.
 	"""
 	# alternative mode for deep dives into the nested dictionary
@@ -171,3 +165,23 @@ def set_dict(*args,**kwargs):
 	 	pairwise[key] = interpret_command_text(val)
 	conf[name] = pairwise
 	write_config(conf)
+
+def config_fold(fn,key):
+	"""Update the config dictionary with a python script."""
+	#! python 2 vs 3 compatibility
+	incoming = {}
+	execfile(fn,incoming)
+	if key not in incoming: raise Exception('key must exist in file')
+	delveset(conf,key,value=incoming[key])
+	write_config(conf)
+
+def look():
+	"""Drop into a debugger with the conf available."""
+	try: 
+		import ipdb
+		ipdb.set_trace()
+	except: pass
+	try:
+		import pdb
+		pdb.set_trace()
+	except: raise Exception('cannot find ipdb or pdbed')

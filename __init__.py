@@ -11,17 +11,21 @@ _init_keys = globals().keys()
 # note that CLI functions are set in cli.py
 # import ortho with wildcard because we control everything here
 # or at least the expose functions are elevated to the top level of ortho
-# but you can still get other functions in submodules in the usual wy
+# but you can still get other functions in submodules in the usual way
+# note that the expose table also sends conf there hence the empties
 #! cannot do e.g. import ortho.submodule if the submodule is not below
 expose = {
 	'bash':['command_check','bash'],
+	'bootstrap':[],
 	'cli':['get_targets','run_program'],
-	'config':['set_config','setlist','set_list','set_dict','unset','read_config','write_config'],
+	'config':['set_config','setlist','set_list','set_dict','unset','read_config','write_config',
+		'config_fold'],
 	'dev':['tracebacker'],
 	# environments must get conf hence it must be here
 	'environments':['environ','env_list','register_extension','load_extension'],
 	'data':['check_repeated_keys'],
 	'imports':['importer'],
+	#'queue':['qbasic'],
 	'unit_tester':['unit_tester'],
 	'misc':['listify','treeview','str_types','string_types','say'],
 	'reexec':['iteratively_execute','interact']}
