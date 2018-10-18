@@ -86,6 +86,9 @@ default_envs = dict([
 	# provide python 2 and python 3 environment options
 	) for v in [2,3]])
 
+#! need to change the location of miniconda.sh? you either have to stream in a whole new env
+#!   or you might as well just double link it
+
 class Factory:
 	def __init__(self,*args,**kwargs):
 		if kwargs: raise Exception('unprocess kwargs %s'%kwargs)
