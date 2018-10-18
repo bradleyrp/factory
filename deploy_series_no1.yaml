@@ -136,3 +136,7 @@ no2_prep:
     make set activate_env="../../env/bin/activate py2"
     echo "ready to run: 'make go protein' at $(pwd)"
 
+demo_omni:
+  script: |
+    # assumes connections/demo.yaml
+    make connect demo

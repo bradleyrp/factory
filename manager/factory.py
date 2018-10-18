@@ -357,6 +357,10 @@ def connect_single(connection_name,**specs):
 			with open(os.path.join('site',connection_name,connection_name,'wsgi_auth.py'),'w') as fp:
 				fp.write(code_check_passwd%str([(k,v) for k,v in creds.items()]))
 
+	raise Exception('no connection here now')		
+	return
+	#! retiring the code below
+
 	#---set up the calculations directory in omnicalc
 	#---check if the repo pointer in the connection is a valid path
 	new_calcs_repo = not (os.path.isdir(abspath(specs['repo'])) and (
