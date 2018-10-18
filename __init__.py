@@ -13,7 +13,8 @@ _init_keys = globals().keys()
 # or at least the expose functions are elevated to the top level of ortho
 # but you can still get other functions in submodules in the usual way
 # note that the expose table also sends conf there hence the empties
-#! cannot do e.g. import ortho.submodule if the submodule is not below
+# cannot do e.g. import ortho.submodule if the submodule is not below
+# any submodule that needs to get the conf should also be on this list
 expose = {
 	'bash':['command_check','bash'],
 	'bootstrap':[],
@@ -22,13 +23,16 @@ expose = {
 		'config_fold'],
 	'dev':['tracebacker'],
 	'environments':['environ','env_list','register_extension','load_extension'],
-	'data':['check_repeated_keys'],
+	'data':['check_repeated_keys','delve','delveset','catalog',
+		'json_type_fixer','dictsub','dictsub_strict','dictsub_sparse'],
 	'imports':['importer'],
-	'queue':['qbasic'],
+	#! dev: 'queue':['qbasic'],
 	'unit_tester':['unit_tester'],
-	'misc':['listify','treeview','str_types','string_types','say'],
-	'reexec':['iteratively_execute','interact']}
-
+	'misc':['listify','unique','treeview','str_types',
+		'string_types','say','ctext','confirm'],
+	'reexec':['iteratively_execute','interact'],
+	'requires':['requires_program','requires_python']}
+	
 # use `python -c "import ortho"` to bootstrap the makefile
 if (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.isdir('ortho')): 
 	if not os.path.isdir('ortho'):
@@ -61,7 +65,8 @@ def prepare_print(override=False):
 		def print_stylized(*args,**kwargs):
 			"""Custom print function."""
 			key_leads = ['status','warning','error','note','usage',
-				'exception','except','question','run','tail','watch','bash']
+				'exception','except','question','run','tail','watch',
+				'bash','debug']
 			if len(args)>0 and args[0] in key_leads:
 				return _print('[%s]'%args[0].upper(),*args[1:])
 			else: return _print(*args,**kwargs)
