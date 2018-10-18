@@ -13,9 +13,21 @@ str_types_list = list(str_types)
 
 def listify(x): 
 	"""Turn a string or a list into a list."""
-	if type(x)==str: return [x]
-	elif type(x)==list: return x
-	else: raise Exception('listify expects a string or a list')
+	if isinstance(x,basestring): return [x]
+	elif isinstance(x,list): return x
+	elif isinstance(x,tuple): return x
+	else: raise Exception(
+		'listify takes a string, list, tuple but got: %s'%type(x))
+
+def unique(items):
+	"""
+	Enforce uniqueness on a list.
+	"""
+	try: (element,) = items
+	except ValueError: 
+		raise Exception('expecting only one item in this list: %s'%str(items))
+	return element
+
 
 def asciitree(obj,depth=0,wide=2,last=[],recursed=False):
 	"""
@@ -37,7 +49,7 @@ def asciitree(obj,depth=0,wide=2,last=[],recursed=False):
 	if type(obj) in [float,int,bool]+str_types_list:
 		if depth == 0: print(spacer+str(obj)+'\n'+horizo*len(obj))
 		else: print(spacer+str(obj))
-	elif type(obj) == dict and all([type(i) in [str,float,int,bool] for i in obj.values()]) and depth==0:
+	elif isinstance(obj,dict) and all([type(i) in [str,float,int,bool] for i in obj.values()]) and depth==0:
 		asciitree({'HASH':obj},depth=1,recursed=True)
 	elif type(obj) in [list,tuple]:
 		for ind,item in enumerate(obj):
@@ -49,7 +61,7 @@ def asciitree(obj,depth=0,wide=2,last=[],recursed=False):
 					last=last+([depth] if ind==len(obj)-1 else []),
 					recursed=True)
 			else: print('unhandled tree object %s'%item)
-	elif type(obj) == dict and obj != {}:
+	elif isinstance(obj,dict) and obj != {}:
 		for ind,key in enumerate(obj.keys()):
 			spacer_this = spacer_both['end'] if ind==len(obj)-1 else spacer
 			if type(obj[key]) in [float,int,bool]+str_types_list: print(spacer_this+key+' = '+str(obj[key]))
@@ -138,3 +150,63 @@ def locate(keyword):
 	"""
 	os.system((r'find . -name "*.py" -not -path "./env/*" '+
 		r'| xargs egrep -i --color=always "(def|class) \w*%s\w*"')%keyword)
+
+class ColorPrinter:
+	"""
+	Write colorful text to terminal.
+	To use ColorPrinter in a script, include:
+		out = ColorPrinter().print
+	Arguments can be builtins, schemes, or integers:
+		out('plain')
+		out('this is angry i.e. red and bold','angry')
+		out('this is just red','red')
+		out('this message is ansi',91)
+	"""
+	#! systematic way to load this with all the colors?
+	defs_colors = dict(
+		red=91,purple=95,cyan=96,dark_cyan=36,blue=94,green=92,
+		bold=1,underline=4,blink=5,gray=123,
+		b_black=40)
+	schemes = dict(angry=('red','bold'),
+		red_black=('red','b_black'),cyan_black=('cyan','b_black'))
+	def _syntax(self,text,how=None): 
+		return b'\033[%sm%s\033[0m'%(
+			';'.join([str(i) for i in how]) if how else '',
+			text if not self.tag else '%s%s'%(self.tag,text))
+	def __init__(self,scheme=None,tag=None,back=False):
+		self.back = back
+		self.scheme = scheme
+		self.name_to_colors = dict((i,(j,)) for i,j in self.defs_colors.items())
+		self.name_to_colors.update(**dict([(i,tuple([
+			m for n in (self.name_to_colors[k] for k in j) for m in n]))
+			for i,j in self.schemes.items()]))
+		self.tag = tag
+	def printer(self,text,*how,**kwargs):
+		#! is it clumsy to do kwargs this way? slow
+		back = kwargs.pop('back',self.back)
+		if kwargs: raise Exception
+		scheme = how if how else self.scheme
+		if not scheme: this = text if not self.tag else '%s%s'%(self.tag,text)
+		else: 
+			spec = list(set([i for j in [
+				self.name_to_colors.get(h,(h,)) for h in how] for i in j]))
+			invalid_codes = [s for s in spec if not isinstance(s,int)]
+			if any(invalid_codes): 
+				raise Exception('Invalid ANSI codes: %s'%str(invalid_codes))
+			this = self._syntax(text=text,how=spec)
+		if back: return this
+		else: print(this)
+
+def ctext(*args,**kwargs):
+	"""
+	Wrap the color printer so you can get 
+	color text back with ctext('error','angry').
+	"""
+	printer = ColorPrinter(back=True).printer
+	return printer(*args,**kwargs)
+
+def confirm(sure=False,*msgs):
+	"""Check with the user."""
+	return sure or all(
+		re.match('^(y|Y)',(input if sys.version_info>(3,0) else raw_input)
+		('[QUESTION] %s (y/N)? '%msg))!=None for msg in msgs)

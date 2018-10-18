@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
-import sys,re
+import sys,re,copy,json
 import unittest,io
 from .misc import str_types
 
@@ -80,11 +80,12 @@ class MultiDict(DotDict):
 		base = kwargs.pop('base',{})
 		self._upnames = kwargs.pop('upnames',{})
 		self._underscores = kwargs.pop('underscores',False)
-		self._silent = kwargs.pop('silent',False)
+		self._silent = kwargs.pop('silent',True)
 		if kwargs: raise Exception('unprocessed kwargs: %s'%str(kwargs))
 		# we check keys in place so that upstream dicts are referenced by pointer
 		if self._underscores: self._key_map_checker(base)
-		protected_keys = ['_name','_strict','_upnames','_underscores','_silent','_up','_check_dict']
+		protected_keys = ['_name','_strict','_upnames','_underscores',
+			'_silent','_up','_check_dict','_dump']
 		super(MultiDict,self).__init__(base,protected_keys=protected_keys)
 		self._check_dict(*args)
 		# send arguments to protected _up attribute
@@ -120,7 +121,7 @@ class MultiDict(DotDict):
 	def __setitem__(self,key,val):
 		"""Handle underscores."""
 		DotDict.__setattr__(self,key if not self._underscores else re.sub(' ','_',key),val)
-	def _get(self,k,d=None):
+	def _get(self,k,d=None,get=False):
 		"""
 		Nested dictionary lookups that consult backup dictionaries (up) on missing key.
 		Note that this is the purpose of MultiDict, namely to keep sets of keys in categories for later,
@@ -132,17 +133,17 @@ class MultiDict(DotDict):
 		else:
 			for unum,up in enumerate(self.__dict__.get('_up',[])):
 				if k in up:
-					if self._upnames and unum in self._upnames:
+					if self._upnames and unum in self._upnames and not self._silent:
 						print('note','using upstream dictionary %s for key %s'%(self._upnames[unum],k))
 					return up[k]
-		if self._strict: raise KeyError('missing key %s'%k)
+		if self._strict and not get: raise KeyError('missing key %s'%k)
 		else: return d
 	__getattr__ = _get
 	def __getitem__(self,k): return self._get(k)
 	def get(self,k,d=None):
 		"""Special sauce to ensure backups work."""
 		if k in self.__dict__: return super(MultiDict,self).get(k,d)
-		else: return self._get(k,d=d)
+		else: return self._get(k,d=d,get=True)
 	def update(self,*args,**kwargs):
 		"""If underscores ensure that we replace spaces with underscores."""
 		if self._underscores:
@@ -157,6 +158,29 @@ class MultiDict(DotDict):
 			if not isinstance(i,str_types) or not i.startswith('_')]
 	def keys(self): return self.__dir__()
 	def __len__(self): return len(self.__dir__())
+	def _dump(self,fn,overwrite=False):
+		"""Write a multidict to JSON."""
+		if not overwrite and os.path.isfile(fn): 
+			raise Exception('cannot overwrite %s'%fn)
+		out = dict([(k,self[k]) for k in self.keys()])
+		# note that each upstream dict is an AMXState and hence has its own
+		#   dict _upnames key for naming its own upstream dicts however
+		#   the upstream dicts are typically only expt or settings and we
+		#   should not recurse any more than that, hence we remove the
+		#   dict _upnames here
+		# basically you cannot dump a MultiDict with upstream dicts that are also MultiDicts with names
+		#   although you can use MultiDict as the upstream dicts because we duck type
+		out['_up'] = [dict(i.items()) for i in self._up]
+		out['_upnames'] = self.get('_upnames',{})
+		for o in out['_up']: 
+			upnames = o.pop('_upnames')
+			if upnames: 
+				raise Exception(
+					'cannot discard upnames %s at  this point. probably a recursion.'%upnames)
+			# remove and discard the other MultiDict keys if the up is that type
+			for key in ['_up','_underscores','_strict','_silent','_name']: o.pop(key)
+		for i in out['_up']: del i['_protect']
+		with open(fn,'w') as fp: fp.write(json.dumps(out))
 
 class TestMultiDict(unittest.TestCase):
 	"""
@@ -194,7 +218,6 @@ class TestMultiDict(unittest.TestCase):
 			sys.stdout = capture
 			this_named['z']
 			sys.stdout = sys.__stdout__
-			# upstream dicts with names get a message on lookup (unless you set silent)
 			message = '[NOTE] found key "z" in upstream dictionary "final" in "MyMultiDict (MultiDict)"\n'
 			self.assertTrue(capture.getvalue()==message)
 		# dictionaries are pointers
