@@ -29,7 +29,7 @@ expose = {
 	#! dev: 'queue':['qbasic'],
 	'unit_tester':['unit_tester'],
 	'misc':['listify','unique','treeview','str_types',
-		'string_types','say','ctext','confirm'],
+		'string_types','say','ctext','confirm','Hook','mkdir_p'],
 	'reexec':['iteratively_execute','interact'],
 	'requires':['requires_program','requires_python']}
 	

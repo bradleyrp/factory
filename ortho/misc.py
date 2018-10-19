@@ -210,3 +210,25 @@ def confirm(sure=False,*msgs):
 	return sure or all(
 		re.match('^(y|Y)',(input if sys.version_info>(3,0) else raw_input)
 		('[QUESTION] %s (y/N)? '%msg))!=None for msg in msgs)
+
+class Hook(object):
+	"""
+	! document why hooks are great: seamless debugging, can override functions, etc
+	"""
+	def __init__(self,source,target):
+		self.source = source
+		self.target = target
+		#! why can we not put this at the top of the script?
+		from ortho import importer
+		self._module = importer(self.source)
+		self._function = self._module[target]
+	@property
+	def function(self):
+		return self._function
+
+def mkdir_p(path):
+	# https://stackoverflow.com/questions/600268
+	try: os.makedirs(path)
+	except OSError as exc:
+		if exc.errno == errno.EEXIST and os.path.isdir(path): pass
+		else: raise
