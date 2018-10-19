@@ -18,22 +18,13 @@ from .imports import importer,glean_functions
 from .unit_tester import unit_tester
 from .reexec import interact
 from .documentation import build_docs
-<<<<<<< HEAD
 from .queue import qbasic
 from .backrun import backrun,screen_background
-=======
-#from .queue import qbasic
-#from .backrun import backrun,screen_background
->>>>>>> c86a56c7a2948717b84940b33cc6bd7d4f65b52c
 
 # any functions from ortho exposed to CLI must be noted here and imported above
 expose_funcs = {'set_config','setlist','set_list','unset','set_dict','environ',
 	'config','bootstrap','interact','unit_tester','import_check','locate','targets','build_docs','look',
-<<<<<<< HEAD
-	'config_fold','backrun','screen_background'}
-=======
 	'config_fold',}#'backrun','screen_background'}
->>>>>>> c86a56c7a2948717b84940b33cc6bd7d4f65b52c
 expose_aliases = {'set_config':'set','environ':'env'}
 
 # collect functions once
