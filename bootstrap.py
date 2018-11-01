@@ -8,11 +8,11 @@ BOOTSTRAP the FACTORY configuration
 
 # default configuration is written to config.json on first make
 default_configuration = {
-	'commands':['manager/factory.py','ortho/replicator/replicator.py','ortho/queue'],
+	'commands':['manager','ortho/replicator/replicator.py','ortho/queue'],
 	'docks_config':'ortho/replicator/docker_config.py',
 	'user_creds':'password',
 	'automacs':{'address':'http://github.com/biophyscode/automacs','branch':'ortho'},
-	'omnicalc':{'address':'http://github.com/biophyscode/omnicalc'},
+	'omnicalc':{'address':'http://github.com/biophyscode/omnicalc','branch':'ortho'},
 	'locks':['lock.queue'],
 	'docs':{'list':{
 		'factory':{'source':'manager/docs_source','build':'docs_factory'},
