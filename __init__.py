@@ -5,7 +5,7 @@ ORTHO MODULE DOCSTRING
 """
 
 from __future__ import print_function
-import os,sys
+import os,sys,re
 _init_keys = globals().keys()
 
 # note that CLI functions are set in cli.py
@@ -20,11 +20,12 @@ expose = {
 	'bootstrap':[],
 	'cli':['get_targets','run_program'],
 	'config':['set_config','setlist','set_list','set_dict','unset',
-		'read_config','write_config','config_fold'],
+		'read_config','write_config','config_fold','set_hook'],
 	'data':['check_repeated_keys','delve','delveset','catalog',
 		'json_type_fixer','dictsub','dictsub_strict','dictsub_sparse',
 		'unique_ordered'],
 	'dev':['tracebacker','debugger'],
+	'dictionary':['DotDict'],
 	'environments':['environ','env_list','register_extension','load_extension'],
 	'handler':['Handler'],
 	# note that you cannot have identical names for the module and a function
@@ -33,10 +34,15 @@ expose = {
 	'unit_tester':['unit_tester'],
 	'misc':['listify','unique','uniform','treeview','str_types',
 		'string_types','say','ctext','confirm','status','Observer',
-		'compare_dicts','Hook','mkdir_p'],
+		'compare_dicts','Hook','mkdirs'],
 	'reexec':['iteratively_execute','interact'],
-	'requires':['requires_program','requires_python','requires_python_check'],
+	'requires':['requires_program','requires_python','requires_python_check',
+		'is_terminal_command'],
 	'timer':['time_limit','TimeoutException'],}
+
+# note that packages which use ortho can just import the items above directly
+#   however ortho submodules have to import from the correct submodule `e.g. from .misc import str_types`
+#   which means that we have to update these internal imports if we later move around some of the functions
 	
 # use `python -c "import ortho"` to bootstrap the makefile
 if (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.isdir('ortho')): 
@@ -56,8 +62,10 @@ def prepare_print(override=False):
 	Prepare a special override print function.
 	This decorator stylizes print statements so that printing a tuple that begins with words like `status` 
 	will cause print to prepend `[STATUS]` to each line. This makes the output somewhat more readable but
-	otherwise does not affect printing. We use builtins to distribute the function. Any code which imports
-	`print_function` from `__future__` gets the stylized print function.
+	otherwise does not affect printing. We use builtins to distribute the function. Any python 2 code which 
+	imports `print_function` from `__future__` gets the stylized print function. Any python 3 code which 
+	uses print will print this correctly. The elif which uses a regex means that the overloaded print
+	can turn e.g. print('debug something bad happened')	into "[DEBUG] something bad happened" in stdout.
 	"""
 	# python 2/3 builtins
 	try: import __builtin__ as builtins
@@ -67,15 +75,27 @@ def prepare_print(override=False):
 		# every script must import print_function from __future__ or syntax error
 		# hold the standard print
 		_print = print
+		key_leads = ['status','warning','error','note','usage',
+			'exception','except','question','run','tail','watch',
+			'bash','debug']
+		key_leads_regex = re.compile(r'^(%s)\s*(.+)$'%'|'.join(key_leads))
 		def print_stylized(*args,**kwargs):
 			"""Custom print function."""
-			key_leads = ['status','warning','error','note','usage',
-				'exception','except','question','run','tail','watch',
-				'bash','debug']
 			if len(args)>0 and args[0] in key_leads:
 				return _print('[%s]'%args[0].upper(),*args[1:])
+			# regex here adds very little time and allows more natural print 
+			#   statements to be capitalized
+			#! note that we can retire all print('debug','message') statements
+			elif len(args)==1:
+				match = key_leads_regex.match(args[0])
+				if match: return _print(
+					'[%s]'%match.group(1).upper(),match.group(2),**kwargs)
+				else: return _print(*args,**kwargs)
 			else: return _print(*args,**kwargs)
 		# export custom print function before other imports
+		# this code ensures that in python 3 we overload print
+		#   while any python 2 code that wishes to use overloaded print
+		#   must of course from __future__ import print_function
 		builtins.print = print_stylized
 
 # special printing happens before imports
@@ -107,7 +127,6 @@ config_fn = 'config.json'
 # hardcoded default
 default_config = {}
 
-# read the configuration here
 # pylint: disable=undefined-variable
 conf = config.read_config(config_fn,default=default_config)
 
