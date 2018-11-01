@@ -1,13 +1,17 @@
 channels:
-  - conda-forge
+  - conda-forge # for ipdb and MDAnalysis
 dependencies:
   - pyyaml
   - numpy
   - scipy
-  - matplotlib
-  - ipdb # requires conda-forge in channels. others may use forge
-  - django
-  - sphinx
+  - matplotlib>2
+  - ipdb # requires conda-forge in channels
   - numpydoc
-  - pil # for omnicalc
-  - notebook # for factory
+  # a caution on conda: using pil here and everything gets downgraded to 2.7
+  - pillow # for omnicalc
+  - h5py # for omnicalc
+  - scikit-learn # for some omnicalc calculations
+  - MDAnalysis
+  - pip:
+    - duecredit # silence warnings in MDAnalysis
+    - brewer2mpl # for some omnicalc codes
