@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
-#from __future__ import print_function
-from ortho.requires import requires_python
+from ortho.requires import requires_python,requires_python_check
 from ortho.dictionary import MultiDict
 from ortho.bash import bash_basic
 from ortho.handler import Handler
@@ -18,7 +17,8 @@ class SpotLocal:
 	#! needs cleanup option
 	def __init__(self,site=None,persist=False):
 		"""Make a local folder."""
-		if persist and site==None: raise Exception('the persist flag is meaningless without site')
+		if persist and site==None: 
+			raise Exception('the persist flag is meaningless without site')
 		if not site:
 			ts = dt.datetime.now().strftime('%Y%m%d%H%M') 
 			code = uuid.uuid4().hex[:2].upper()
@@ -48,20 +48,23 @@ class Runner:
 		bash_basic(self.cmd,cwd=self.cwd,log=self.log)
 
 class ReplicatorSpecial(Handler):
-	taxonomy = {
+	#! retiring  this in favor of auto-detection
+	taxonomy_DEPRECATED = {
 		'dockerfiles':{'dockerfiles'},}
 	def dockerfiles(self,**kwargs):
 		self.dockerfiles = kwargs.pop('dockerfiles')
 		if kwargs: raise Exception
 
 class DockerFileChunk(Handler):
-	taxonomy = {
+	#! retiring  this in favor of auto-detection
+	taxonomy_DEPRECATED = {
 		'substitutes':{'text','subs'},}
 	def substitutes(self,text,subs):
 		self.text = text%subs
 
 class DockerFileMaker(Handler):
-	taxonomy = {
+	#! retiring  this in favor of auto-detection
+	taxonomy_DEPRECATED = {
 		'sequence':{'base':{'sequence'},'opts':{'addendum'}},}
 	def sequence(self,sequence,addendum=None):
 		"""Assemble a sequence of dockerfiles."""
@@ -78,7 +81,8 @@ class DockerFileMaker(Handler):
 ### SUPERVISOR
 
 class ReplicatorGuide(Handler):
-	taxonomy = {
+	#! retiring  this in favor of auto-detection
+	taxonomy_DEPRECATED = {
 		'simple':{'base':{'script'},'opts':{'site','persist'}},
 		'simple_docker':{'base':{'script','dockerfile','tag'},'opts':{'site','persist'}},
 		'docker_compose':{
@@ -113,12 +117,14 @@ class ReplicatorGuide(Handler):
 			cwd=spot.path,fn='script.sh',log='log-run',
 			cmd='docker run %s'%tag)#+' %(path)s')
 
-	@requires_python('yaml')
 	def docker_compose(self,script,compose,dockerfile,site,
 		command,persist=True,rebuild=True):
 		"""
 		Prepare a docker-compose folder and run a command in the docker.
 		"""
+		#! note that the Handler class uses introspection to detect args,kwargs
+		#!   to classify incoming calls and this is broken by the decorator
+		requires_python_check('yaml')
 		import yaml
 		dfm = DockerFileMaker(meta=self.meta,**dockerfile)
 		spot = SpotLocal(site=site,persist=persist)
