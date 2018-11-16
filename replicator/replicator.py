@@ -2,13 +2,14 @@
 
 from ortho.requires import requires_python,requires_python_check
 from ortho.dictionary import MultiDict
-from ortho.bash import bash_basic
+from ortho.bash import bash_basic,bash
 from ortho.handler import Handler
+from ortho import read_config
 import re,tempfile,os,copy
 import datetime as dt
 import uuid
 
-__all__ = ['repl','test_clean','test_help','docker_clean']
+__all__ = ['repl','pipe','test_clean','test_help','docker_clean']
 
 ### TOOLS
 
@@ -48,30 +49,33 @@ class Runner:
 		bash_basic(self.cmd,cwd=self.cwd,log=self.log)
 
 class ReplicatorSpecial(Handler):
-	#! retiring  this in favor of auto-detection
-	taxonomy_DEPRECATED = {
-		'dockerfiles':{'dockerfiles'},}
-	def dockerfiles(self,**kwargs):
-		self.dockerfiles = kwargs.pop('dockerfiles')
-		if kwargs: raise Exception
+
+	def dockerfiles(self,dockerfiles):
+		# unorthodox: this function overwrites itself with its key
+		#   note that this is a neat way to hook something: we expect the 
+		#   ReplicatorSpecial to get a portion of a YAML file and just add
+		#   it to the class right here, however the way this is called from
+		#   replicator_read_yaml means we can easily process it here
+		self.dockerfiles = dockerfiles
+
+	#! UNDER CONSTRUCTION def interface(self,interface):
+	#! import ipdb;ipdb.set_trace()
 
 class DockerFileChunk(Handler):
-	#! retiring  this in favor of auto-detection
-	taxonomy_DEPRECATED = {
-		'substitutes':{'text','subs'},}
+
 	def substitutes(self,text,subs):
 		self.text = text%subs
 
 class DockerFileMaker(Handler):
-	#! retiring  this in favor of auto-detection
-	taxonomy_DEPRECATED = {
-		'sequence':{'base':{'sequence'},'opts':{'addendum'}},}
+
 	def sequence(self,sequence,addendum=None):
 		"""Assemble a sequence of dockerfiles."""
-		index = MultiDict(base=self.meta['dockerfiles'].dockerfiles,underscores=True)
+		index = MultiDict(base=self.meta['dockerfiles'].dockerfiles,
+			underscores=True)
 		self.dockerfile = '\n'.join([self.refine(index[i]) for i in sequence])
 		if addendum: 
 			for i in addendum: self.dockerfile += "\n%s"%i
+
 	def refine(self,this):
 		"""Refine the Dockerfiles."""
 		if isinstance(this,dict): 
@@ -81,14 +85,16 @@ class DockerFileMaker(Handler):
 ### SUPERVISOR
 
 class ReplicatorGuide(Handler):
-	#! retiring  this in favor of auto-detection
-	taxonomy_DEPRECATED = {
-		'simple':{'base':{'script'},'opts':{'site','persist'}},
-		'simple_docker':{'base':{'script','dockerfile','tag'},'opts':{'site','persist'}},
-		'docker_compose':{
-			'base':{'script','dockerfile','site','compose','command'},
-			'opts':{'persist','rebuild'}},
-		'via':{'via','overrides'},}
+
+	"""
+	def __init__(self,*args,**kwargs):
+		print('status subclassed in the ReplicatorGuide 1')
+		super().__init__(*args,**kwargs)
+	"""
+
+	def bash(self,call):
+		"""Run a bash call."""
+		bash(call)
 
 	def simple(self,script,site=None,persist=False):
 		"""
@@ -118,7 +124,7 @@ class ReplicatorGuide(Handler):
 			cmd='docker run %s'%tag)#+' %(path)s')
 
 	def docker_compose(self,script,compose,dockerfile,site,
-		command,persist=True,rebuild=True):
+		command,persist=True,rebuild=True,prelim=None):
 		"""
 		Prepare a docker-compose folder and run a command in the docker.
 		"""
@@ -126,6 +132,9 @@ class ReplicatorGuide(Handler):
 		#!   to classify incoming calls and this is broken by the decorator
 		requires_python_check('yaml')
 		import yaml
+		if prelim:
+			result = read_config(hook=prelim)[re.sub('@','',prelim)]
+			#! do something with result? right now this is just a do hook
 		dfm = DockerFileMaker(meta=self.meta,**dockerfile)
 		spot = SpotLocal(site=site,persist=persist)
 		with open(os.path.join(spot.path,'Dockerfile'),'w') as fp: 
@@ -135,7 +144,8 @@ class ReplicatorGuide(Handler):
 		with open(os.path.join(spot.path,'script.sh'),'w') as fp: 
 			fp.write(script)
 		if rebuild: bash_basic('docker-compose build',cwd=spot.path)
-		# no need to log this since it manipulates a presumably persistent set of files
+		# no need to log this since it manipulates a presumably 
+		#   persistent set of files
 		bash_basic(command,cwd=spot.path)
 
 	def via(self,via,overrides):
@@ -152,19 +162,24 @@ class ReplicatorGuide(Handler):
 ### READERS
 
 @requires_python('yaml')
-def replicator_read_yaml(source,name=None):
+def replicator_read_yaml(source,name=None,args=None,kwargs=None):
 	"""
 	Read a replicator instruction and send it to the Guide for execution.
 	"""
 	import yaml
 	with open(source) as fp: 
-		# we load into a MultiDict to forbid spaces (replaced with underscores) in top-level dictionary.
-		instruct = MultiDict(base=yaml.load(fp.read()),underscores=True,strict=True)
+		# we load into a MultiDict to forbid spaces (replaced with 
+		#   underscores) in top-level dictionary.
+		instruct = MultiDict(base=yaml.load(fp.read()),
+			underscores=True,strict=True)
 	# special handling
 	reference = {}
-	for key in ReplicatorSpecial.taxonomy:
+	# previously used custom taxonomy but here we infer it via inspect
+	taxonomy_rs = ReplicatorSpecial(inspect=True).taxonomy
+	for key in taxonomy_rs:
 		if key in instruct: 
-			reference[key] = ReplicatorSpecial(name=key,**{key:instruct.pop(key)})
+			reference[key] = ReplicatorSpecial(name=key,
+				**{key:instruct.pop(key)})
 	# leftovers from special handling must be tests
 	if not name and len(instruct)>1: 
 		raise Exception(
@@ -172,7 +187,8 @@ def replicator_read_yaml(source,name=None):
 				'one with the name argument: %s')%(source,instruct.keys()))
 	elif not name and len(instruct)==1: 
 		test_name = instruct.keys()[0]
-		print('status','found one instruction in source %s: %s'%(source,test_name))
+		print('status','found one instruction in source %s: %s'%(
+			source,test_name))
 	elif name:test_name = name
 	else: raise Exception('source %s is empty'%source)
 	if test_name not in instruct: 
@@ -184,29 +200,35 @@ def replicator_read_yaml(source,name=None):
 ### INTERFACE
 
 def test_clean():
+	#! needs more care?
 	os.system(' rm -rf repl_*')
 
-def repl(**kwargs):
+def docker_clean():
+	"""Remove unused docker images and completed processes."""
+	os.system('docker rm $(docker ps -a -q)')
+	os.system('docker rmi $(docker images -f "dangling=true" -q)')
+
+def repl(*args,**kwargs):
 	"""
 	Run a test.
 	Disambiguates incoming test format and sends it to the right reader.
 	Requires explicit kwargs from the command line.
 	"""
-	# read the request according to format
-	if (set(kwargs.keys())<={'source','name'} 
+	# allow args to be handled by the interface key for easier CLI
+	if args:
+		raise Exception('under construction')
+		#! hard coded for now
+		this_test = replicator_read_yaml(args=args,kwargs=kwargs,
+			source='pipelines.yaml')
+		#! import ipdb;ipdb.set_trace()
+	# specific format uses only kwargs
+	elif (set(kwargs.keys())<={'source','name'} 
 		and re.match(r'^(.*)\.(yaml|yml)$',kwargs['source'])):
 		this_test = replicator_read_yaml(**kwargs)
+		# run the replicator
+		rg = ReplicatorGuide(name=this_test['name'],
+			meta=this_test['meta'],**this_test['detail'])
 	else: raise Exception('unclear request')
-	# run the replicator
-	rg = ReplicatorGuide(name=this_test['name'],
-		meta=this_test['meta'],**this_test['detail'])
 
-def test_help():
-	#!!! retire this eventually
-	print('make tester source=deploy_v1.yaml name=simple_test')
-	print('make tester source=deploy_v1.yaml name=simple_docker')
-	print('rm -rf test-no1 && make tester source=deploy_v1.yaml name=no1')
-
-def docker_clean():
-	os.system('docker rm $(docker ps -a -q)')
-	os.system('docker rmi $(docker images -f "dangling=true" -q)')
+# alias for the replicator
+pipe = repl
