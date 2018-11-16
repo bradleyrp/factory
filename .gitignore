@@ -6,3 +6,10 @@ env
 logs
 pack
 *.pyc
+connections
+.ipynb_checkpoints
+#! temporary files ignored during development
+manager/legacy
+senv
+miniconda.sh
+site
