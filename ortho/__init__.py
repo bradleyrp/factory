@@ -18,9 +18,11 @@ _init_keys = globals().keys()
 expose = {
 	'bash':['command_check','bash'],
 	'bootstrap':[],
+	'background':['backrun'],
 	'cli':['get_targets','run_program'],
 	'config':['set_config','setlist','set_list','set_dict','unset',
-		'read_config','write_config','config_fold','set_hook'],
+		'read_config','write_config','config_fold','set_hook',
+		'config_hook_get'],
 	'data':['check_repeated_keys','delve','delveset','catalog',
 		'json_type_fixer','dictsub','dictsub_strict','dictsub_sparse',
 		'unique_ordered'],
@@ -35,6 +37,8 @@ expose = {
 	'misc':['listify','unique','uniform','treeview','str_types',
 		'string_types','say','ctext','confirm','status','Observer',
 		'compare_dicts','Hook','mkdirs'],
+	'packman':['packs','github_install'],
+	'ports':['check_port'],
 	'reexec':['iteratively_execute','interact'],
 	'requires':['requires_program','requires_python','requires_python_check',
 		'is_terminal_command'],
@@ -87,7 +91,7 @@ def prepare_print(override=False):
 			#   statements to be capitalized
 			#! note that we can retire all print('debug','message') statements
 			elif len(args)==1:
-				match = key_leads_regex.match(args[0])
+				match = key_leads_regex.match(str(args[0]))
 				if match: return _print(
 					'[%s]'%match.group(1).upper(),match.group(2),**kwargs)
 				else: return _print(*args,**kwargs)
