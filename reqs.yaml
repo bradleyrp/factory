@@ -15,3 +15,13 @@ dependencies:
   - pip:
     - duecredit # silence warnings in MDAnalysis
     - brewer2mpl # for some omnicalc codes
+    # factory requirements
+    - ipython[notebook] # for factory
+    - jupyter_contrib_nbextensions # for factory
+  # factory requirements
+  # serve django via apache (requires apache2-devel rpm because no conda package for py2 yet)
+  # removed requirement "mod_wsgi" here because it requires apache2-devel on rpm systems to be useful
+  - django-extensions # requires conda forge
+  - jupyter_contrib_nbextensions # ???
+  # experimental
+  - flask

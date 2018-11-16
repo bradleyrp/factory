@@ -11,7 +11,7 @@ default_configuration = {
 	'commands':['manager','ortho/replicator/replicator.py','ortho/queue'],
 	'docks_config':'ortho/replicator/docker_config.py',
 	'user_creds':'password',
-	'automacs':{'address':'http://github.com/biophyscode/automacs','branch':'ortho'},
+	'automacs':{'address':'http://github.com/biophyscode/automacs','branch':'ortho_clean'},
 	'omnicalc':{'address':'http://github.com/biophyscode/omnicalc','branch':'ortho'},
 	'locks':['lock.queue'],
 	'docs':{'list':{
