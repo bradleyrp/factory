@@ -1,3 +1,3 @@
 #!/usr/bin/env python
 
-from .cli import connect,connection_template,run
+from .cli import connect,connection_template,run,shutdown,ps

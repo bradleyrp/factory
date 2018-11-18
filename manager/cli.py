@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
-import os,re,datetime,shutil,time
+import os,re,datetime,shutil,time,glob
 import ortho
 from ortho import read_config,Hook,treeview,Handler,str_types,mkdirs
 from ortho import modules,check_port,backrun,tracebacker
-from .deploy import start_site,start_cluster,stop_locked
+from .deploy import start_site,start_cluster,start_notebook,stop_locked
 from .sites import site_setup,abspath
 from .settings import *
 
@@ -207,6 +207,15 @@ def connect(name):
 		project_name=name,settings_custom=settings_custom,
 		**specs).result
 
+def shutdown_stop_locked(name,**locks):
+	# we try/except on these since any one may have failed
+	try: stop_locked(lock=locks['lock_site'],log=locks['log_site'])
+	except: pass
+	try: stop_locked(lock=locks['lock_cluster'],log=locks['log_cluster'])
+	except: pass
+	try: stop_locked(lock=locks['lock_notebook'],log=locks['log_notebook'])
+	except: pass
+
 def run(name,public=False):
 	"""
 	Start a factory.
@@ -225,24 +234,22 @@ def run(name,public=False):
 	# check the ports before continuing
 	check_port(site_port)
 	check_port(nb_port)
+	locks = {}
 	# master try except loop so everything runs together or not at all
 	try:
 		lock_site,log_site = start_site(name,port=site_port,public=public)
+		locks.update(lock_site=lock_site,log_site=log_site)
 		lock_cluster,log_cluster = start_cluster(name,public=public)
+		a = fdfadsfasfsa
+		locks.update(lock_cluster=lock_cluster,log_cluster=log_cluster)
+		lock_notebook,log_notebook = start_notebook(name,port=nb_port,public=public)
+		locks.update(lock_notebook=lock_notebook,log_notebook=log_notebook)
 	except Exception as e:
-		tracebacker(e)
-		print('error failed to start the site so we are shutting down')
+		print('status failed to start the site so we are shutting down')
+		shutdown_stop_locked(name,**locks)
+		raise e
 
-		#stop_locked(lock=lock_site,log=log_site)
-		#stop_locked(lock=lock_notebook,log=log_notebook)
-
-		# we try/except on these since locks and logs may not be ready
-		#! what if one is formed and not the other?
-		try: stop_locked(lock=lock_site,log=log_site)
-		except: pass
-		try: stop_locked(lock=lock_cluster,log=log_cluster)
-		except: pass
-
+	#! need to report public use here
 	if False:
 		if False:
 			try: lock_cluster,log_cluster = start_cluster(name,public=public)
@@ -276,3 +283,24 @@ def run(name,public=False):
 			for this_hostname in this_hostnames:
 				url = 'http://%s:%d'%(this_hostname,specs['public']['port'])
 				print('status serving from: %s'%url)
+
+def shutdown():
+	"""Shutdown every running job."""
+	#! needs confirm
+	#! explain how many lines of code this saves
+	for fn in glob.glob('pid.*'): 
+		print('status shutting down %s'%fn)
+		ortho.bash('bash %s'%fn)
+
+def show_running_factories():
+	"""
+	Show all factory processes.
+	Note that jupyter notebooks cannot be easily killed manually so use the full path and try `pkill -f`.
+	Otherwise this function can help you clean up redundant factories by username.
+	"""
+	cmd = 'ps xao pid,user,command | egrep "([c]luster|[m]anage.py|[m]od_wsgi-express|[j]upyter)"'
+	try: ortho.bash(cmd)
+	except: print('[NOTE] no processes found using bash command: `%s`'%cmd)
+
+# alias for the background jobs
+ps = show_running_factories
