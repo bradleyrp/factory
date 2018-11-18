@@ -5,7 +5,7 @@ ORTHO MODULE DOCSTRING
 """
 
 from __future__ import print_function
-import os,sys,re
+import os,sys,re,subprocess
 _init_keys = globals().keys()
 
 # note that CLI functions are set in cli.py
@@ -51,8 +51,13 @@ expose = {
 # use `python -c "import ortho"` to bootstrap the makefile
 if (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.isdir('ortho')): 
 	if not os.path.isdir('ortho'):
-		#! currently ortho must be a local module (a folder)
-		raise Exception('current directory is %s and ortho folder is missing'%os.getcwd())
+		# check site packages
+		reqs = subprocess.check_output([sys.executable, '-m', 'pip', 'freeze'])
+		installed_packages = [r.decode().split('==')[0] for r in reqs.split()]
+		if 'ortho' not in installed_packages:
+			#! currently ortho must be a local module (a folder)
+			raise Exception('current directory is %s and ortho folder is missing'%os.getcwd())
+		else: pass
 	else: raise Exception('__file__=%s'%__file__)
 elif not os.path.isfile('makefile'):
 	import shutil
