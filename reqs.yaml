@@ -25,3 +25,5 @@ dependencies:
   - jupyter_contrib_nbextensions # ???
   # experimental
   - flask
+  # factory interface
+  - beautifulsoup4
