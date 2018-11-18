@@ -6,6 +6,7 @@ ORTHO MODULE DOCSTRING
 
 from __future__ import print_function
 import os,sys,re
+from .misc import str_types
 _init_keys = globals().keys()
 
 # note that CLI functions are set in cli.py
@@ -18,9 +19,11 @@ _init_keys = globals().keys()
 expose = {
 	'bash':['command_check','bash'],
 	'bootstrap':[],
+	'background':['backrun'],
 	'cli':['get_targets','run_program'],
 	'config':['set_config','setlist','set_list','set_dict','unset',
-		'read_config','write_config','config_fold','set_hook'],
+		'read_config','write_config','config_fold','set_hook',
+		'config_hook_get'],
 	'data':['check_repeated_keys','delve','delveset','catalog',
 		'json_type_fixer','dictsub','dictsub_strict','dictsub_sparse',
 		'unique_ordered'],
@@ -35,6 +38,8 @@ expose = {
 	'misc':['listify','unique','uniform','treeview','str_types',
 		'string_types','say','ctext','confirm','status','Observer',
 		'compare_dicts','Hook','mkdirs'],
+	'packman':['packs','github_install'],
+	'ports':['check_port'],
 	'reexec':['iteratively_execute','interact'],
 	'requires':['requires_program','requires_python','requires_python_check',
 		'is_terminal_command'],
@@ -81,13 +86,14 @@ def prepare_print(override=False):
 		key_leads_regex = re.compile(r'^(?:(%s)\s)(.+)$'%'|'.join(key_leads))
 		def print_stylized(*args,**kwargs):
 			"""Custom print function."""
-			if len(args)>0 and args[0] in key_leads:
+			if (len(args)>0 and 
+				isinstance(args[0],str_types) and args[0] in key_leads):
 				return _print('[%s]'%args[0].upper(),*args[1:])
 			# regex here adds very little time and allows more natural print 
 			#   statements to be capitalized
 			#! note that we can retire all print('debug','message') statements
-			elif len(args)==1:
-				match = key_leads_regex.match(str(args[0]))
+			elif len(args)==1 and isinstance(args[0],str_types):
+				match = key_leads_regex.match(args[0])
 				if match: return _print(
 					'[%s]'%match.group(1).upper(),match.group(2),**kwargs)
 				else: return _print(*args,**kwargs)
