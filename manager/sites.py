@@ -78,7 +78,10 @@ def site_setup(name,settings_custom,make_superuser=True,specs=None):
 		# only use the development code if the flag is set and we are not running public
 		if specs.get('development',True) and not specs.get('public',False):
 			fp.write('\n# use the development copy of the code\n'+
-				'import sys;sys.path.insert(0,os.path.join(os.getcwd(),"%s"))'%django_source) 
+				'import sys;sys.path.insert(0,os.path.join(os.getcwd(),"%s"))'%django_source)
+			#! get access to ortho
+			#! this was a long saga: hard to install ortho the way I want
+			fp.write("\nsys.path.insert(0,os.path.join(os.getcwd()))") 
 		# one more thing: custom settings specify static paths for local or public serve
 		fp.write("\nSTATICFILES_DIRS = [os.path.join('%s','interface','static')]"%
 			os.path.abspath(os.getcwd()))

@@ -240,7 +240,6 @@ def run(name,public=False):
 		lock_site,log_site = start_site(name,port=site_port,public=public)
 		locks.update(lock_site=lock_site,log_site=log_site)
 		lock_cluster,log_cluster = start_cluster(name,public=public)
-		a = fdfadsfasfsa
 		locks.update(lock_cluster=lock_cluster,log_cluster=log_cluster)
 		lock_notebook,log_notebook = start_notebook(name,port=nb_port,public=public)
 		locks.update(lock_notebook=lock_notebook,log_notebook=log_notebook)
@@ -284,13 +283,23 @@ def run(name,public=False):
 				url = 'http://%s:%d'%(this_hostname,specs['public']['port'])
 				print('status serving from: %s'%url)
 
-def shutdown():
+def shutdown(name=None):
 	"""Shutdown every running job."""
-	#! needs confirm
-	#! explain how many lines of code this saves
-	for fn in glob.glob('pid.*'): 
-		print('status shutting down %s'%fn)
-		ortho.bash('bash %s'%fn)
+	# note that previous shutdown routines were much more complicated 
+	#   but here we just run the lock files which serve as kill switches
+	regex_pid = r'^pid\.(?P<site>.*?)\.(?P<component>.*?)\.lock$'
+	runs = {}
+	sites = list(set([re.match(regex_pid,i).groupdict()['site'] for i in glob.glob('pid.*')]))
+	for site in sites:
+		runs[site] = dict([(re.match(regex_pid,i).groupdict()['component'],i) for i in glob.glob('pid.*')
+			if re.match(regex_pid,i).groupdict()['site']==site])
+	if not name:
+		treeview(dict(projects=runs))
+		print('status use `make shutdown <name>` to close one of the projects above')
+	else:
+		for i,fn in runs[name].items():
+			print('status shutting down %s'%fn)
+			ortho.bash('bash %s'%fn)
 
 def show_running_factories():
 	"""
