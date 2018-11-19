@@ -20,6 +20,10 @@ def simple_task_queue(**kwargs):
 
 def launch(*args,**kwargs):
 	"""Run something in the task queue. A trivial wrapper."""
+	kwargs_out = {}
+	cwd = kwargs.pop('cwd',None)
+	command = kwargs.pop('command',None)
+	if cwd: kwargs_out['cwd'] = cwd
 	#! cannot be a BASH-interpretable command here?
 	queue_fn = ortho.conf.get('task_queue','TASK_QUEUE')
 	try: os.stat(queue_fn)
@@ -29,9 +33,17 @@ def launch(*args,**kwargs):
 	form_args = ' '.join(args) if args else ''
 	form_kwargs = ('' if not kwargs else 
 		' '.join(['%s=%s'%(i,j) for i,j in kwargs.items()]))
-	# call to the task queue by piping into the fifo
-	ortho.bash('echo "%s" > %s'%(' '.join(
-		[i for i in ['make',form_args,form_kwargs] if i]),queue_fn))
+	# using the command kwarg triggers an explicit mode
+	if command:
+		if args or kwargs:
+			raise Exception('cannot mix cmd with other arguments: %s and %s'%(args,kwargs))
+		ortho.bash('echo "%s" > %s'%(cmd,queue_fn),**kwargs_out)
+	# if no command then we assume is interfacing with functions via make
+	else:
+		# call to the task queue by piping into the fifo
+		ortho.bash('echo "%s" > %s'%(' '.join(
+			[i for i in ['make',form_args,form_kwargs] if i]),queue_fn),
+			**kwargs_out)
 
 """
 unfinished business:

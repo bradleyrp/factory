@@ -38,6 +38,7 @@ expose = {
 	'misc':['listify','unique','uniform','treeview','str_types',
 		'string_types','say','ctext','confirm','status','Observer',
 		'compare_dicts','Hook','mkdirs'],
+	'modules':['sync'],
 	'packman':['packs','github_install'],
 	'ports':['check_port'],
 	'reexec':['iteratively_execute','interact'],
@@ -48,7 +49,7 @@ expose = {
 # note that packages which use ortho can just import the items above directly
 #   however ortho submodules have to import from the correct submodule `e.g. from .misc import str_types`
 #   which means that we have to update these internal imports if we later move around some of the functions
-	
+
 # use `python -c "import ortho"` to bootstrap the makefile
 if (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.isdir('ortho')): 
 	if not os.path.isdir('ortho'):
@@ -60,6 +61,7 @@ if (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.i
 			raise Exception('current directory is %s and ortho folder is missing'%os.getcwd())
 		else: pass
 	else: raise Exception('__file__=%s'%__file__)
+# makefile is bootstrapped if we have an ortho directory, hence not if using pip-installed ortho
 elif not os.path.isfile('makefile'):
 	import shutil
 	print('bootstrapping makefile from ortho')
