@@ -13,3 +13,4 @@ manager/legacy
 senv
 miniconda.sh
 site
+data/
