@@ -54,6 +54,7 @@ def stop_locked(lock,log,cleanup=False):
 	"""
 	Save the logs and terminate the server.
 	"""
+	print('status stopping log=%s lock=%s'%(log,lock))
 	# terminate first in case there is a problem saving the log
 	daemon_ender(lock,cleanup=cleanup)
 	stamp = datetime.datetime.now().strftime('%Y%m%d%H%M%S')
