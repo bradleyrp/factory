@@ -4,15 +4,23 @@ import os
 import ortho
 
 # settings
-mount,source = '/Volumes/site-nix','~/worker/site-nix.dmg'
 
 def get_macdrive():
 	"""
 	Mount an external drive on a macos system. 
 	Use this by running:
-	make set_hook deploy_site="\"{'s':'hooks/macdrive.py','f':'get_macdrive'}\""
-	Set the mount and source above
+		make set_hook deploy_site="\"{'s':'hooks/macdrive.py','f':'get_macdrive'}\""
+	Set the mount and source with:
+		make set macdrive_paths="\"{'mount':'/Volumes/site-nix','source':'~/worker/site-nix.dmg'}\""
+	The purpose is to get a Linux drive with case sensitivity on MacOS which is 
+	case insensitive (for some reason).
 	"""
+	# get mount information from config
+	if 'macdrive_paths' not in ortho.conf:
+		raise Exception('you need to make an ext4 volume and register it with e.g.: \n'
+			'make set macdrive_paths=\"\\\"'
+			'{\'mount\':\'/Volumes/site-nix\',\'source\':\'~/worker/site-nix.dmg\'}\\\"\"')
+	mount,source = [ortho.conf['macdrive_paths'][k] for k in ['mount','source']]
 	mount_abs = os.path.expanduser(os.path.abspath(mount))
 	if not os.path.ismount(mount_abs): 
 		print('status mounting external drive')
