@@ -54,6 +54,8 @@ dockerfiles:
     WORKDIR /root
 
 JUNK: |
+  ### INCOMING DOCKER FILES NEED FOLDED IN
+  
   dockerfile_gromacs = """
   WORKDIR /root
   RUN apt-get install -y libfftw3-dev

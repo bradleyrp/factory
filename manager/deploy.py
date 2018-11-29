@@ -5,6 +5,8 @@ import ortho
 from ortho import check_port,backrun
 from .settings import *
 
+#! add "job cancelled" to kill_switch_coda below
+
 def start_site(name,port,public=False,sudo=False):
 	"""
 	Run the mod_wsgi server to serve the site.
@@ -67,7 +69,8 @@ def start_cluster(name,public=False,sudo=False):
 	Start a calculation cluster.
 	"""
 	from ortho.queue import simple_task_queue
-	queue_spec = simple_task_queue(log='logs/log-cluster',lock='pid.%s.cluster.lock'%name)
+	queue_spec = simple_task_queue(log='logs/cluster.%s'%name,
+		lock='pid.%s.cluster.lock'%name)
 	return queue_spec['lock'],queue_spec['log']
 
 def start_notebook(name,port,public=False,sudo=False):
