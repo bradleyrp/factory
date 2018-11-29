@@ -1,6 +1,6 @@
 #!/bin/bash
 # run in a screen with specific log file
-tmp_screen_rc=$(mktemp $TMPDIR"screenrc.X")
+tmp_screen_rc=$(mktemp $TMPDIR"screenrc.XXX")
 echo "[STATUS] temporary screenrc at $tmp_screen_rc"
 cat <<EOF> $tmp_screen_rc
 logfile ${SCREEN_LOG_QUEUE:-log-task-queue}
