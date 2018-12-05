@@ -7,9 +7,9 @@ dockerfiles:
     CMD ["bash","script.sh"]
   stretch: |
     FROM debian:stretch
-  debian start: |
+  debian_start: |
     ARG DEBIAN_FRONTEND=noninteractive
-    RUN apt-get update --fix-missing
+    RUN apt-get -y update
     RUN apt-get install -y git make wget vim screen
     RUN apt-get install -y procps
     RUN apt-get install -y python python-dev
@@ -19,6 +19,9 @@ dockerfiles:
   debian_compilers: |
     RUN apt-get install -y cmake
     RUN apt-get install -y build-essential
+    RUN apt-get install -y m4
+    RUN apt-get install -y automake
+    RUN apt-get install -y libtool
   debian_expose_ports: |
     EXPOSE 22
     EXPOSE 8000
@@ -27,7 +30,7 @@ dockerfiles:
     SHELL ["/bin/bash", "--login", "-c"]
   make_user:
     # formats for subs: key, val, python function, builtin function
-    subs: #
+    subs:
       user: rpb
       uid: 501
       user_passwd: secret
@@ -52,6 +55,26 @@ dockerfiles:
     RUN make -j 2
     RUN make install
     WORKDIR /root
+  singularity: |
+    WORKDIR /root
+    RUN apt-get install -y squashfs-tools
+    RUN apt-get install -y libarchive-dev
+    RUN git clone https://github.com/singularityware/singularity.git
+    WORKDIR /root/singularity
+    RUN git checkout vault/release-2.6
+    RUN ./autogen.sh
+    RUN ./configure --prefix=/usr/local
+    RUN make
+    RUN make install
+  singularityXX: |
+    WORKDIR /root
+    RUN git clone https://github.com/gmkurtzer/singularity.git
+    WORKDIR /root/singularity
+    RUN git checkout release-2.6
+    RUN ./autogen.sh
+    RUN ./configure --prefix=/usr/local
+    RUN make
+    RUN make install
 
 JUNK: |
   ### INCOMING DOCKER FILES NEED FOLDED IN
@@ -171,9 +194,11 @@ factory_do:
 
 deploy_linux_factory:
   # hook to check mounts if we must run in an external volume
+  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
   prelim: "@deploy_site"
   persist: true
   # use the macos disk image utility to make a case-insensitive volume
+  #! disambiguate this and prelim for deployment on other linux machines
   site: /Volumes/site-nix/site-factory-linux
   # note that redeployment always reruns the conda env update command
   script: |
@@ -194,6 +219,7 @@ deploy_linux_factory:
     sequence:
       - stretch
       - debian_start
+      - debian_compilers
       - debian_mysql
       - debian_shell_bash
       - make_user
@@ -282,6 +308,7 @@ no3:
     cd inputs/proteins && git checkout ortho_clean && cd ../..
     make prep protein
     python -u script.py
+  site: /Users/rpb/dumbspot
 
 ### DOCKER TESTS
 ### these tests run inside a Docker (see above)
@@ -303,3 +330,123 @@ no4:
       #! python -u script.py
 
 #! debugging import ortho;ortho.bash('gmx',log='log',cwd='.')
+
+#! custom for macos right now
+vagrant_setup:
+  site: ~/worker/vagrant-springboard
+  singularity_version: 2.6
+
+oof:
+  # hook to check mounts if we must run in an external volume
+  persist: true
+  # use the macos disk image utility to make a case-insensitive volume
+  site: /Volumes/site-nix/site-factory-linux
+  # note that redeployment always reruns the conda env update command
+  script: |
+    # this script can repeat to confirm the installation
+    git clone https://github.com/bradleyrp/factory factory
+    cd factory
+    git pull
+    if [ ! -f Miniconda3-latest-Linux-x86_64.sh ]; then 
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      ln -s Miniconda3-latest-Linux-x86_64.sh miniconda.sh
+    fi
+    # bootstrap the config
+    make
+    # make the environment or update if reqs.yaml has changed
+    make env conda_py2
+  rebuild: false 
+  dockerfile:
+    sequence:
+      - stretch
+      - debian_start
+      - debian_mysql
+      - debian_shell_bash
+      - make_user
+    addendum:
+      #! needs shell substitution
+      - WORKDIR /home/rpb/extern
+  compose:
+    version: '3'
+    services:
+      # use: docker-compose run visit
+      visit:
+        build: '.'
+        volumes:
+          - ./:/home/rpb/extern
+        stdin_open: true
+        tty: true
+        command: ['/bin/bash']
+        ports:
+          - "8888:8888"
+      deploy:
+        entrypoint: ['/bin/bash','script.sh']
+        build: .
+        volumes:
+          - ./:/home/rpb/extern
+        ports:
+          - "8888:8888"
+  command: docker-compose up -d deploy
+
+### SINGULARITY via DOCKER on macos
+
+docker_singularity:
+  # hook to check mounts if we must run in an external volume
+  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
+  prelim: "@deploy_site"
+  persist: true
+  # use the macos disk image utility to make a case-insensitive volume
+  #! disambiguate this and prelim for deployment on other linux machines
+  site: /Volumes/site-nix/site-factory-linux
+  rebuild: false 
+  script: |
+    echo "HELLO WORLD!"
+  dockerfile:
+    sequence:
+      - stretch
+      - debian_start
+      - debian_compilers
+      - debian_mysql
+      - debian_shell_bash
+      - singularity
+      #! must be root - make_user
+    addendum:
+      #! needs shell substitution
+      - WORKDIR /home/rpb/extern
+  compose:
+    version: '3'
+    services:
+      # use: docker-compose run visit
+      visit:
+        build: '.'
+        volumes:
+          - ./:/home/rpb/extern
+        stdin_open: true
+        tty: true
+        command: ['/bin/bash']
+        ports:
+          - "8888:8888"
+      deploy:
+        entrypoint: ['/bin/bash','script.sh']
+        build: .
+        volumes:
+          - ./:/home/rpb/extern
+        ports:
+          - "8888:8888"
+  command: docker-compose up -d deploy
+
+docker_singularity_rebuild:
+  via: docker_singularity
+  overrides:
+    rebuild: true
+  
+docker_singularity_visit:
+  via: docker_singularity
+  overrides:
+    command: docker-compose run --service-ports visit
+
+docker_singularity_makerspace:
+  ### recipe for making Singularity containers
+  via: docker_singularity
+  overrides:
+    command: sudo docker-compose run --service-ports visit
