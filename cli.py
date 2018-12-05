@@ -11,7 +11,8 @@ from __future__ import print_function
 import os,sys,re,importlib,inspect
 from .dev import tracebacker
 from .misc import str_types,locate,treeview
-from .config import set_config,setlist,set_list,unset,config,set_dict,look,config_fold,set_hook
+from .config import set_config,setlist,set_list,unset,config,set_dict,look
+from .config import config_fold,set_hook,config_hook_get
 from .environments import environ
 from .bootstrap import bootstrap
 from .imports import importer,glean_functions
