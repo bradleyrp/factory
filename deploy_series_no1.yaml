@@ -450,3 +450,43 @@ docker_singularity_makerspace:
   via: docker_singularity
   overrides:
     command: sudo docker-compose run --service-ports visit
+    compose:
+      version: '3'
+      services:
+        # use: docker-compose run visit
+        visit:
+          build: '.'
+          volumes:
+            - ./:/home/rpb/extern
+          stdin_open: true
+          tty: true
+          command: ['/bin/bash']
+          ports:
+            - "8888:8888"
+          privileged: true
+        deploy:
+          entrypoint: ['/bin/bash','script.sh']
+          build: .
+          volumes:
+            - ./:/home/rpb/extern
+          ports:
+            - "8888:8888"
+  notes: |
+    make repl source=deploy_series_no1.yaml name=docker_singularity_makerspace
+    cd /home/rpb/extern/singularity-makerspace
+    singularity image.create container.simg
+    cat > Singularity
+      BootStrap: docker
+      From: centos:centos7
+      OSVersion: 7
+      MirrorURL: http://mirror.centos.org/centos-%{OSVERSION}/%{OSVERSION}/os/$basearch/
+      Include: yum
+      %runscript
+      echo "welcome"
+      exec echo "Hello World" "$@"
+      %post
+      echo "Ready to install software and other dependencies for the container!"
+      yum -y update
+      yum -y install git
+      yum -y groupinstall "Development Tools"
+    singularity build container.simg Singularity
