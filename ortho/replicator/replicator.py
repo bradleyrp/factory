@@ -2,14 +2,20 @@
 
 import re
 
-__all__ = ['repl','pipe','test_clean','test_help','docker_clean']
+__all__ = ['repl','pipeline','test_clean','test_help','docker_clean']
 
 # standard handlers from ortho
+import ortho
 from .formula import *
 
-from ortho import hook_merge
-# +++ allow user to hook in other handlers here
-hook_merge(hook='replicator',namespace=globals())
+#! no: from ortho import hook_merge
+#!   no: from ortho.hooks import hook_merge
+#!   instead use import ortho then later ortho.hook_merge
+#! turning this off for now because of import issues. needs revisited
+if False:
+	# +++ allow user to hook in other handlers here
+	import ortho
+	ortho.hook_merge(hook='replicator',namespace=globals())
 
 ### READERS
 
@@ -68,19 +74,25 @@ def repl(*args,**kwargs):
 	"""
 	# allow args to be handled by the interface key for easier CLI
 	if args:
-		raise Exception('under construction')
-		#! hard coded for now
-		this_test = replicator_read_yaml(args=args,kwargs=kwargs,
-			source='pipelines.yaml')
-		#! import ipdb;ipdb.set_trace()
+		if kwargs: raise Exception('cannot use kwargs with args here')
+		if 'replicator_recipes' not in ortho.conf:
+			raise Exception('calling repl with args requires the '
+				'"replicator_recipes" variable be set in the config')
+		source = ortho.conf['replicator_recipes']
+		if not os.path.isfile(source):
+			raise Exception('cannot find %s'%source)
+		this_test = replicator_read_yaml(
+			name=args[0],args=args[1:],kwargs=kwargs,source=source)
 	# specific format uses only kwargs
 	elif (set(kwargs.keys())<={'source','name'} 
+		and 'source' in kwargs 
 		and re.match(r'^(.*)\.(yaml|yml)$',kwargs['source'])):
 		this_test = replicator_read_yaml(**kwargs)
-		# run the replicator
-		rg = ReplicatorGuide(name=this_test['name'],
-			meta=this_test['meta'],**this_test['detail'])
 	else: raise Exception('unclear request')
+	# run the replicator
+	rg = ReplicatorGuide(name=this_test['name'],
+		meta=this_test['meta'],**this_test['detail'])
+
 
 # alias for the replicator
-pipe = repl
+pipeline = repl
