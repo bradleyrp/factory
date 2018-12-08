@@ -66,91 +66,6 @@ dockerfiles:
     RUN ./configure --prefix=/usr/local
     RUN make
     RUN make install
-  singularityXX: |
-    WORKDIR /root
-    RUN git clone https://github.com/gmkurtzer/singularity.git
-    WORKDIR /root/singularity
-    RUN git checkout release-2.6
-    RUN ./autogen.sh
-    RUN ./configure --prefix=/usr/local
-    RUN make
-    RUN make install
-
-JUNK: |
-  ### INCOMING DOCKER FILES NEED FOLDED IN
-  
-  dockerfile_gromacs = """
-  WORKDIR /root
-  RUN apt-get install -y libfftw3-dev
-  RUN wget ftp://ftp.gromacs.org/pub/gromacs/gromacs-5.1.2.tar.gz
-  RUN tar xvf gromacs-5.1.2.tar.gz
-  RUN rm gromacs-5.1.2.tar.gz
-  WORKDIR /root/gromacs-5.1.2
-  RUN mkdir build
-  WORKDIR /root/gromacs-5.1.2/build
-  RUN cmake /root/gromacs-5.1.2
-  RUN make -j 4
-  RUN make install
-  WORKDIR /root
-  """
-
-  dockerfile_debian_apache = """
-  WORKDIR /root/
-  RUN apt-get install -y apache2
-  RUN apt-get install -y apache2-dev
-  """
-
-  dockerfile_debian_vmd = """
-  ARG DEBIAN_FRONTEND=noninteractive
-  RUN apt-get install -y libglu1 libxinerama1 libxi6 libgconf-2-4 imagemagick
-  WORKDIR /root
-  COPY VMD_SOURCE /root/
-  RUN mkdir vmd-latest
-  RUN tar xvf VMD_SOURCE -C vmd-latest --strip-components=1
-  WORKDIR /root/vmd-latest
-  RUN ./configure
-  WORKDIR /root/vmd-latest/src
-  RUN make install
-  """
-
-  dockerfile_debian_ffmpeg = """
-  WORKDIR /root/
-  RUN echo "deb http://www.deb-multimedia.org stretch main non-free" >> /etc/apt/sources.list
-  RUN apt-get update
-  RUN apt-get install --allow-unauthenticated -y deb-multimedia-keyring 
-  RUN apt-get update
-  RUN apt-get install -y ffmpeg x264
-  """
-
-  dockerfile_debian_gotty = """
-  WORKDIR /root/
-  RUN mkdir /usr/local/gotty
-  WORKDIR /usr/local/gotty
-  RUN wget https://github.com/yudai/gotty/releases/download/v1.0.1/gotty_linux_amd64.tar.gz
-  RUN tar xvf gotty_linux_amd64.tar.gz
-  """
-
-  dockerfile_debian_node = """
-  WORKDIR /root/
-  RUN apt-get install curl
-  RUN curl -sL https://deb.nodesource.com/setup_6.x | bash -
-  RUN apt-get install nodejs npm
-  WORKDIR /root/
-  """
-
-  dockerfile_debian_sshd = """
-  WORKDIR /root/
-  RUN apt-get install -y openssh-server
-  RUN sed -i 's/#PermitRootLogin yes/PermitRootLogin yes/' /etc/ssh/sshd_config
-  RUN sed 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' -i /etc/pam.d/sshd
-  ENV NOTVISIBLE "in users profile"
-  RUN echo "export VISIBLE=now" >> /etc/profile
-  EXPOSE 22
-  RUN useradd -m @USER
-  RUN usermod -s /bin/bash @USER
-  RUN echo @USER:@read_config('user_creds') |chpasswd
-  ENTRYPOINT service ssh restart && sleep infinity
-  """
 
 # easy commands
 #! note that overrides ability could eventually be replaced with kwargs
@@ -180,73 +95,27 @@ factory_visit:
 factory_notebook:
   via: deploy_linux_factory
   overrides:
+    command: docker-compose up -d deploy
+    script: |
+      cd factory
+      source env/bin/activate py2
+      jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 
+
+factory_notebook_live:
+  # run the notebook in the foreground
+  via: deploy_linux_factory
+  overrides:
     command: docker-compose run --service-ports deploy
     script: |
       cd factory
       source env/bin/activate py2
-      jupyter notebook --port=8888 --no-browser --ip=0.0.0.0
+      jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 
 
 #! need recursion so you can use this (see no4 below)
 factory_do:
   via: deploy_linux_factory
   overrides:
     command: docker-compose run --service-ports deploy
-
-deploy_linux_factory:
-  # hook to check mounts if we must run in an external volume
-  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
-  prelim: "@deploy_site"
-  persist: true
-  # use the macos disk image utility to make a case-insensitive volume
-  #! disambiguate this and prelim for deployment on other linux machines
-  site: /Volumes/site-nix/site-factory-linux
-  # note that redeployment always reruns the conda env update command
-  script: |
-    # this script can repeat to confirm the installation
-    git clone https://github.com/bradleyrp/factory factory
-    cd factory
-    git pull
-    if [ ! -f Miniconda3-latest-Linux-x86_64.sh ]; then 
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-      ln -s Miniconda3-latest-Linux-x86_64.sh miniconda.sh
-    fi
-    # bootstrap the config
-    make
-    # make the environment or update if reqs.yaml has changed
-    make env conda_py2
-  rebuild: false 
-  dockerfile:
-    sequence:
-      - stretch
-      - debian_start
-      - debian_compilers
-      - debian_mysql
-      - debian_shell_bash
-      - make_user
-    addendum:
-      #! needs shell substitution
-      - WORKDIR /home/rpb/extern
-  compose:
-    version: '3'
-    services:
-      # use: docker-compose run visit
-      visit:
-        build: '.'
-        volumes:
-          - ./:/home/rpb/extern
-        stdin_open: true
-        tty: true
-        command: ['/bin/bash']
-        ports:
-          - "8888:8888"
-      deploy:
-        entrypoint: ['/bin/bash','script.sh']
-        build: .
-        volumes:
-          - ./:/home/rpb/extern
-        ports:
-          - "8888:8888"
-  command: docker-compose up -d deploy
 
 factory_build_full:
   via: deploy_linux_factory
@@ -264,6 +133,93 @@ factory_build_full:
       addendum:
         #! needs shell substitution
         - WORKDIR /home/rpb/extern
+
+factory_build:
+  # run the build script below to ensure factory exists without rebuilding image
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run deploy
+
+deploy_linux_factory:
+  # see factory_* recipes above rather than using this directly
+  # hook to check mounts if we must run in an external volume
+  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
+  prelim: "@deploy_site"
+  #! not currently used in formula.py?
+  persist: true
+  # use the macos disk image utility to make a case-insensitive volume
+  #! disambiguate this and prelim for deployment on other linux machines
+  site: /Volumes/site-nix/site-factory-linux
+  # note that redeployment always reruns the conda env update command
+  script: |
+    if [ -d factory ]; then echo "[STATUS] factory already exists" && exit 0; fi
+    # this script can repeat to confirm the installation
+    git clone https://github.com/bradleyrp/factory factory
+    cd factory
+    git pull
+    if [ ! -f Miniconda3-latest-Linux-x86_64.sh ]; then 
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      ln -s Miniconda3-latest-Linux-x86_64.sh miniconda.sh
+    fi
+    # bootstrap the config
+    make
+    # make the environment or update if reqs.yaml has changed
+    make env conda_py2
+  #! note that if you want to build this, you should run factory_build
+  #!   since this recipe is just the parent
+  rebuild: false 
+  dockerfile:
+    sequence:
+      - stretch
+      - debian_start
+      - debian_compilers
+      - debian_mysql
+      - debian_shell_bash
+      - make_user
+    addendum:
+      #! needs shell substitution
+      - WORKDIR /home/rpb/extern
+  compose:
+    version: '3'
+    services:
+      # use: docker-compose run visit
+      visit:
+        build: .
+        image: factory:deploy_linux_factory
+        volumes:
+          - ./:/home/rpb/extern
+        stdin_open: true
+        tty: true
+        command: ['/bin/bash']
+        ports:
+          - "8888:8888"
+        container_name: factory_visit
+      deploy:
+        entrypoint: ['/bin/bash','script.sh']
+        build: .
+        image: factory:deploy_linux_factory
+        volumes:
+          - ./:/home/rpb/extern
+        ports:
+          - "8888:8888"
+        hostname: factory_remote
+        container_name: factory_deploy
+      site:
+        entrypoint: ['/bin/bash']
+        build: .
+        image: factory:deploy_linux_factory
+        volumes:
+          - ./:/home/rpb/extern
+        ports:
+          - "8000:8000"
+        hostname: factory_site
+        container_name: factory_site
+  command: docker-compose up -d deploy
+
+factory_up:
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run site # up -d site
 
 ### LOCAL/NATIVE tests
 ### these tests run inside the parent factory
@@ -329,66 +285,12 @@ no4:
       make prep protein
       #! python -u script.py
 
-#! debugging import ortho;ortho.bash('gmx',log='log',cwd='.')
+### SINGULARITY via DOCKER on macos
 
 #! custom for macos right now
 vagrant_setup:
   site: ~/worker/vagrant-springboard
   singularity_version: 2.6
-
-oof:
-  # hook to check mounts if we must run in an external volume
-  persist: true
-  # use the macos disk image utility to make a case-insensitive volume
-  site: /Volumes/site-nix/site-factory-linux
-  # note that redeployment always reruns the conda env update command
-  script: |
-    # this script can repeat to confirm the installation
-    git clone https://github.com/bradleyrp/factory factory
-    cd factory
-    git pull
-    if [ ! -f Miniconda3-latest-Linux-x86_64.sh ]; then 
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-      ln -s Miniconda3-latest-Linux-x86_64.sh miniconda.sh
-    fi
-    # bootstrap the config
-    make
-    # make the environment or update if reqs.yaml has changed
-    make env conda_py2
-  rebuild: false 
-  dockerfile:
-    sequence:
-      - stretch
-      - debian_start
-      - debian_mysql
-      - debian_shell_bash
-      - make_user
-    addendum:
-      #! needs shell substitution
-      - WORKDIR /home/rpb/extern
-  compose:
-    version: '3'
-    services:
-      # use: docker-compose run visit
-      visit:
-        build: '.'
-        volumes:
-          - ./:/home/rpb/extern
-        stdin_open: true
-        tty: true
-        command: ['/bin/bash']
-        ports:
-          - "8888:8888"
-      deploy:
-        entrypoint: ['/bin/bash','script.sh']
-        build: .
-        volumes:
-          - ./:/home/rpb/extern
-        ports:
-          - "8888:8888"
-  command: docker-compose up -d deploy
-
-### SINGULARITY via DOCKER on macos
 
 docker_singularity:
   # hook to check mounts if we must run in an external volume
@@ -399,8 +301,12 @@ docker_singularity:
   #! disambiguate this and prelim for deployment on other linux machines
   site: /Volumes/site-nix/site-factory-linux
   rebuild: false 
+  #! script, deploy service entrypoint, and the up command with detach (-d)
+  #!   flag are all probably unnecessary. the script runs in detach and the
+  #!   entire purpose of this recipe is to parent the docker_singularity_rebuild
+  #!   and hence set the stage for the other derived recipes
   script: |
-    echo "HELLO WORLD!"
+    echo "docker_singularity is built!"
   dockerfile:
     sequence:
       - stretch
@@ -418,7 +324,8 @@ docker_singularity:
     services:
       # use: docker-compose run visit
       visit:
-        build: '.'
+        build: .
+        image: factory:docker_singularity
         volumes:
           - ./:/home/rpb/extern
         stdin_open: true
@@ -426,13 +333,16 @@ docker_singularity:
         command: ['/bin/bash']
         ports:
           - "8888:8888"
+        container_name: docker_singularity_visit
       deploy:
         entrypoint: ['/bin/bash','script.sh']
         build: .
+        image: factory:docker_singularity
         volumes:
           - ./:/home/rpb/extern
         ports:
           - "8888:8888"
+        container_name: docker_singularity_deploy
   command: docker-compose up -d deploy
 
 docker_singularity_rebuild:
@@ -455,7 +365,8 @@ docker_singularity_makerspace:
       services:
         # use: docker-compose run visit
         visit:
-          build: '.'
+          build: .
+          image: factory:docker_singularity
           volumes:
             - ./:/home/rpb/extern
           stdin_open: true
@@ -467,6 +378,7 @@ docker_singularity_makerspace:
         deploy:
           entrypoint: ['/bin/bash','script.sh']
           build: .
+          image: factory:docker_singularity
           volumes:
             - ./:/home/rpb/extern
           ports:
