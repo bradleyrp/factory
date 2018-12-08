@@ -1,10 +1,14 @@
 #!/usr/bin/env python
 
+#! once we added replicator/__init__.py to expose pipeline in 
+#!   ortho/__init__.py we had to change e.g. from ortho import read_config
+#!   hence internal ortho imports need to have the path to the submodule
 from ortho.requires import requires_python,requires_python_check
 from ortho.dictionary import MultiDict
 from ortho.bash import bash_basic,bash
 from ortho.handler import Handler
-from ortho import read_config
+from ortho.config import read_config
+
 import re,tempfile,os,copy
 import datetime as dt
 import uuid
@@ -124,8 +128,8 @@ class ReplicatorGuide(Handler):
 			cwd=spot.path,fn='script.sh',log='log-run',
 			cmd='docker run %s'%tag)#+' %(path)s')
 
-	def docker_compose(self,script,compose,dockerfile,site,
-		command,persist=True,rebuild=True,prelim=None):
+	def docker_compose(self,compose,dockerfile,site,
+		command,script=None,persist=True,rebuild=True,prelim=None):
 		"""
 		Prepare a docker-compose folder and run a command in the docker.
 		"""
@@ -143,18 +147,26 @@ class ReplicatorGuide(Handler):
 			fp.write(dfm.dockerfile)
 		with open(os.path.join(spot.path,'docker-compose.yml'),'w') as fp:
 			fp.write(yaml.dump(compose))
-		with open(os.path.join(spot.path,'script.sh'),'w') as fp: 
-			fp.write(script)
+		# script is optional. it only runs if you run a docker command below
+		#   which also depends on it via an entrypoint
+		if script:
+			with open(os.path.join(spot.path,'script.sh'),'w') as fp: 
+				fp.write(script)
 		if rebuild: bash_basic('docker-compose build',cwd=spot.path)
 		# no need to log this since it manipulates a presumably 
 		#   persistent set of files
 		print('status running command %s'%command)
+		#! note that we could use docker_compose just for building if we 
+		#!   made the rebuild True when no script or command. this might be
+		#!   somewhat more elegant? this could be done with another method
+		#!   for clarity
 		bash_basic(command,cwd=spot.path)
 
-	def via(self,via,overrides):
+	def via(self,via,overrides=None):
 		"""
 		Run a replicate with a modification. Extremely useful for DRY.
 		"""
+		if not overrides: overrides = {}
 		if via not in self.meta['complete']: 
 			raise Exception('reference to replicate %s is missing'%via)
 		fname = self.classify(*self.meta['complete'][via].keys())
