@@ -1,0 +1,90 @@
+{% load staticfiles %}
+
+<form action="" method="POST">{% csrf_token %}
+
+<div class="btn-group-lg btn-group-vertical">
+<button type="submit" name="button_compute" id="run_compute" class="btn btn-large btn-default">
+<strong><code>compute!</code></strong>
+</button>
+<button type="submit" href="refresh?workspace={{ workspace_visible }}&pictures={{ pictures_visible }}" 
+	name="button_refresh" id="run_refresh" class="btn btn-large btn-default">
+<strong><code>refresh!</code></strong>
+</button>
+
+<!-- <input name="say" id="say" value="Hi"> -->
+
+</div>
+
+<!--
+compute form
+<form action="" method="POST">{% csrf_token %}
+{{ compute_form.as_p }}<button type="submit">Submit</button>
+</form>
+done
+-->
+
+<br><i>Use toggle switches to change the metadata for the "compute" function. 
+To reveal calculations and plots to the interface, update the metadata, select them 
+with the toggles, and use the "refresh" button. 
+Use the <a href="clear_stale">clear_stale</a> function to reset after a failed calculation. 
+</i>
+{% if not meta_files.items %}
+<br><strong>no meta files available yet. use the button below to make the default.</strong><br>
+<div class="btn-group" style="margin: 5px 0 5px 0;">
+<a href="make_yaml_file?workspace={{ workspace_visible }}&pictures={{ pictures_visible }}" 
+id="run_refresh" class="btn btn-large btn-default">regenerate "meta.current.yaml"</a>
+</div>
+{% else %}
+<div class="btn-group" data-toggle="buttons" style="margin: 5px 0 0 0;">
+{% for key,val in meta_files.items %}
+<label id="toggle_meta_{{key}}" class="btn btn-default btn-outline" style="text-align:left;">
+<input name="toggle_{{key}}" id="toggle_{{key}}" type="checkbox" autocomplete="off">
+{{ val }}
+</label> 
+{% endfor %} 
+</div>
+{% endif %}
+
+</form>
+
+<i>show or hide tiles on this page</i><br>
+
+<div class="btn-group-sm" style="margin: 5px 0 0 0;">
+<label id="toggle_workspace_on" class="btn btn-default">
+show all
+</label>
+<label id="toggle_workspace_off" class="btn btn-default">
+hide all
+</label>
+</div>
+
+<div class="btn-group" data-toggle="buttons" style="margin: 5px 0 0 0;">
+{% for treekey,tree in trees.items %}
+<label id="toggle_label_{{treekey}}" class="btn btn-default btn-outline active" style="text-align:left;">
+<input id="toggle_{{treekey}}" checked type="checkbox" autocomplete="off">
+{{ tree.title }}
+</label> 
+{% endfor %}  
+</div>
+
+<br><i>jump to tiles</i><br>
+
+<div class="btn-group" style="margin: 5px 0 0 0;">
+{% for treekey,tree in trees.items %}
+<label href="{{ tree.name }}" id="jump_{{treekey}}" class="btn btn-default" style="text-align:left;">
+&#10533; {{ tree.title }}
+</label> 
+{% endfor %}  
+</div>
+
+<h2>workspace status</h2>
+
+<ul style="list-style-type:square;" style="">
+<li style="margin: 10px 0;">last loaded at (UTC) {{ workspace_timestamp }} </li>
+{% if log_status %}<li style="margin: 10px 0;">logging state is {{ log_status }}</li>{% endif %}
+{% if found_meta_changes %}
+<li style="margin: 10px 0;">note that the meta files have changed since the last refresh</li>
+{% else %}
+<li style="margin: 10px 0;">no meta file changes so this view is current</li>
+{% endif %}
+</ul>

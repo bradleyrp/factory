@@ -1,0 +1,48 @@
+
+{% load code_syntax %}
+
+<div class="brick">
+<h2>picture selectors</h2>
+
+<div class="btn-group-sm" style="margin:0 0 5px 0;">
+<label id="toggle_pictures_on" class="btn btn-default">
+show all
+</label>
+<label id="toggle_pictures_off" class="btn btn-default">
+hide all
+</label>
+<a href="refresh_thumbnails" id="toggle_pictures_on" class="btn btn-default">
+regenerate thumbnails
+</a>
+</div>
+<div class="btn-group" data-toggle="buttons">
+  {% for cat in album.cats %}
+    <!-- !!!??? v. annoying that the focus is retained after unchecking these-->
+    <label id="toggle_label_{{cat}}" class="btn btn-default">
+      <input id="toggle_{{cat}}" type="checkbox" autocomplete="off">{{ cat }}
+    </label>
+  {% endfor %}
+</div>
+
+</div>
+
+{% for name,dat in album.files.items %}
+<div class="brick image_tile_{{dat.cat}}" style="display:none;">
+<h3>{{ dat.shortname }}</h3>
+<a href="media/raw/{{ dat.fn }}" target="_blank">
+<img src="media/raw/{{ album.thumbnail_dn_base }}/{{ dat.fn }}" 
+	style="max-height:400;max-width:100%;padding:10px;text-align:center"></a>
+{% if dat.meta %}
+<br>
+<div class="btn-group" data-toggle="buttons">
+<label id="toggle_meta_label_{{dat.ukey}}" class="btn btn-default">
+<input id="toggle_meta{{dat.ukey}}" class="meta_toggle_button" type="checkbox" autocomplete="off">metadata
+</label>
+</div>
+<div id="meta_{{ dat.ukey }}" style="display:none;">
+{{ dat.meta|highlight|safe }}
+</div>
+{% endif %}
+
+</div>
+{% endfor %}

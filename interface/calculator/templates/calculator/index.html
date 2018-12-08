@@ -1,0 +1,68 @@
+{% extends "calculator/base.html" %}
+{% load staticfiles %}
+{% block title %}factory-calculator{% endblock %}
+{% block content %}
+
+<div id="container">
+
+<div class="brick">
+{% include "calculator/navigate.html" %}
+</div>
+
+{% if show_workspace_toggles %}
+<div class="brick">
+{% include "calculator/workspace_status.html" %}
+</div>
+{% endif %}
+
+<!---removed "or logging_text" below to remove stray consoles ... -->
+{% if show_console %}
+<div id="logging" class="brick brick-wide2">
+<a name="{{ console }}"></a> 
+<h2><span id="{{ treekey }}_tree_brick_title">console</span></h2>
+<div class="btn-group-sm">
+{% if log_status %}<label id="calculator_status" class="label label-info">{{ log_status }}</label>{% endif %}
+<button id="reset_calculator" class="btn btn-default">reset calculator</button>
+</div>
+{% if logging %}
+<code>{{ logging }}</code> 
+{% else %}
+{% endif %}
+
+<!--
+<div class="btn-group" role="group" style="margin: 10px 0 10px 0;">
+<span id="calculator_status" class="label label-info">{{ log_status }}</span>
+<button id="reset_calculator" class="label label-info">reset calculator</button>
+</div>
+-->
+
+<textarea readonly id="textarea_logging" style="border:none;resize:none;padding:-10px;min-height:30em;font-weight:400;width:100%;font-family:Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New, monospace;" spellcheck="false" placeholder="CALCULATOR CONSOLE">{{ log_text }}</textarea>
+</div>
+{% endif %}
+
+{% if album %}
+{% include "calculator/album.html" %}
+{% endif %}
+
+{% for treekey,tree in trees.items %}
+{% ifnotequal tree.data "[]" %}
+<div id="{{ treekey }}_tree_brick" class="brick">
+<a name="{{ tree.name }}"></a> 
+<h2><span id="{{ treekey }}_tree_brick_title">{{ tree.title }}</span> <a href="#" id="top_from_{{ tree.name }}" >&#10531;</a></h2>
+{% ifequal tree.title "meta files" %}
+<div class="btn-group" style="margin: 5px 0 5px 0;">
+<a href="make_yaml_file?workspace={{ workspace_visible }}&pictures={{ pictures_visible }}" 
+id="run_refresh" class="btn btn-large btn-default">regenerate "meta.current.yaml"</a>
+<a href="make_look_times?workspace={{ workspace_visible }}&pictures={{ pictures_visible }}" 
+id="run_make_look" target="_blank" class="btn btn-large btn-default">inspect simulation times</a>
+</div>
+{% endifequal %}
+<div id="{{ tree.name }}_tree"></div>
+</div>
+{% endifnotequal %}
+{% endfor %}
+
+</div>
+
+{% endblock %}
+

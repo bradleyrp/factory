@@ -1,0 +1,107 @@
+{% extends "simulator/base.html" %}
+{% load staticfiles %}
+{% block content %}
+
+<!--on the detail page the navigate has own container-->
+<div id="container">
+<div class="brick">
+{% include "simulator/navigate.html" %}
+</div>
+
+<div class="brick brick-wide2">
+<h1>simulation: {{ sim.name }}</h1>
+{% if job_status %}job status: <strong>{{ job_status }}</strong>{% endif %}
+{% ifequal job_status "waiting" %}<br>when the job starts, refreshing this page will turn on the monitor{% endifequal %}
+
+<div class="btn-group" data-toggle="buttons">
+<label class="btn btn-default">
+<input id="toggle_config_block" class="meta_toggle_button" type="checkbox" autocomplete="off">configuration
+</label>
+</div>
+<code id="config_block" style="display:none;">
+<ol>
+{% for key,val in config.items %}
+<li>{{ key }}: {{ val }}</li>
+{% endfor %}
+</ol>
+</code>
+
+</div>
+
+{% if logging %}
+<div class="brick brick-wide2">
+{% include "simulator/simulation_status.html" %}
+</div>
+{% endif %}
+
+{% if kickstarts %}
+<div class="brick brick-wide2">
+<h2>kickstarts</h2>
+select a kickstarter to load automacs with experiments
+<br>
+{% for kick in kickstarts %}
+<a class="btn btn-info btn-pad" href="/simulator/sim{{ sim.id }}/kick{{ kick.id }}">{{ kick.name }}</a>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if expts %}
+<div class="brick brick-wide2">
+<h2>experiments</h2>
+select an experiment<br>
+{% for name_group,expt_group in expts.items %}
+	<div class="btn-group">
+	<h3>{{ name_group }}</h3>
+	{% for item in expt_group %}
+	<a class="btn btn-info" style="color:black;text-align:left" href="/simulator/sim{{ sim.id }}/prep/{{ item.0 }} ">
+		{{ item.0 }} <br><font style="color:white">{{ item.1 }}</font></a>
+	{% endfor %}
+	</div>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if settings %}
+<div class="brick brick-wide2">
+<h2>settings</h2>
+{{ settings }}
+</div>
+{% endif %}
+
+{% if manual_interactive_state %}
+<div class="brick brick-wide2">
+<h2>manual script</h2>
+<a target="_blank" href="http://{{ NOTEBOOK_IP }}:{{ NOTEBOOK_PORT }}/tree/{{ manual_interactive_state }}?token={{ notebook_token }}"><button type="button">interactive script</button></a>
+<br>This simulation has been converted to an interactive script.
+<br>Users are expected to run the simulations inside the notebook.
+</div>
+{% endif %}
+
+{% if fieldsets %}
+<div class="brick brick-wide2">
+<form spellcheck="false" action="{{ ROOT_URL }}/simulator/sim{{ sim.id }}" method="post" enctype="multipart/form-data">
+{% csrf_token %}
+{% for set in fieldsets %}
+<table class="brick_table brick_detail">
+<thead><tr><th style="text-align:left;"></th><th style="text-align:left;"></th></tr></thead>
+<tbody>
+<tr><legend style="text-align:left"><h3>{{ set.legend }}</h3></legend></tr>
+{% if set.details %}{{set.details}}<br>{% endif %}
+{% for field in set %}
+<tr><td style="text-align:right;">{{ field.label }}</td><td>{{ field }}
+{% if field.help_text %}<div class="help" style="font-family: sans-serif;white-space: normal;">{{ field.help_text }}</div>{% endif %}
+</td></tr>
+{% endfor %}
+</tbody>
+</table>
+{% endfor %}
+<br>
+<input class="button" name="method_auto" type="submit" value="START" style="width:100"/>
+<input class="button" name="method_manual" type="submit" value="manual" style="width:100"/>
+</form>
+</div>
+{% endif %}
+
+</div>
+
+{% endblock %}

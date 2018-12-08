@@ -1,0 +1,35 @@
+{% extends "simulator/base.html" %}
+{% load staticfiles %}
+{% block title %}factory-simulator{% endblock %}
+{% block content %}
+
+<div id="container">
+
+<div class="brick">
+{% include "simulator/navigate.html" %}
+</div>
+
+<div class="brick brick-wide2">
+{% include "simulator/cluster_status.html" %}
+</div>
+
+<div class="brick">
+{% include "simulator/build_simulation.html" %}
+</div>
+
+<div class="brick">
+{% include "simulator/upload_coordinates.html" %}
+</div>
+
+<div class="brick">
+{% include "simulator/simulation_list.html" %}
+</div>
+
+<div class="brick">
+{% include "simulator/coordinates_list.html" %}
+</div>
+
+</div>
+
+{% endblock %}
+

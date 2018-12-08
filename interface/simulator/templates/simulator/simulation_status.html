@@ -1,0 +1,73 @@
+
+{% if logging %}
+
+<h3>console</h3>
+
+<code>{{ logging }}</code><br>
+
+<code><textarea readonly id="destination_sim_console" style="min-height:30em;font-weight:400;width:100%;"
+spellcheck="false" placeholder="SIMULATOR CONSOLE"></textarea></code>
+
+<script type="text/javascript">
+// CSRF code
+function getCookie(name) {
+    var cookieValue = null;
+    var i = 0;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (i; i < cookies.length; i++) {
+            var cookie = jQuery.trim(cookies[i]);
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+var csrftoken = getCookie('csrftoken');
+function csrfSafeMethod(method) {
+    // these HTTP methods do not require CSRF protection
+    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+}
+$.ajaxSetup({
+    crossDomain: false, // obviates need for sameOrigin test
+    beforeSend: function(xhr, settings) {
+        if (!csrfSafeMethod(settings.type)) {
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        }
+    }
+}); 
+function doUpdate_queue() {
+    $.ajax({
+        url: '{{ SITE_URL }}/simulator/sim_console/{{ logging }}',
+        type: 'get',
+        cache: true,
+        success: function(data) {
+            $('#result_queue').show();
+            if(data.running){
+                // only change text if running so the log remains after the calculation
+                if(data.line!='' && data.line != 
+                    document.getElementById("destination_sim_console").innerHTML) { 
+                    document.getElementById("destination_sim_console").innerHTML = data.line;
+                    $(window).trigger("resize");
+                    }
+                document.getElementById('destination_sim_console').scrollTop = 
+                    document.getElementById('destination_sim_console').scrollHeight;
+                document.getElementById("destination_sim_console").style.overflow = "hidden"; 
+            } else { 
+                document.getElementById("destination_sim_console").style.overflow="visible"; 
+            }
+        },
+        failure: function(data) { 
+            $('#result_queue').append("ERROR");
+        },
+
+    });
+}
+doUpdate_queue()
+setInterval("doUpdate_queue()",3000);
+</script>
+
+{% endif %}

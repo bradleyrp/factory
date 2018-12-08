@@ -1,0 +1,11 @@
+{% if form_sim_new %}
+<form action="builder" method="post" enctype="multipart/form-data">
+<table class="brick_table"><tbody>
+<tr><td></td>
+<td><h2>build simulation</h2></td></tr>
+<tr><td></td>
+<td><input class="button" type="submit" value="start building"  name='build_button' id="submit"/></td></tr>
+{% csrf_token %}
+{{ form_sim_new.as_table }}
+</tbody></table></form>
+{% endif %}

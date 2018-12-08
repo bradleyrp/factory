@@ -1,0 +1,48 @@
+{% load staticfiles %}
+
+<head>
+	<title>{% block title %}{% endblock %}</title>
+	<meta content="text/html; charset=utf-8" http-equiv="content-type">
+	<meta name="description" content=""/>
+	<meta name="keywords" content=""/>
+	<link rel="icon" href="favicon.ico" type="image/x-icon" />
+	<!---! add setting to turn off tiling here-->
+	<script type="text/javascript" src="{% static "jquery-3.2.1.min.js" %}"></script>
+	<script type="text/javascript" src="{% static "masonry.pkgd.min.js" %}"></script>
+	<script type="text/javascript" src="{% static "bootstrap-treeview.js" %}"></script>
+    <script type="text/javascript" src="{% static "bootstrap.min.js" %}"></script>
+    <link href="{% static "bootstrap.css" %}" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="{% static "pygments.css" %}">
+    <link href="{% static "style.base.css" %}" rel="stylesheet">
+</head>
+<body>
+
+{% block content %}
+{% endblock %}
+
+<script>
+
+// masonry container
+var $grid = $('#container').masonry({
+    columnWidth: 50,
+    itemSelector: '.brick'
+});
+
+// masonry refresh when ready
+$(document).ready(function () {
+    $grid.masonry('layout');
+});
+
+// toggle config block
+$('#toggle_config_block').change(function(){
+    if ($(this).is(':checked')) {
+        $("#config_block").show();
+    } else {
+        $("#config_block").hide();
+    };
+    $grid.masonry('layout');
+});
+
+</script>
+
+</body>

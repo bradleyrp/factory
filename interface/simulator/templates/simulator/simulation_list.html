@@ -1,0 +1,20 @@
+<h2>simulations</h2>
+a single simulation system or replicate<br>
+{% if sims %}
+<ol>
+{% for sim in sims %}
+{% with sim.name as name %}
+<li><a href="/simulator/sim{{ sim.id }}/">{{ sim.name }}
+{% if status_by_sim %}
+<font style="color:gray">
+{{ status_by_sim|get_item:sim.name }}
+{% endif %}
+</font>
+</a>
+</li>
+{% endwith %}
+{% endfor %}
+</ol>
+{% else %}
+<p>nothing here yet</p>
+{% endif %}
