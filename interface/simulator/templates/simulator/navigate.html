@@ -1,0 +1,52 @@
+{% load staticfiles %}
+
+<table style="width:auto;">
+<tr>
+	<td>
+		<img height="60" width="60" style="border: 3px solid white;border-radius:5px;margin: 0 0 20px 0"
+			src="{% static "factory.png" %}" border="0">
+	</td>
+	<td style="width:100%;text-align:left;vertical-align:middle;">
+		<ul style="list-style: none;">
+		<li><strong style="font-size:200%"><code>factory</code></strong></li>
+		<li>by <a href="http://biophyscode.github.io/" target="_blank">BioPhysCode</a></li>
+		</ul>
+	</td>
+</tr>
+<tr>
+	<td>
+		<a href="{{ SITE_URL }}/simulator">
+		<img height="60" width="60" style="border: 3px solid gray;border-radius:5px"
+		src="{% static "automacs.png" %}" border="0"></a>
+		<a href="{{ SITE_URL }}/simulator" style="color:black;text-decoration:none;">
+		<br><strong>simulator</strong></a></td>
+	</td>
+	<td>
+		<ul style="list-style: none;">
+			<li><a href="{{ SITE_URL }}/simulator">simulator dashboard</a><br></li>
+			<li><a href="{{ SITE_URL }}/admin" target="_blank">administration</a><br></li>
+			<li><a href="https://biophyscode.github.io/automacs/" target="_blank">automacs documentation</a><br></li>
+		</ul>
+	</td>
+</tr>
+<tr>
+	<td>
+		<a href="{{ SITE_URL }}/calculator">
+		<img height="60" width="60" style="border: 3px solid white;border-radius:5px"
+		src="{% static "omnicalc.png" %}" border="0"></a>
+		<a href="{{ SITE_URL }}/calculator" style="color:black;text-decoration:none;">
+		<br><strong>calculator</strong></a>
+	</td>
+	<td>
+		<ul style="list-style: none;">
+			<li><a href="http://{{ NOTEBOOK_IP }}:{{ NOTEBOOK_PORT }}/tree/calc/{{ NAME }}/calcs?token={{ notebook_token }}" 
+				target="_blank">interactive notebooks</a></li>
+			<li><a href="{{ SITE_URL }}/calculator">calculator dashboard</a><br></li>
+			<li><a href="https://biophyscode.github.io/omnicalc/" target="_blank">omnicalc documentation</a><br></li>
+			<li><a href="{{ SITE_URL }}/calculator/workspace">only workspace</a><br></li>
+			<li><a href="{{ SITE_URL }}/calculator/pictures">only pictures</a><br></li>
+
+		</ul>
+	</td>
+</tr>
+</table>

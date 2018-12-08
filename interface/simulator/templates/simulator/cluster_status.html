@@ -1,0 +1,84 @@
+
+<h2>cluster</h2>
+<code><textarea readonly id="destination_cluster" style="min-height:10em;font-weight:400;width:100%;"
+spellcheck="false" placeholder="cluster appears idle: refresh to start logging again"></textarea></code>
+<br><i>refresh to update statuses</i>
+{% if cluster_stat %}
+<table style="padding:10px 0 0 0;">
+{% for key,listing in cluster_stat.items %}
+{% if listing %}
+<tr>
+<td>
+<h3 style="display:inline-block">{{ key }}</h3></td><td><ul class="widelist" style="display:inline-block;">
+{% for item in listing %}
+<li><a href="sim{{ item.id }}">{{ item.name }}</a></li>
+{% endfor %}</ul></td>
+</tr>
+{% endif %}
+{% endfor %}
+</table>
+{% endif %}
+
+{% if cluster_running %}
+<script type="text/javascript">
+// CSRF code
+function getCookie(name) {
+    var cookieValue = null;
+    var i = 0;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (i; i < cookies.length; i++) {
+            var cookie = jQuery.trim(cookies[i]);
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+var csrftoken = getCookie('csrftoken');
+function csrfSafeMethod(method) {
+    // these HTTP methods do not require CSRF protection
+    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+}
+$.ajaxSetup({
+    crossDomain: false, // obviates need for sameOrigin test
+    beforeSend: function(xhr, settings) {
+        if (!csrfSafeMethod(settings.type)) {
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        }
+    }
+}); 
+function doUpdate_queue() {
+    $.ajax({
+        url: 'cluster_view',
+        type: 'get',
+        cache: true,
+        success: function(data) {
+            $('#result_queue').show();
+            if(data.running){
+                // only change text if running so the log remains after the calculation
+                if(data.line!='' && data.line != 
+                    document.getElementById("destination_cluster").innerHTML) { 
+                    document.getElementById("destination_cluster").innerHTML = data.line;
+                    $(window).trigger("resize");
+                    }
+                document.getElementById('destination_cluster').scrollTop = 
+                    document.getElementById('destination_cluster').scrollHeight;
+                document.getElementById("destination_cluster").style.overflow = "hidden"; 
+            } else { 
+                document.getElementById("destination_cluster").style.overflow="visible"; 
+            }
+        },
+        failure: function(data) { 
+            $('#result_queue').append("ERROR");
+        },
+
+    });
+}
+doUpdate_queue()
+setInterval("doUpdate_queue()",3000);
+</script>
+{% endif %}

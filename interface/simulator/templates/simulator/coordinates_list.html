@@ -1,0 +1,13 @@
+{% load staticfiles %}
+
+<h2>coordinates</h2>
+a starting structure for a simulation<br>
+{% if coords %}
+<ol>
+{% for coord in coords %}
+<li><a href="http://{{ NOTEBOOK_IP }}:{{ NOTEBOOK_PORT }}/edit/data/{{ NAME }}/coords/{{ coord.name }}?token={{ notebook_token }}">{{ coord.name }}</a> (originally {{ coord.source_file_name }})</li>
+{% endfor %}
+</ol>
+{% else %}
+<p>nothing here yet</p>
+{% endif %}

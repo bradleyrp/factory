@@ -1,0 +1,254 @@
+{% load staticfiles %}
+
+<head>
+	<title>{% block title %}{% endblock %}</title>
+	<meta content="text/html; charset=utf-8" http-equiv="content-type">
+	<meta name="description" content=""/>
+	<meta name="keywords" content=""/>
+	<link rel="icon" href="favicon.ico" type="image/x-icon" />
+
+<!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">-->
+<link href="{% static "bootstrap.css" %}" rel="stylesheet">
+<link href="{% static "bootstrap.treeview.css" %}" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="{% static "pygments.css" %}">
+<link href="{% static "style.base.css" %}" rel="stylesheet">
+
+</head>
+<body>
+
+{% block content %}
+{% endblock %}
+
+<!--
+<script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.4.0/js/tether.min.js" integrity="sha384-DztdAPBWPRXSA/3eYEEUWrWCy7G5KFbe8fFjk5JAIxUYHKkDx6Qin1DkWx51bBrb" crossorigin="anonymous"></script>
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/js/bootstrap.min.js" integrity="sha384-vBWWzlZJ8ea9aCX4pEW3rVHjgjt7zpkNpZk+02D9phzyeVkE+jo0ieGizqPLForn" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-treeview/1.2.0/bootstrap-treeview.min.js"></script>
+-->
+<script type="text/javascript" src="{% static "jquery-3.2.1.min.js" %}"></script>
+<script type="text/javascript" src="{% static "masonry.pkgd.min.js" %}"></script>
+<script type="text/javascript" src="{% static "bootstrap.min.js" %}"></script>
+<script type="text/javascript" src="{% static "bootstrap-treeview.js" %}"></script>
+
+<script>
+
+// toggle the workspace tiles
+{% for treekey,tree in trees.items %}
+    $('#toggle_{{treekey}}').change(function(){
+        if ($(this).is(':checked')) {
+            $('#{{ treekey }}_tree_brick').show();
+        }
+        else {
+            $('#{{ treekey }}_tree_brick').hide();
+        }
+        $grid.masonry('layout');
+    });
+{% endfor %}
+
+// toggle all workspace tiles on or off
+$('#toggle_workspace_on').on('click',function(){
+    {% for treekey,tree in trees.items %}
+        if (!$('#toggle_{{treekey}}').is(':checked')) {
+            $('#toggle_{{treekey}}').prop('checked',true).change();
+            $('#toggle_label_{{treekey}}').addClass('active');
+        };
+    {% endfor %}
+});
+$('#toggle_workspace_off').on('click',function(){
+    {% for treekey,tree in trees.items %}
+        if ($('#toggle_{{treekey}}').is(':checked')) {
+            $('#toggle_{{treekey}}').prop('checked',false).change();
+            $('#toggle_label_{{treekey}}').removeClass('active');
+        };
+    {% endfor %}
+});
+
+// populate the trees
+{% for treekey,tree in trees.items %}
+    var meta_toc_json = '{{ tree.data|safe }}';
+    $('#{{ tree.name_tree }}').treeview({
+      data: JSON.parse(meta_toc_json),
+      // changed selected color from '#E6E6E6' to background
+      levels: 1,backColor: '#E6E6E6', selectedBackColor: "#E6E6E6",
+      selectedColor: "black",enableLinks: true,showTags: true,
+    });
+{% endfor %}
+
+// update masonry when interacting with the bricks. this might be inefficient?
+$('.brick').on('click',function(){ $grid.masonry('layout'); });
+
+// on jump click we turn it on if it is off
+{% for treekey,tree in trees.items %}
+    $('#jump_{{treekey}}').on('click',function(){
+        if (!$('#toggle_{{treekey}}').is(':checked')) {
+            $('#toggle_{{treekey}}').prop('checked',true).change();
+            $('#toggle_label_{{treekey}}').addClass('active');
+            // this is a hack because ryan is too lazy to really understand callbacks in template loop ...
+            // removed the timeout because it might not be useful: window.setTimeout(function(){ 
+                location.href = "#{{ tree.name}}"; 
+                $('#{{ tree.name }}_tree_brick_title').addClass('namefocus');
+            // },2000);
+        } else { 
+            location.href = "#{{ tree.name}}"; 
+            {% for treekey,tree in trees.items %}
+                $('#{{ tree.name }}_tree_brick_title').removeClass('namefocus');
+            {% endfor %}
+            $('#{{ tree.name }}_tree_brick_title').addClass('namefocus');
+        }
+    });
+    $('#top_from_{{ tree.name }}').on('click',function(){
+        {% for treekey,tree in trees.items %}
+            $('#{{ tree.name }}_tree_brick_title').removeClass('namefocus');
+        {% endfor %}
+    });
+{% endfor %}
+
+// toggle picture categories
+{% if album %}
+{% for cat in album.cats %}
+    $('#toggle_{{cat}}').change(function(){
+        if ($(this).is(':checked')) {
+            $('.image_tile_{{ cat }}').show();
+        }
+        else {
+            $('.image_tile_{{ cat }}').hide();
+        }
+        $grid.masonry('layout');
+    });
+{% endfor %}
+{% endif %}
+
+$('#toggle_pictures_on').on('click',function(){
+    {% for cat in album.cats %}
+        if (!$('#toggle_{{cat}}').is(':checked')) {
+            $('#toggle_{{cat}}').prop('checked',true).change();
+            $('#toggle_label_{{cat}}').addClass('active');
+        };
+    {% endfor %}
+});
+$('#toggle_pictures_off').on('click',function(){
+    {% for cat in album.cats %}
+        if ($('#toggle_{{cat}}').is(':checked')) {
+            $('#toggle_{{cat}}').prop('checked',false).change();
+            $('#toggle_label_{{cat}}').removeClass('active');
+        };
+    {% endfor %}
+});
+
+$('#toggle_pictures_off').on('click',function(){
+    {% for cat in album.cats %}
+        if ($('#toggle_{{cat}}').is(':checked')) {
+            $('#toggle_{{cat}}').prop('checked',false).change();
+            $('#toggle_label_{{cat}}').removeClass('active');
+        };
+    {% endfor %}
+});
+
+//toggle metadata
+{% for name,dat in album.files.items %}
+    $('#toggle_meta{{dat.ukey}}').change(function(){
+        if ($(this).is(':checked')) {
+            $("#meta_{{ dat.ukey }}").show();
+        } else {
+            $("#meta_{{ dat.ukey }}").hide();
+        };
+        $grid.masonry('layout');
+    });
+{% endfor %}
+
+// masonry container
+var $grid = $('#container').masonry({
+    columnWidth: 50,
+    itemSelector: '.brick'
+});
+
+// reset the calculator
+$('#reset_calculator').on('click',function(){
+    window.location = "clear_logging?workspace={{ workspace_visible }}&pictures={{ pictures_visible }}"
+});
+
+// masonry refresh when ready
+$(document).ready(function () {
+    $grid.masonry('layout');
+});
+
+</script>
+
+
+<script>
+// AJAX CONSOLE
+
+function getCookie(name) {
+    // CSRF code
+    var cookieValue = null;
+    var i = 0;
+    if (document.cookie && document.cookie !== '') {
+        var cookies = document.cookie.split(';');
+        for (i; i < cookies.length; i++) {
+            var cookie = jQuery.trim(cookies[i]);
+            // Does this cookie string begin with the name we want?
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+var csrftoken = getCookie('csrftoken');
+
+function csrfSafeMethod(method) {
+    // these HTTP methods do not require CSRF protection
+    return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+}
+
+$.ajaxSetup({
+    crossDomain: false, // obviates need for sameOrigin test
+    beforeSend: function(xhr, settings) {
+        if (!csrfSafeMethod(settings.type)) {
+            xhr.setRequestHeader("X-CSRFToken", csrftoken);
+        }
+    }
+}); 
+
+function doUpdate_queue() {
+    $.ajax({
+        url: '{{ SITE_URL }}/calculator/logging',
+        type: 'get',
+        cache: true,
+        success: function(data) {
+            if(data.running){
+                // only change text if running so the log remains after the calculation
+                if(data.line!='' && data.line != document.getElementById('textarea_logging').innerHTML) { 
+                    document.getElementById('textarea_logging').innerHTML = data.line;
+                    $(window).trigger('resize');
+                    }
+                document.getElementById('textarea_logging').scrollTop = 
+                    document.getElementById('textarea_logging').scrollHeight;
+                document.getElementById('textarea_logging').style.overflow = "hidden"; 
+            } else { 
+                document.getElementById('textarea_logging').style.overflow="visible"; 
+                window.location = "{{ SITE_URL }}/calculator?workspace={{ workspace_visible }}&pictures={{ pictures_visible }}";
+            }
+            // live status tag
+            document.getElementById('calculator_status').innerHTML = data.calculator_status;
+        },
+    });
+}
+
+{% if show_console %}
+    doUpdate_queue()
+    setInterval("doUpdate_queue()",2000);
+{% else %}
+    $(document).ready(function(){
+        var $textarea = $('#textarea_logging');
+        $textarea.scrollTop($textarea[0].scrollHeight);
+        $grid.masonry('layout');
+    });
+{% endif %}
+</script>
+
+
+</body>

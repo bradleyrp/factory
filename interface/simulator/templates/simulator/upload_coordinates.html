@@ -1,0 +1,16 @@
+{% if form_upload_coords %}
+<form action="upload_coordinates" method="post" enctype="multipart/form-data">
+<table class="brick_table"><tbody>
+<tr><td></td><td>
+<h2>upload coordinates</h2>
+</tr>
+<tr><td></td><td>
+<input class="button" type="submit" value="upload coordinates" 
+	name='upload_button' id="submit_coordinates"/></td>
+</tr>
+{% csrf_token %}
+{{ form_upload_coords.as_table }}
+</tbody>
+</table>
+</form>
+{% endif %}
