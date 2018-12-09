@@ -2,7 +2,8 @@
 
 import re,os
 from .handler import Handler
-from .misc import str_types
+from .misc import str_types,listify
+from .imports import importer
 
 class HookHandler(Handler):
 	#! remove from omni after port
@@ -23,6 +24,11 @@ class HookHandler(Handler):
 	def short(self,s,f): 
 		"""Alias for standard with shorter keys."""
 		return self.standard(import_target=s,function=f)
+	def merger(self,s,collect=True):
+		mod = importer(s)
+		return mod
+		#!! import ipdb;ipdb.set_trace()
+		#!! raise Exception('!!!! YAYYY')
 
 def hook_handler(conf,this=None,strict=True):
 	"""
@@ -53,9 +59,9 @@ def hook_handler(conf,this=None,strict=True):
 	for i,j in hook_keys:
 		if j in conf: 
 			raise ValueError('cannot use keys %s and %s together'%(i,j))
+	if this!=None and not this.startswith('@'): this = '@'+this
 	if this!=None and this not in dict(hook_keys).keys(): 
 		# we request hooks without the @-syntax and add it here if missing
-		if not this.startswith('@'): this = '@'+this
 		if strict: 
 			raise Exception(
 				'cannot find the requested hook "%s" in the list: %s'%(
@@ -75,3 +81,13 @@ def hook_handler(conf,this=None,strict=True):
 			conf[key_simple] = HookHandler(**hook_defn).solve
 		else: raise Exception('dev')
 	return True
+
+def hook_merge(hook,namespace):
+	"""
+	This is also a minimal working example of using a hook.
+	"""
+	#! for some reason this has to be imported here?
+	from .config import config_hook_get
+	collected = config_hook_get('replicator_hooks',None)
+	namespace.update(**collected)
+	return 
