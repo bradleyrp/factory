@@ -40,8 +40,10 @@ class OmniFromFactory(Handler):
 		# clone omnicalc into the calculation folder
 		modules_this = {calc_root:
 			self.config.get('omnicalc',default_omnicalc_repo)}
-		try: modules.sync(modules=modules_this)
-		except: print('warning failed to sync the repo: %s'%modules_this)
+		try: modules.sync(modules=modules_this,current=True)
+		except Exception as e: 
+			print('warning got error on sync: '+str(e))
+			print('warning failed to sync the repo: %s'%modules_this)
 		# clone and synchronize calculations reposotory
 		if calculations: 
 			modules_calcs_this = {
