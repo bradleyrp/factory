@@ -164,7 +164,7 @@ deploy_linux_factory:
     # bootstrap the config
     make
     # make the environment or update if reqs.yaml has changed
-    make env conda_py2
+    make env conda_py3
   #! note that if you want to build this, you should run factory_build
   #!   since this recipe is just the parent
   rebuild: false 
