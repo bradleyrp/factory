@@ -57,6 +57,7 @@ def site_setup(name,settings_custom,make_superuser=True,specs=None):
 	"""
 	Sandbox the management of the Django site here.
 	"""
+	if not os.path.isdir('site'): os.mkdir('site')
 	clear_site(name)
 	if not specs: specs = {}
 	connection_name = name

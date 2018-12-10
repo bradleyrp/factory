@@ -236,6 +236,7 @@ def mkdirs(path):
 	# https://stackoverflow.com/questions/600268
 	try: os.makedirs(path)
 	except OSError as exc:
+		import errno
 		if exc.errno == errno.EEXIST and os.path.isdir(path): pass
 		else: raise
 
