@@ -149,7 +149,7 @@ deploy_linux_factory:
   persist: true
   # use the macos disk image utility to make a case-insensitive volume
   #! disambiguate this and prelim for deployment on other linux machines
-  site: /Volumes/site-nix/site-factory-linux
+  site: /Volumes/site-nix/
   # note that redeployment always reruns the conda env update command
   script: |
     if [ -d factory ]; then echo "[STATUS] factory already exists" && exit 0; fi
@@ -164,7 +164,7 @@ deploy_linux_factory:
     # bootstrap the config
     make
     # make the environment or update if reqs.yaml has changed
-    make env conda_py2
+    make env conda_py3
   #! note that if you want to build this, you should run factory_build
   #!   since this recipe is just the parent
   rebuild: false 
@@ -215,6 +215,30 @@ deploy_linux_factory:
         hostname: factory_site
         container_name: factory_site
   command: docker-compose up -d deploy
+
+factory_connect:
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run site # up -d site
+    compose:
+      version: '3'
+      services:
+        # use: docker-compose run visit
+        site:
+          build: .
+          image: factory:deploy_linux_factory
+          volumes:
+            - ./:/home/rpb/extern
+            #! hardcoded for now. use the connection file
+            - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/rpb/extern/factory/connections/actinlink.yaml
+            #! paths used in actinlink.yaml 
+            - /Users/rpb/worker/post-factory-demo:/home/rpb/worker/post-factory-demo
+          stdin_open: true
+          tty: true
+          command: ['/bin/bash']
+          ports:
+            - "8888:8888"
+          container_name: factory_visit
 
 factory_up:
   via: deploy_linux_factory
