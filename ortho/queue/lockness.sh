@@ -6,7 +6,7 @@ cat <<EOF> $tmp_screen_rc
 logfile ${SCREEN_LOG_QUEUE:-log-task-queue}
 EOF
 if [ -z "$STY" ]; then 
-exec screen -c $tmp_screen_rc -LdmS factory /bin/bash "$0"
+exec screen -c $tmp_screen_rc -Ldm -S factory /bin/bash "$0"
 rm $tmp_screen_rc 
 fi
 
