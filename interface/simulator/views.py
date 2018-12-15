@@ -316,7 +316,7 @@ def cluster_view(request,debug=False):
 	#---! NOTE THAT WE WANT ALL FILE MONITORING TO HAVE SOME KIND OF CHANGE-PUSH METHOD INSTEAD OF FREQUENT
 	#---! ...CALLS TO DJANGO, WHICH SEEMS SILLY.
 	try:
-		with open('logs/cluster.%s'%settings.NAME) as fp: text = fp.read()
+		with open('logs/%s.cluster'%settings.NAME) as fp: text = fp.read()
 		return JsonResponse({'line':text,'running':True})
 	except: return JsonResponse({'line':'idle','running':False})
 

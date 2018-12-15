@@ -28,7 +28,7 @@ class OmniFromFactory(Handler):
 	Connect a connection.
 	"""
 	def connect(self,project_name,calc_spot,post_spot,settings_custom,
-		plot_spot,sims=None,calculations=None):
+		plot_spot,sims=None,calculations=None,public=False,development=True):
 		"""Basic connection from the factory to omnicalc."""
 		self.config = read_config()
 		# make directories minus calc spot which is cloned
@@ -54,8 +54,10 @@ class OmniFromFactory(Handler):
 		# update the postprocssing locations
 		ortho.bash('make set post_plot_spot %s'%plot_spot,cwd=calc_root)
 		ortho.bash('make set post_data_spot %s'%post_spot,cwd=calc_root)
-		# prepare the site
-		site_setup(project_name,settings_custom=settings_custom)
+		# prepare the site, with some yaml keys passed through
+		#! could also pass through database, calc
+		site_setup(project_name,settings_custom=settings_custom,
+			public=public,development=development)
 
 def connection_template(kind,name):
 	"""Make a template and write the file."""
@@ -142,27 +144,27 @@ def prep_settings_custom(project_name,**specs):
 	# if there is a public dictionary and we receive the "public" flag from make we serve public site
 	if specs.get('public',None):
 		site_port = specs['public'].get('port',8000)
-		#---the notebook IP for django must be the public hostname, however in the get_public_ports function
-		#---...we have an internal notebook_hostname for users who have a router
+		# the notebook IP for django must be the public hostname, however in the get_public_ports function
+		#   we have an internal notebook_hostname for users who have a router
 		if 'hostname' not in specs['public']:
 			raise Exception('for public deployment you must add the hostname to the connection')
-		#---the hostnames are a list passed to ALLOWED_HOSTS starting with localhost
+	    # the hostnames are a list passed to ALLOWED_HOSTS starting with localhost
 		if type(specs['public']['hostname']) in str_types: hostnames = [specs['public']['hostname']]
 		elif type(specs['public']['hostname'])==list: hostnames = specs['public']['hostname']
 		else: raise Exception('cannot parse hostname')
 		hostnames.append('localhost')
 		settings_custom['extra_allowed_hosts'] = list(set(hostnames))
-		#---the first hostname is the primary one
+		# the first hostname is the primary one
 		settings_custom['NOTEBOOK_IP'] = hostnames[0]
 		settings_custom['NOTEBOOK_PORT'] = specs['public'].get('notebook_port',site_port+1)
-	#---serve locally
+	# serve locally
 	else:
-		#---note that notebook ports are always one higher than the site port
+		# note that notebook ports are always one higher than the site port
 		site_port = specs.get('port',8000)
 		settings_custom['NOTEBOOK_IP'] = 'localhost'
 		settings_custom['NOTEBOOK_PORT'] = specs.get('port_notebook',site_port+1)
 		settings_custom['extra_allowed_hosts'] = []
-	#---name this project
+	# name this project
 	settings_custom['NAME'] = project_name
 
 	###---END DJANGO SETTINGS
@@ -249,41 +251,6 @@ def run(name,public=False):
 		print('status failed to start the site so we are shutting down')
 		shutdown_stop_locked(name,**locks)
 		raise e
-
-	#! need to report public use here
-	if False:
-		if False:
-			try: lock_cluster,log_cluster = start_cluster(name,public=public)
-			except Exception as e:
-				stop_locked(lock=lock_site,log=log_site)
-				ortho.tracebacker(e)
-				raise Exception('failed to start the cluster so we shut down the site. exception: %s'%str(e)) 
-			try: lock_notebook,log_notebook = start_notebook(name,nb_port,public=public)
-			except Exception as e:
-				stop_locked(lock=lock_site,log=log_site)
-				stop_locked(lock=lock_cluster,log=log_cluster)
-				raise Exception('failed to start the notebook so we shut down the site and cluster. '
-					'exception: %s'%str(e))
-		# custom check that the notebook has found its port
-		# wait for the notebook to start up and then check for a port failure
-		time.sleep(2)
-		if False:
-			with open(log_notebook) as fp: log_text = fp.read()
-			if re.search('is already in use',log_text,re.M): 
-				stop_locked(lock=lock_site,log=log_site)
-				stop_locked(lock=lock_notebook,log=log_notebook)
-				stop_locked(lock=lock_cluster,log=log_cluster)
-				raise Exception('failed to start the notebook so we shut down the site and cluster. '
-					'possible port error in %s'%log_notebook)
-		# report the status to the user
-		url = 'http://%s:%d'%('localhost',site_port)
-		if public:
-			#! previously in a try/except/pass loop
-			this_hostnames = specs['public']['hostname']
-			this_hostnames = [this_hostnames] if type(this_hostnames) in str_types else this_hostnames
-			for this_hostname in this_hostnames:
-				url = 'http://%s:%d'%(this_hostname,specs['public']['port'])
-				print('status serving from: %s'%url)
 
 def shutdown(name=None):
 	"""Shutdown every running job."""

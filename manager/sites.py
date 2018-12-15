@@ -12,7 +12,7 @@ django_source = 'interface'
 project_settings_addendum = """
 # django settings addendum
 INSTALLED_APPS = tuple(list(INSTALLED_APPS)+['django_extensions','simulator','calculator'])
-# common static directory
+# common static directory if using collectstatic
 STATIC_ROOT = os.path.join(BASE_DIR,'static_root')
 TEMPLATES[0]['OPTIONS']['libraries'] = {'code_syntax':'calculator.templatetags.code_syntax'}
 TEMPLATES[0]['OPTIONS']['context_processors'].append('calculator.context_processors.global_settings')
@@ -34,9 +34,18 @@ urlpatterns = [
 	url(r'^admin/', admin.site.urls),]
 """
 
+# authorization for public sites
+code_check_passwd = """		
+def check_password(environ,user,password):
+	creds = %s
+	if (user,password) in creds: return True
+	else: False
+"""
+
 def abspath(fn):
 	"""Return absolute paths even inside user directory."""
-	return os.path.expanduser(os.path.abspath(fn))
+	#! very stupid to put expand user outside!
+	return os.path.abspath(os.path.expanduser(fn))
 
 def clear_site(name):
 	"""
@@ -53,7 +62,7 @@ def clear_site(name):
 		shutil.rmtree('site/'+name)
 
 #! should we have separate settings custom or what?
-def site_setup(name,settings_custom,make_superuser=True,specs=None):
+def site_setup(name,settings_custom,make_superuser=True,**specs):
 	"""
 	Sandbox the management of the Django site here.
 	"""
@@ -86,6 +95,10 @@ def site_setup(name,settings_custom,make_superuser=True,specs=None):
 		# one more thing: custom settings specify static paths for local or public serve
 		fp.write("\nSTATICFILES_DIRS = [os.path.join('%s','interface','static')]"%
 			os.path.abspath(os.getcwd()))
+		#! for development without copying the actual code and instead linking to the interface folder
+		#!   we have to add this or you cannot collect static files below with collectstatic
+		#! best to resolve the development vs non-development environment issues in a more comprehensive way
+		fp.write("\nimport sys;sys.path.insert(0,os.path.join('%s','interface'))"%os.path.abspath(os.getcwd()))
 
 	# write custom settings
 	custom_literals = ['CLUSTER_NAMER']
@@ -100,16 +113,17 @@ def site_setup(name,settings_custom,make_superuser=True,specs=None):
 			else: out = '%s = "%s"\n'%(key,val)
 			fp.write(out)
 
-	# development uses live copy of static files in interface/static
-	if not specs.get('public',None):
+	# development uses live copy of static files in interface/static via symlink
+	if not specs.get('public',None): 
 		try:
 			# link the static files to the development codes (could use copytree)
 			os.symlink(os.path.join(os.getcwd(),django_source,'static'),
 				os.path.join('site',connection_name,'static'))
-		#! already exists?
+		#! already exists? check for this strictly
 		except: pass
 	# production collects all static files
-	else: 
+	#! this is off because we have told wsgi where to find the static files
+	elif False: 
 		os.mkdir(os.path.join(os.getcwd(),'site',connection_name,'static_root'))
 		bash('python manage.py collectstatic',cwd='site/%s'%connection_name)
 
@@ -120,7 +134,9 @@ def site_setup(name,settings_custom,make_superuser=True,specs=None):
 	#!!! replace this with sync
 	# clone omnicalc if necessary
 	omnicalc_previous = os.path.isdir('calc/%s'%connection_name)
-	if not omnicalc_previous:
+	if not omnicalc_previous and not specs.get('calc',{}):
+		raise Exception('no previous omnicalc at %s and no calc key in the connection'%omnicalc_previous)
+	elif not omnicalc_previous:
 		if isinstance(omnicalc_upstream,dict):
 			address = omnicalc_upstream.pop('address')
 			if omnicalc_upstream: raise Exception('unprocessed git directives: %s'%omnicalc_upstream)

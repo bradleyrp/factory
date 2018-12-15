@@ -64,7 +64,8 @@ def make_tree_calculations(outgoing):
 	for cc,c in enumerate(calcs_tree_raw): calcs_tree_raw[cc]['href'] = 'get_code/%s.py'%c['text']
 	calcs_tree = json.dumps(calcs_tree_raw)
 	outgoing['trees']['calcs'] = {'title':'calculations',
-		'name':'calcs','name_tree':'calcs_tree','data':calcs_tree}
+		#!!!!!!!!!!!! RYAN THIS IS BROKEN FIX IT
+		'name':'calcs','name_tree':'calcs_tree','data':json.dumps([])}
 
 def make_tree_plots(outgoing):
 	"""Present plots as a tree."""

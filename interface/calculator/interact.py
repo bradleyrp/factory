@@ -23,6 +23,12 @@ from omni.base.store import picturedat
 from omni.omnicalc import WorkSpace
 #! omnicalc = __import__('omnicalc')
 
+try: import ortho
+except:
+	sys.path.insert(0,settings.FACTORY)
+	import ortho
+from ortho import backrun
+
 def get_workspace():
 	"""
 	Get a fresh copy of the workspace. Called by the calculator index function.
@@ -61,16 +67,15 @@ def get_notebook_token():
 	See if there is a notebook server running for the factory.
 	"""
 	#---check the notebook log file to get the token
-	with open('logs/notebook.%s'%settings.NAME) as fp: text = fp.read()
+	with open('logs/%s.notebook'%settings.NAME) as fp: text = fp.read()
 	# note that this token will also match a dummy noticed by the factory run command for using 
 	# ... a password instead of the token
 	token_regex = r'http:(?:.*?)\:(\d+)(?:\/\?token=)(.*?)\s'
-	jupyters_by_port = dict(re.findall(token_regex,text,re.M+re.DOTALL))
-	if len(jupyters_by_port)!=1: 
-		print(text)
-		raise Exception('error figuring out jupyter token: %s. notebook text is:\n%s'%(
+	jupyters_by_port = re.findall(token_regex,text,re.M+re.DOTALL)
+	if len(jupyters_by_port)==0: 
+		raise Exception('error figuring out jupyter token: %s. notebook text search is:\n%s'%(
 			jupyters_by_port,text))
-	else: return list(jupyters_by_port.values())[0]
+	else: return jupyters_by_port[-1][1]
 
 class FactoryBackrun:
 
@@ -93,7 +98,7 @@ class FactoryBackrun:
 		"""
 		self.avail()
 		self.log_fn = log
-		kwargs = dict(log=self.log_fn,stopper=self.lock_fn_abs,
+		kwargs = dict(log=self.log_fn,lock=self.lock_fn_abs,
 			cwd=self.cwd,killsig='KILL',scripted=False,kill_switch_coda='rm %s%s'%(self.lock_fn_abs,
 				'\n%s'%kill_switch_coda_extras if kill_switch_coda_extras else ''))
 		#---single command
@@ -206,7 +211,7 @@ class PictureAlbum:
 			plots_details[base_fn] = details
 
 		#---package the data into the global album which gets shipped out to the view
-		self.album = dict(files=dict([(k,plots_details[k]) for k in plots_details.keys()[:]]),
+		self.album = dict(files=dict([(k,plots_details[k]) for k in list(plots_details.keys())[:]]),
 			thumbnail_dn_base=thumbnails_subdn,thumbnail_dn_abs=thumbnails_dn,cats=sorted(cats))
 
 		#---make thumbnails if necessary
