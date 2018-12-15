@@ -12,7 +12,11 @@ from django.http import HttpResponse,HttpResponseRedirect
 from django.urls import reverse
 from .models import Kickstart,Simulation
 
-import ortho
+try: import ortho
+except:
+	sys.path.insert(0,settings.FACTORY)
+	import ortho
+	
 # requires ortho installed in site-packages via `python ortho/setup.py install`
 from ortho import bash
 from ortho.queue.simple_queue import launch

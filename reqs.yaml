@@ -18,6 +18,8 @@ dependencies:
     # factory requirements
     - ipython[notebook] # for factory
     - jupyter_contrib_nbextensions # for factory
+    #!!! putting this here on 2018.12.13. probably need to check apache2 and apache2-devel
+    - mod_wsgi
   # factory requirements
   # serve django via apache (requires apache2-devel rpm because no conda package for py2 yet)
   # removed requirement "mod_wsgi" here because it requires apache2-devel on rpm systems to be useful
