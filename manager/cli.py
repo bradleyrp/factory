@@ -8,13 +8,12 @@ from .deploy import start_site,start_cluster,start_notebook,stop_locked
 from .sites import site_setup,abspath
 from .settings import *
 
-# hook to find connection files
+# +++ HOOK: hook to find connection files
 default_connection_handler = {
 	'source':'manager/connection_handler.py',
 	'target':'connection_handler'}
 
-# hook to get a function for sending templates to connection files
-#! repetitive with the handler above
+# +++ HOOK: hook to get a function for sending templates to connection files
 connection_to_template = {
 	'source':'manager/connection_handler.py',
 	'target':'template_to_connection'}
@@ -23,7 +22,93 @@ default_omnicalc_repo = 'https://github.com/biophyscode/omnicalc'
 
 ### COMMAND-LINE INTERFACE
 
+def cluster_namer_settings(settings,specs):
+	#!!! deprecated. needs reworked. remains here as placeholder for interface
+	# cluster namer is set in a separate file
+	cluster_namer = {}
+	#! with open('manager/cluster_spec.py') as fp: exec(fp.read(),cluster_namer) 
+	"""
+	File naming conventions for the "cluster".
+	Important to the connection between factory and the cluster.
+	"""
+	cluster_namer = dict(
+		keepsakes = 'waiting running finished'.split(),
+		# extract the stamp with e.g.: '^%s$'%re.sub('STAMP','(.+)',waiting)
+		# glob the files with e.g.: re.sub('STAMP','*',waiting)
+		waiting = 'STAMP.req',
+		running = 'run-STAMP',
+		finished = 'fin-STAMP',)
+	for key in [i for i in cluster_namer if i 
+		not in cluster_namer['keepsakes']]: del cluster_namer[key]
+	settings['CLUSTER_NAMER'] = cluster_namer
+
+def gromacs_config_settings(settings,specs):
+	# if the user does not supply a gromacs_config.py the default happens
+	# option to specify gromacs config file for automacs8
+	if 'gromacs_config' in specs: 
+		gromacs_config_fn = specs['gromacs_config']
+		if not os.path.isfile(gromacs_config_fn):
+			raise Exception('cannot find gromacs_config file at %s'%gromacs_config_fn)
+		settings['GROMACS_CONFIG'] = os.path.join(os.getcwd(),gromacs_config_fn)
+	else: settings['GROMACS_CONFIG'] = False
+
+def base_settings(**specs):
+	"""Basic settings for all projects."""
+	settings = {
+		#! hard-coded from automacs in the conf. needs default?
+		'AUTOMACS':ortho.conf.get('automacs',
+			'https://github.com/biophyscode/automacs'),
+		'PLOT':abspath(specs['plot_spot']),
+		'POST':abspath(specs['post_spot']),
+		#! what is the purpose of COORDS?
+		'COORDS':abspath(specs.get('coords_spot',
+			os.path.join('data',specs['project_name'],'coords')),),
+		# omnicalc locations are fixed
+		'CALC':abspath(os.path.join('calc',specs['project_name'])),
+		'FACTORY':os.getcwd(),
+		#! cluster is under construction
+		'CLUSTER':'cluster'}
+	settings['NAME'] = specs['project_name']
+	#! necessary?
+	if False:
+		# all paths are absolute unless they have a colon in them, in which case it 
+		#   is ssh or http. we attach filesystem separators as well so that e.g. 
+		#   settings.SPOT can be added to relative paths
+		settings_custom = dict([(key,os.path.join(os.path.abspath(val),'') 
+			if ':' not in val else val)
+			for key,val in settings_custom.items()])
+	return settings
+
+def init_settings(project_name,calculations,calc_spot,post_spot,plot_spot):
+	"""Prepare all settings for the site with modular functions."""
+	#! python3 might have a nice args object to convert args to kwargs
+	specs = dict(project_name=project_name,calculations=calculations,
+		calc_spot=calc_spot,post_spot=post_spot,plot_spot=plot_spot)
+	settings = base_settings(**specs)
+	# add cluster namer, gromacs configuration
+	cluster_namer_settings(settings,specs)
+	gromacs_config_settings(settings,specs)
+	return settings
+
 class OmniFromFactory(Handler):
+	"""
+	Standard required flags are: calculations,calc_spot,post_spot,plot_spot
+	"""
+	def connection_development(self,project_name,
+		calculations,calc_spot,post_spot,plot_spot):
+		"""Main handler for the development environment."""
+		# initialize settings
+		settings = init_settings(project_name,
+			calculations,calc_spot,post_spot,plot_spot)
+		site_port = 8000
+		settings['NOTEBOOK_IP'] = 'localhost'
+		settings['NOTEBOOK_PORT'] = specs.get('port_notebook',site_port+1)
+		settings['extra_allowed_hosts'] = []
+
+		print('ready to roll binch')
+		import ipdb;ipdb.set_trace()
+
+class OmniFromFactoryDEPRECATED(Handler):
 	"""
 	Connect a connection.
 	"""
@@ -87,59 +172,9 @@ def get_connections(name):
 			'cannot find connection in the list of connections above: %s'%name)
 	return toc[name]
 
+#! this function is not long for this world
 def prep_settings_custom(project_name,**specs):
-	"""Prepare settings for Django."""
-	# first define folders and (possibly) http git repos
-	settings_custom = {
-		'SIMSPOT':abspath(specs.get('simulation_spot',
-			os.path.join('data',project_name,'sims'))),
-		#! hard-coded. get it from config.py??
-		'AUTOMACS':ortho.conf['automacs'],
-		'PLOT':abspath(specs['plot_spot']),
-		'POST':abspath(specs['post_spot']),
-		#! what is the purpose of COORDS?
-		'COORDS':abspath(specs.get('coords_spot',
-			os.path.join('data',project_name,'coords')),),
-		# omnicalc locations are fixed
-		'CALC':abspath(os.path.join('calc',project_name)),
-		'FACTORY':os.getcwd(),
-		#! get this from config.py
-		'CLUSTER':'cluster'}
-	#! some items like the github links are going to become dictionaries soon
-	for key,val in settings_custom.items():
-		if not isinstance(val,str_types): settings_custom[key] = str(val)
-	# all paths are absolute unless they have a colon in them, in which case it is ssh or http
-	# we attach filesystem separators as well so that e.g. settings.SPOT can be added to relative paths
-	settings_custom = dict([(key,os.path.join(os.path.abspath(val),'') if ':' not in val else val)
-		for key,val in settings_custom.items()])
-
 	#! previously in a separate file
-	# cluster namer is set in a separate file
-	cluster_namer = {}
-	#with open('manager/cluster_spec.py') as fp: exec(fp.read(),cluster_namer) 
-	"""
-	File naming conventions for the "cluster".
-	Important to the connection between factory and the cluster.
-	"""
-	cluster_namer = dict(
-		keepsakes = 'waiting running finished'.split(),
-		#---extract the stamp with e.g.: '^%s$'%re.sub('STAMP','(.+)',waiting)
-		#---glob the files with e.g.: re.sub('STAMP','*',waiting)
-		waiting = 'STAMP.req',
-		running = 'run-STAMP',
-		finished = 'fin-STAMP',
-		)
-	for key in [i for i in cluster_namer if i not in cluster_namer['keepsakes']]: del cluster_namer[key]
-
-	settings_custom['CLUSTER_NAMER'] = cluster_namer
-	# if the user does not supply a gromacs_config.py the default happens
-	# option to specify gromacs config file for automacs
-	if 'gromacs_config' in specs: 
-		gromacs_config_fn = specs['gromacs_config']
-		if not os.path.isfile(gromacs_config_fn):
-			raise Exception('cannot find gromacs_config file at %s'%gromacs_config_fn)
-		settings_custom['GROMACS_CONFIG'] = os.path.join(os.getcwd(),gromacs_config_fn)
-	else: settings_custom['GROMACS_CONFIG'] = False
 	# additional custom settings which are not paths
 	# if there is a public dictionary and we receive the "public" flag from make we serve public site
 	if specs.get('public',None):
@@ -191,25 +226,41 @@ def prep_settings_custom(project_name,**specs):
 		settings_custom['AUTOMACS'] = automacs_upstream
 		automacs_branch = config.get('automacs_branch',None)
 		if automacs_branch != None: settings_custom['AUTOMACS_BRANCH'] = automacs_branch
-
+	"""
+{'AUTOMACS': '/Users/rpb/worker/factory/{/',
+ 'CALC': '/Users/rpb/worker/factory/calc/actinlink_dev/',
+ 'CLUSTER': '/Users/rpb/worker/factory/cluster/',
+ 'CLUSTER_NAMER': {'finished': 'fin-STAMP',
+                   'running': 'run-STAMP',
+                   'waiting': 'STAMP.req'},
+ 'COORDS': '/Users/rpb/worker/factory/data/actinlink_dev/coords/',
+ 'FACTORY': '/Users/rpb/worker/factory/',
+ 'GROMACS_CONFIG': False,
+ 'NAME': 'actinlink_dev',
+ 'NOTEBOOK_IP': 'localhost',
+ 'NOTEBOOK_PORT': 8001,
+ 'PLOT': '/Users/rpb/worker/post-factory-demo/plot/',
+ 'POST': '/Users/rpb/worker/post-factory-demo/post/',
+ 'SIMSPOT': '/Users/rpb/worker/factory/data/actinlink_dev/sims/',
+ 'extra_allowed_hosts': []}
+	"""
 	return settings_custom
 
 def connect(name):
 	"""
 	Refresh an omnicalc project.
 	"""
-	#! arguments to specify whether we repack the web interface, etc
 	specs = get_connections(name)
+	# multiple connections can map to the same project by setting the name here
+	name = specs.pop('name',name)
+	specs['project_name'] = name
 	# substitute PROJECT_NAME with the root
 	if ' ' in name: raise Exception('name cannot contain spaces: %s'%name)
 	for key,val in specs.items():
 		if isinstance(val,str_types):
 			specs[key] = re.sub('PROJECT_NAME',name,val)
-	settings_custom = prep_settings_custom(project_name=name,**specs)
 	# run the connection handler
-	connector = OmniFromFactory(
-		project_name=name,settings_custom=settings_custom,
-		**specs).result
+	connector = OmniFromFactory(**specs).result
 
 def shutdown_stop_locked(name,**locks):
 	# we try/except on these since any one may have failed
