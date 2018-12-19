@@ -60,7 +60,12 @@ class OmniFromFactory(Handler):
 			public=public,development=development)
 
 def connection_template(kind,name):
-	"""Make a template and write the file."""
+	"""
+	Make a template and write the file.
+
+	:kind: a style (basic)
+	:name: the name of the project
+	"""
 	config = read_config()
 	connection_templates = {
 		'basic':{
