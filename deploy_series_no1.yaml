@@ -26,6 +26,8 @@ dockerfiles:
     EXPOSE 22
     EXPOSE 8000
     EXPOSE 8888
+  debian_apache:
+    RUN apt-get install -y apache2 apache2-dev
   debian_shell_bash: |
     SHELL ["/bin/bash", "--login", "-c"]
   make_user:
@@ -219,6 +221,9 @@ deploy_linux_factory:
 factory_connect:
   via: deploy_linux_factory
   overrides:
+    script: |
+      cd factory
+      make connect actinlink
     command: docker-compose run site # up -d site
     compose:
       version: '3'
@@ -228,22 +233,56 @@ factory_connect:
           build: .
           image: factory:deploy_linux_factory
           volumes:
+            # note that dot means site here, because we run from there
             - ./:/home/rpb/extern
             #! hardcoded for now. use the connection file
             - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/rpb/extern/factory/connections/actinlink.yaml
-            #! paths used in actinlink.yaml 
+            #! paths used in actinlink.yaml hardcoded above
             - /Users/rpb/worker/post-factory-demo:/home/rpb/worker/post-factory-demo
           stdin_open: true
           tty: true
           command: ['/bin/bash']
           ports:
             - "8888:8888"
-          container_name: factory_visit
+            - "8000:8000"
+          container_name: factory_site
 
+#! under development. run things in connect first
+#! we need recursion for via! this is very similar to the above
 factory_up:
   via: deploy_linux_factory
   overrides:
-    command: docker-compose run site # up -d site
+    #command: docker-compose up -d site # up -d site
+    command: docker-compose run --service-ports site # up -d site
+    compose:
+      version: '3'
+      services:
+        # use: docker-compose run visit
+        site:
+          build: .
+          image: factory:deploy_linux_factory
+          volumes:
+            # note that dot means site here, because we run from there
+            - ./:/home/rpb/extern
+            #! hardcoded for now. use the connection file
+            - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/rpb/extern/factory/connections/actinlink.yaml
+            #! paths used in actinlink.yaml hardcoded above
+            - /Users/rpb/worker/post-factory-demo:/home/rpb/worker/post-factory-demo
+          stdin_open: true
+          tty: true
+          #entrypoint: ['/usr/bin/make','-C','~/extern/factory','run','actinlink']
+          ports:
+            - "8888:8888"
+            - "8000:8000"
+            - "8001:8001"
+          container_name: factory_site
+          entrypoint: ['/bin/bash','script.sh']
+    script: |
+      cd factory
+      rm -f pid* TASK_QUEUE
+      make connect actinlink
+      make run actinlink public
+      sleep infinity
 
 ### LOCAL/NATIVE tests
 ### these tests run inside the parent factory
