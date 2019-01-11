@@ -170,7 +170,7 @@ def site_setup(name,settings_custom,make_superuser=True,**specs):
 	# now that site is ready we can write credentials
 	if specs.get('public',None):
 		# write key,value pairs as Basic Auth user/passwords
-		creds = specs['public'].get('credentials',{})
+		creds = specs.get('public',{}).get('credentials',{})
 		if creds: 
 			with open(os.path.join('site',connection_name,connection_name,'wsgi_auth.py'),'w') as fp:
 				fp.write(code_check_passwd%str([(k,v) for k,v in creds.items()]))
