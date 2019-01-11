@@ -102,10 +102,10 @@ class OmniFromFactory(Handler):
 			calculations,calc_spot,post_spot,plot_spot)
 		site_port = 8000
 		settings['NOTEBOOK_IP'] = 'localhost'
+		#!!! settings['NOTEBOOK_PORT'] = specs.get('port_notebook',site_port+1)
 		settings['NOTEBOOK_PORT'] = specs.get('port_notebook',site_port+1)
 		settings['extra_allowed_hosts'] = []
-
-		print('ready to roll binch')
+		
 		import ipdb;ipdb.set_trace()
 
 class OmniFromFactoryDEPRECATED(Handler):
@@ -145,7 +145,12 @@ class OmniFromFactoryDEPRECATED(Handler):
 			public=public,development=development)
 
 def connection_template(kind,name):
-	"""Make a template and write the file."""
+	"""
+	Make a template and write the file.
+
+	:kind: a style (basic)
+	:name: the name of the project
+	"""
 	config = read_config()
 	connection_templates = {
 		'basic':{
