@@ -102,10 +102,10 @@ class OmniFromFactory(Handler):
 			calculations,calc_spot,post_spot,plot_spot)
 		site_port = 8000
 		settings['NOTEBOOK_IP'] = 'localhost'
+		#!!! settings['NOTEBOOK_PORT'] = specs.get('port_notebook',site_port+1)
 		settings['NOTEBOOK_PORT'] = specs.get('port_notebook',site_port+1)
 		settings['extra_allowed_hosts'] = []
-
-		print('ready to roll binch')
+		
 		import ipdb;ipdb.set_trace()
 
 class OmniFromFactoryDEPRECATED(Handler):
