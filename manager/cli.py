@@ -254,6 +254,7 @@ def connect(name):
 	# multiple connections can map to the same project by setting the name here
 	name = specs.pop('name',name)
 	specs['project_name'] = name
+	import ipdb;ipdb.set_trace()
 	# substitute PROJECT_NAME with the root
 	if ' ' in name: raise Exception('name cannot contain spaces: %s'%name)
 	for key,val in specs.items():
