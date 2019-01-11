@@ -65,6 +65,7 @@ def base_settings(**specs):
 			os.path.join('data',specs['project_name'],'coords')),),
 		# omnicalc locations are fixed
 		'CALC':abspath(os.path.join('calc',specs['project_name'])),
+		'SIMSPOT':None,
 		'FACTORY':os.getcwd(),
 		#! cluster is under construction
 		'CLUSTER':'cluster'}
@@ -90,27 +91,77 @@ def init_settings(project_name,calculations,calc_spot,post_spot,plot_spot):
 	gromacs_config_settings(settings,specs)
 	return settings
 
+def connect_run(project_name,settings_custom,post_spot,plot_spot,calculations,
+	public=False,development=False,sims=None):
+	"""
+	Instantiate a connection. Called by OmniFromFactory.
+	"""
+	config = read_config()
+	# make directories minus calc spot which is cloned
+	dns = [post_spot,plot_spot]+([sims] if sims!=None else [])
+	for dn in dns:
+		if dn==None: continue
+		if not os.path.isdir(dn): mkdirs(dn)
+	calc_root = os.path.join('calc',project_name)
+	# clone omnicalc into the calculation folder
+	modules_this = {calc_root:
+		config.get('omnicalc',default_omnicalc_repo)}
+	try: modules.sync(modules=modules_this,current=True)
+	except Exception as e: 
+		print('warning got error on sync: '+str(e))
+		print('warning failed to sync the repo: %s'%modules_this)
+	# clone and synchronize calculations reposotory
+	if calculations: 
+		modules_calcs_this = {
+			os.path.join('calc',project_name,'calcs'):calculations}
+		try: modules.sync(modules=modules_calcs_this)
+		except: print('warning failed to sync the repo: %s'%
+			modules_calcs_this)
+	# update the postprocssing locations
+	ortho.bash('make set post_plot_spot %s'%plot_spot,cwd=calc_root)
+	ortho.bash('make set post_data_spot %s'%post_spot,cwd=calc_root)
+	# prepare the site, with some yaml keys passed through
+	#! could also pass through database, calc
+	site_setup(project_name,settings_custom=settings_custom,
+		public=public,development=development)
+
 class OmniFromFactory(Handler):
 	"""
-	Standard required flags are: calculations,calc_spot,post_spot,plot_spot
+	Route requests for an omnicalc project to the connect_run function
+	with settings depending on the connection dictionary.
 	"""
 	def connection_development(self,project_name,
 		calculations,calc_spot,post_spot,plot_spot):
 		"""Main handler for the development environment."""
-		# initialize settings
 		settings = init_settings(project_name,
 			calculations,calc_spot,post_spot,plot_spot)
 		site_port = 8000
 		settings['NOTEBOOK_IP'] = 'localhost'
-		settings['NOTEBOOK_PORT'] = specs.get('port_notebook',site_port+1)
+		connect_run(project_name=project_name,settings_custom=settings,
+			post_spot=post_spot,plot_spot=plot_spot,calculations=calculations)
+	def connection_public(self,project_name,
+		calculations,calc_spot,post_spot,plot_spot,public):
+		"""Main handler for the development environment."""
+		# initialize settings (repetitive with connection_development above)
+		settings = init_settings(project_name,
+			calculations,calc_spot,post_spot,plot_spot)
+		site_port = 8000
+		settings['NOTEBOOK_IP'] = 'localhost'
+		# additional commands because public
+		# the apparent notebook port is used to set the NOTEBOOK_PORT in django
+		#   in case we are in a container and the link to the notebook needs to
+		#   happen on another port
+		settings['NOTEBOOK_PORT'] = public.get('notebook_port_apparent',
+			public.get('notebook_port',site_port+1))
 		settings['extra_allowed_hosts'] = []
-
-		print('ready to roll binch')
-		import ipdb;ipdb.set_trace()
+		connect_run(public=public,
+			project_name=project_name,settings_custom=settings,
+			post_spot=post_spot,plot_spot=plot_spot,calculations=calculations)
 
 class OmniFromFactoryDEPRECATED(Handler):
 	"""
 	Connect a connection.
+	DEPRECATED above in kind and in connect_run
 	"""
 	def connect(self,project_name,calc_spot,post_spot,settings_custom,
 		plot_spot,sims=None,calculations=None,public=False,development=True):
@@ -170,7 +221,11 @@ def get_connections(name):
 		treeview(dict(connections=toc.keys()))
 		raise Exception(
 			'cannot find connection in the list of connections above: %s'%name)
-	return toc[name]
+	specs = toc[name]
+	# multiple connections can map to the same project by setting the name here
+	name = specs.pop('name',name)
+	specs['project_name'] = name
+	return specs
 
 #! this function is not long for this world
 def prep_settings_custom(project_name,**specs):
@@ -250,10 +305,8 @@ def connect(name):
 	"""
 	Refresh an omnicalc project.
 	"""
+	print('status connecting to %s'%name)
 	specs = get_connections(name)
-	# multiple connections can map to the same project by setting the name here
-	name = specs.pop('name',name)
-	specs['project_name'] = name
 	# substitute PROJECT_NAME with the root
 	if ' ' in name: raise Exception('name cannot contain spaces: %s'%name)
 	for key,val in specs.items():
@@ -278,6 +331,8 @@ def run(name,public=False):
 	from ortho import check_port
 	# start the site first before starting the cluster
 	specs = get_connections(name)
+	# the command-line name can be overridden by the connection dict
+	project_name = specs['project_name']
 	if not public:
 		# local runs always use the next port for the notebook
 		site_port = specs.get('port',8000)
@@ -292,14 +347,17 @@ def run(name,public=False):
 	locks = {}
 	# master try except loop so everything runs together or not at all
 	try:
-		lock_site,log_site = start_site(name,port=site_port,public=public)
+		lock_site,log_site = start_site(project_name,connection_name=name,
+			port=site_port,public=public)
 		locks.update(lock_site=lock_site,log_site=log_site)
-		lock_cluster,log_cluster = start_cluster(name,public=public)
+		lock_cluster,log_cluster = start_cluster(project_name,public=public)
 		locks.update(lock_cluster=lock_cluster,log_cluster=log_cluster)
-		lock_notebook,log_notebook = start_notebook(name,port=nb_port,public=public)
+		lock_notebook,log_notebook = start_notebook(project_name,connection_name=name,
+			port=nb_port,public=public)
 		locks.update(lock_notebook=lock_notebook,log_notebook=log_notebook)
 	except Exception as e:
 		print('status failed to start the site so we are shutting down')
+		print('warning exception that caused the failure was: %s'%e)
 		shutdown_stop_locked(name,**locks)
 		raise e
 

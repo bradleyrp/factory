@@ -64,15 +64,16 @@ def get_public_ports(name):
 	user,group = username,groupname
 	port_site = public_details['port']
 	port_notebook = public_details.get('notebook_port',port_site+1)
-	notebook_ip = public_details.get('notebook_hostname',public_details.get('hostname','localhost'))
+	notebook_ip = public_details.get('hostname_notebook',public_details.get('hostname','localhost'))
 	# if we have a list of hostnames then the first is the primary
 	if type(notebook_ip) not in str_types: notebook_ip = notebook_ip[0]
 	details = dict(user=user,group=group,port_notebook=port_notebook,
 		port_site=port_site,notebook_ip=notebook_ip,
 		jupyter_localhost=public_details.get('jupyter_localhost',False))
+	#! why are there three different IPs, one for the notebook and one for the jupyter_localhost?
 	return details
 
-def start_site(name,port,public=False,sudo=False):
+def start_site(name,connection_name,port,public=False,sudo=False):
 	"""
 	Run the mod_wsgi server to serve the site.
 	Note that mod_wsgi must be in reqs.yaml and you may need apache2 and apache2-devel rpms.
@@ -83,7 +84,7 @@ def start_site(name,port,public=False,sudo=False):
 		raise Exception('missing project named "%s". did you forget to connect it?'%name)
 	# if public we require an override port so that users are careful
 	if public:
-		public_details = get_public_ports(name)
+		public_details = get_public_ports(connection_name)
 		port = public_details['port_site']
 		# previously got user/group from the public dictionary but now we just use the current user
 		username,uid = get_user()
@@ -97,7 +98,12 @@ def start_site(name,port,public=False,sudo=False):
 	if not public:
 		cmd = 'python %s runserver 0.0.0.0:%s'%(os.path.join(os.getcwd(),site_dn,'manage.py'),port)
 	else:
-		wsgi_path = get_conda_bin('mod_wsgi-express')
+		try: wsgi_path = get_conda_bin('mod_wsgi-express')
+		except Exception as e: 
+			print('warning you may need to ensure mod_wsgi is in the pip list in '
+				'reqs.yaml (followed by a `make env <name>` command), and that '
+				'apache, apache-devel are installed in your operating system')
+			raise Exception(e)
 		#! hard-coded development static paths
 		cmd = ('%s%s start-server '%('sudo ' if sudo else '',wsgi_path)+
 			'--port %d site/%s/%s/wsgi.py --user %s --group %s '+
@@ -141,17 +147,17 @@ def start_cluster(name,public=False,sudo=False):
 	Start a calculation cluster.
 	"""
 	from ortho.queue import simple_task_queue
-	queue_spec = simple_task_queue(log='logs/cluster.%s'%name,
+	queue_spec = simple_task_queue(log=log_cluster%name,
 		lock='pid.%s.cluster.lock'%name)
 	return queue_spec['lock'],queue_spec['log']
 
-def start_notebook(name,port,public=False,sudo=False):
+def start_notebook(name,connection_name,port,public=False,sudo=False):
 	"""
 	Start a Jupyter notebook server.
 	"""
 	# if public we require an override port so that users are careful
 	if public: 
-		public_details = get_public_ports(name)
+		public_details = get_public_ports(connection_name)
 		port,notebook_ip = [public_details[i] for i in ['port_notebook','notebook_ip']]
 		#! low ports are on. to turn them off remove False below and 
 		if port<=1024: raise Exception('cannot use port %d for this project. '%port+
@@ -188,7 +194,10 @@ def start_notebook(name,port,public=False,sudo=False):
 			os.path.join(os.getcwd(),path_jupyter))+
 			('--user=%s '%username if sudo else '')+(' %s '%rate_cmd if rate_cmd else '')+
 			'--port-retries=0 '+'--port=%d --no-browser --ip="%s" --notebook-dir="%s"'%(port,
-				notebook_ip if not public_details.get('jupyter_localhost',False) else 'localhost',
+				#! notebook_ip if not public_details.get('jupyter_localhost',False) else 'localhost',
+				#! changed the above to get the jupuyter_localhost directly
+				#! note that we have three different hostname equivalents
+				public_details.get('jupyter_localhost',notebook_ip),
 				note_root))
 	backrun(cmd=cmd,log=log,lock=lock,killsig='TERM',
 		scripted=False,kill_switch_coda='rm %s'%lock,sudo=sudo,
