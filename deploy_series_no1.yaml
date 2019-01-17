@@ -140,13 +140,23 @@ deploy_linux_factory:
   # see factory_* recipes above rather than using this directly
   # hook to check mounts if we must run in an external volume
   #! move this prelim to a macos flavored version via "via" version or it will fail on linux
-  prelim: "@deploy_site"
+  #! make set_hook deploy_site="\"False\"" ... !!!!
+  #! replace prelim with the site key below: prelim: "@deploy_site"
   #! not currently used in formula.py?
-  persist: true
+  #! persist: true
   # use the macos disk image utility to make a case-insensitive volume
   #! disambiguate this and prelim for deployment on other linux machines
-  site: /Volumes/site-nix/
+  #! site: /Volumes/site-nix/
+  #! site: /home/rpb/sigma/spot/deploy/site
+  site: "@deploy_site"
   # note that redeployment always reruns the conda env update command
+  # the following is a default/null hook (@linux_identity) which, when not
+  #   pointing to a non-null hook, checks if you are on linux and adds the 
+  #   user argument (with UID and GID) to all subtrees in a compose, services 
+  #   tree. this is only necessary on docker for linux, so you can operate as
+  #   a user (even though docker needs to be started by root). on docker for 
+  #   macos, the docker commands seem to run as the user, and not root
+  identity: "@linux_identity"
   script: |
     if [ -d factory ]; then echo "[STATUS] factory already exists" && exit 0; fi
     # this script can repeat to confirm the installation
@@ -220,8 +230,8 @@ factory_up:
   via: deploy_linux_factory
   overrides:
     # use run if you want to visit otherwise use up (see entrypoint also)
-    # command: docker-compose run --service-ports site
-    command: docker-compose up -d site
+    command: docker-compose run --service-ports site
+    # command: docker-compose up -d site
     compose:
       version: '3'
       services:
@@ -246,14 +256,16 @@ factory_up:
             - "9001:8001"
           container_name: factory_site
           # if you want to visit just use bash below and run in the command above
-          # entrypoint: ['/bin/bash']
-          entrypoint: ['/bin/bash','script.sh']
+          entrypoint: ['/bin/bash']
+          # entrypoint: ['/bin/bash','script.sh']
     script: |
       cd factory
       rm -f pid* TASK_QUEUE
       make connect actinlink_container
       make run actinlink_container public
       sleep infinity
+
+#! need a reaching-into method for changing entrypoint and command to modify the recipe above!
 
 ### LOCAL/NATIVE tests
 ### these tests run inside the parent factory
