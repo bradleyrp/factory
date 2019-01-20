@@ -137,26 +137,16 @@ factory_build_full:
 ### PRIMARY RECIPE BASE
 
 deploy_linux_factory:
-  # see factory_* recipes above rather than using this directly
+  # see factory_* recipes rather than using this directly
   # hook to check mounts if we must run in an external volume
-  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
-  #! make set_hook deploy_site="\"False\"" ... !!!!
-  #! replace prelim with the site key below: prelim: "@deploy_site"
-  #! not currently used in formula.py?
-  #! persist: true
-  # use the macos disk image utility to make a case-insensitive volume
-  #! disambiguate this and prelim for deployment on other linux machines
-  #! site: /Volumes/site-nix/
-  #! site: /home/rpb/sigma/spot/deploy/site
+  # "site" instructions
+  #   the site tells this factory where (on disk) to deploy a dockerized factory
+  #   on linux, run `make set_hook deploy_site=/path/to/deployment/site`
+  #   on macos, read the docstring in get_macrdive in hooks/macdrive.py 
+  #     to set up an external volume, which is required due to filename case
   site: "@deploy_site"
-  # note that redeployment always reruns the conda env update command
-  # the following is a default/null hook (@linux_identity) which, when not
-  #   pointing to a non-null hook, checks if you are on linux and adds the 
-  #   user argument (with UID and GID) to all subtrees in a compose, services 
-  #   tree. this is only necessary on docker for linux, so you can operate as
-  #   a user (even though docker needs to be started by root). on docker for 
-  #   macos, the docker commands seem to run as the user, and not root
-  identity: "@linux_identity"
+  # we assume that the site is a permanent spot for storing the "real" factory
+  persist: true
   script: |
     if [ -d factory ]; then echo "[STATUS] factory already exists" && exit 0; fi
     # this script can repeat to confirm the installation
@@ -171,8 +161,7 @@ deploy_linux_factory:
     make
     # make the environment or update if reqs.yaml has changed
     make env conda_py3
-  #! note that if you want to build this, you should run factory_build
-  #!   since this recipe is just the parent
+  # note that if you want to build this, you should run factory_(re)build
   rebuild: false 
   dockerfile:
     sequence:
@@ -185,8 +174,8 @@ deploy_linux_factory:
       - debian_shell_bash
       - make_user
     addendum:
-      #! needs shell substitution
-      - WORKDIR /home/rpb/extern
+      # we use a generic "user" throughout
+      - WORKDIR /home/user/extern
   compose:
     version: '3'
     services:
@@ -195,7 +184,7 @@ deploy_linux_factory:
         build: .
         image: factory:deploy_linux_factory
         volumes:
-          - ./:/home/rpb/extern
+          - ./:/home/user/extern
         stdin_open: true
         tty: true
         command: ['/bin/bash']
@@ -207,7 +196,7 @@ deploy_linux_factory:
         build: .
         image: factory:deploy_linux_factory
         volumes:
-          - ./:/home/rpb/extern
+          - ./:/home/user/extern
         ports:
           - "8888:8888"
         hostname: factory_remote
@@ -217,7 +206,7 @@ deploy_linux_factory:
         build: .
         image: factory:deploy_linux_factory
         volumes:
-          - ./:/home/rpb/extern
+          - ./:/home/user/extern
         ports:
           - "8000:8000"
         hostname: factory_site
@@ -241,11 +230,11 @@ factory_up:
           image: factory:deploy_linux_factory
           volumes:
             # note that dot means site here, because we run from there
-            - ./:/home/rpb/extern
+            - ./:/home/user/extern
             #! hardcoded for now. use the connection file
-            - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/rpb/extern/factory/connections/actinlink.yaml
+            - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/user/extern/factory/connections/actinlink.yaml
             #! paths used in actinlink.yaml hardcoded above
-            - /Users/rpb/worker/post-factory-demo:/home/rpb/worker/post-factory-demo
+            - /Users/rpb/worker/post-factory-demo:/home/user/worker/post-factory-demo
           stdin_open: true
           tty: true
           # entrypoint: ['/usr/bin/make','-C','~/extern/factory','run','actinlink']
@@ -266,186 +255,3 @@ factory_up:
       sleep infinity
 
 #! need a reaching-into method for changing entrypoint and command to modify the recipe above!
-
-### LOCAL/NATIVE tests
-### these tests run inside the parent factory
-
-no2:
-  site: test-no2
-  script: |
-    set -e
-    git clone https://github.com/biophyscode/automacs -b ortho test
-    cd test
-    make 
-    make gromacs_config local
-    make setup all
-    #! bug: note that `make go protein` fails in this context but not typically
-    make prep protein
-    python -u script.py
-
-no2_prep:
-  site: test-no2
-  script: |
-    set -e
-    git clone https://github.com/biophyscode/automacs -b ortho test
-    cd test
-    make 
-    make gromacs_config local
-    make setup all
-    make set activate_env="../../env/bin/activate py3"
-    echo "ready to run: 'make go protein' at $(pwd)"
-
-demo_omni:
-  script: |
-    # assumes connections/demo.yaml
-    make connect demo
-
-no3:
-  #! site: test-no3
-  script: |
-    set -e
-    git clone https://github.com/biophyscode/automacs -b ortho_clean test
-    cd test
-    make setup all
-    cd inputs/proteins && git checkout ortho_clean && cd ../..
-    make prep protein
-    python -u script.py
-  site: /Users/rpb/dumbspot
-
-### DOCKER TESTS
-### these tests run inside a Docker (see above)
-
-no4:
-  #! failing because this depends on gromacs and you need to do a build_full first
-  via: deploy_linux_factory
-  overrides:
-    command: docker-compose run --service-ports deploy
-    script: |
-      set -e
-      source factory/env/bin/activate py3
-      source /usr/local/gromacs/bin/GMXRC.bash
-      this=test-$(date +%Y%m%d%H%M)
-      git clone https://github.com/biophyscode/automacs -b ortho_clean $this
-      cd $this
-      make setup all
-      cd inputs/proteins && git checkout ortho_clean && cd ../..
-      make prep protein
-      #! python -u script.py
-
-### SINGULARITY via DOCKER on macos
-
-#! custom for macos right now
-vagrant_setup:
-  site: ~/worker/vagrant-springboard
-  singularity_version: 2.6
-
-docker_singularity:
-  # hook to check mounts if we must run in an external volume
-  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
-  prelim: "@deploy_site"
-  persist: true
-  # use the macos disk image utility to make a case-insensitive volume
-  #! disambiguate this and prelim for deployment on other linux machines
-  site: /Volumes/site-nix/site-factory-linux
-  rebuild: false 
-  #! script, deploy service entrypoint, and the up command with detach (-d)
-  #!   flag are all probably unnecessary. the script runs in detach and the
-  #!   entire purpose of this recipe is to parent the docker_singularity_rebuild
-  #!   and hence set the stage for the other derived recipes
-  script: |
-    echo "docker_singularity is built!"
-  dockerfile:
-    sequence:
-      - stretch
-      - debian_start
-      - debian_compilers
-      - debian_mysql
-      - debian_shell_bash
-      - singularity
-      #! must be root - make_user
-    addendum:
-      #! needs shell substitution
-      - WORKDIR /home/rpb/extern
-  compose:
-    version: '3'
-    services:
-      # use: docker-compose run visit
-      visit:
-        build: .
-        image: factory:docker_singularity
-        volumes:
-          - ./:/home/rpb/extern
-        stdin_open: true
-        tty: true
-        command: ['/bin/bash']
-        ports:
-          - "8888:8888"
-        container_name: docker_singularity_visit
-      deploy:
-        entrypoint: ['/bin/bash','script.sh']
-        build: .
-        image: factory:docker_singularity
-        volumes:
-          - ./:/home/rpb/extern
-        ports:
-          - "8888:8888"
-        container_name: docker_singularity_deploy
-  command: docker-compose up -d deploy
-
-docker_singularity_rebuild:
-  via: docker_singularity
-  overrides:
-    rebuild: true
-  
-docker_singularity_visit:
-  via: docker_singularity
-  overrides:
-    command: docker-compose run --service-ports visit
-
-docker_singularity_makerspace:
-  ### recipe for making Singularity containers
-  via: docker_singularity
-  overrides:
-    command: sudo docker-compose run --service-ports visit
-    compose:
-      version: '3'
-      services:
-        # use: docker-compose run visit
-        visit:
-          build: .
-          image: factory:docker_singularity
-          volumes:
-            - ./:/home/rpb/extern
-          stdin_open: true
-          tty: true
-          command: ['/bin/bash']
-          ports:
-            - "8888:8888"
-          privileged: true
-        deploy:
-          entrypoint: ['/bin/bash','script.sh']
-          build: .
-          image: factory:docker_singularity
-          volumes:
-            - ./:/home/rpb/extern
-          ports:
-            - "8888:8888"
-  notes: |
-    make repl source=deploy_series_no1.yaml name=docker_singularity_makerspace
-    cd /home/rpb/extern/singularity-makerspace
-    singularity image.create container.simg
-    cat > Singularity
-      BootStrap: docker
-      From: centos:centos7
-      OSVersion: 7
-      MirrorURL: http://mirror.centos.org/centos-%{OSVERSION}/%{OSVERSION}/os/$basearch/
-      Include: yum
-      %runscript
-      echo "welcome"
-      exec echo "Hello World" "$@"
-      %post
-      echo "Ready to install software and other dependencies for the container!"
-      yum -y update
-      yum -y install git
-      yum -y groupinstall "Development Tools"
-    singularity build container.simg Singularity
