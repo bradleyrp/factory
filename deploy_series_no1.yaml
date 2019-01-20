@@ -1,6 +1,6 @@
 ### REFERENCE
 
-# segments of Dockerfile
+# Dockerfile components
 dockerfiles:
   copy_run_script: |
     COPY script.sh script.sh
@@ -9,6 +9,7 @@ dockerfiles:
     FROM debian:stretch
   debian_start: |
     ARG DEBIAN_FRONTEND=noninteractive
+    RUN apt-get -y clean
     RUN apt-get -y update
     RUN apt-get install -y git make wget vim screen
     RUN apt-get install -y procps
@@ -28,6 +29,8 @@ dockerfiles:
     EXPOSE 8888
   debian_apache:
     RUN apt-get install -y apache2 apache2-dev
+  debian_image_magick:
+    RUN apt-get install -y imagemagick
   debian_shell_bash: |
     SHELL ["/bin/bash", "--login", "-c"]
   make_user:
@@ -69,30 +72,21 @@ dockerfiles:
     RUN make
     RUN make install
 
-# easy commands
-#! note that overrides ability could eventually be replaced with kwargs
-#!   which would allow kwargs to override some flags, but this would require
-#!   hooks but would reduce the YAML spec
-interface:
-  central:
-    args:
-      notebook: factory_notebook
-
 ### macos utilities (see hooks/macdrive.py)
 macos_unmount:
   call: hdiutil detach /Volumes/site-nix
 
 ### DEPLOY IN DOCKER
 
-factory_rebuild:
-  via: deploy_linux_factory
-  overrides:
-    rebuild: true
-
 factory_visit:
   via: deploy_linux_factory
   overrides:
     command: docker-compose run --service-ports visit
+factory_do:
+  #! need recursion so you can use this (see no4 below)
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run --service-ports deploy
 
 factory_notebook:
   via: deploy_linux_factory
@@ -100,9 +94,8 @@ factory_notebook:
     command: docker-compose up -d deploy
     script: |
       cd factory
-      source env/bin/activate py2
+      source env/bin/activate py3
       jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 
-
 factory_notebook_live:
   # run the notebook in the foreground
   via: deploy_linux_factory
@@ -110,16 +103,21 @@ factory_notebook_live:
     command: docker-compose run --service-ports deploy
     script: |
       cd factory
-      source env/bin/activate py2
+      source env/bin/activate py3
       jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 
 
-#! need recursion so you can use this (see no4 below)
-factory_do:
+factory_build:
+  # run the build script below to ensure factory exists without rebuilding image
   via: deploy_linux_factory
   overrides:
-    command: docker-compose run --service-ports deploy
-
+    command: docker-compose run deploy
+factory_rebuild:
+  # rebuild the container to accomodate changes
+  via: deploy_linux_factory
+  overrides:
+    rebuild: true
 factory_build_full:
+  # an alternate (override) rebuild of the container with more software
   via: deploy_linux_factory
   overrides:
     rebuild: true
@@ -136,23 +134,29 @@ factory_build_full:
         #! needs shell substitution
         - WORKDIR /home/rpb/extern
 
-factory_build:
-  # run the build script below to ensure factory exists without rebuilding image
-  via: deploy_linux_factory
-  overrides:
-    command: docker-compose run deploy
+### PRIMARY RECIPE BASE
 
 deploy_linux_factory:
   # see factory_* recipes above rather than using this directly
   # hook to check mounts if we must run in an external volume
   #! move this prelim to a macos flavored version via "via" version or it will fail on linux
-  prelim: "@deploy_site"
+  #! make set_hook deploy_site="\"False\"" ... !!!!
+  #! replace prelim with the site key below: prelim: "@deploy_site"
   #! not currently used in formula.py?
-  persist: true
+  #! persist: true
   # use the macos disk image utility to make a case-insensitive volume
   #! disambiguate this and prelim for deployment on other linux machines
-  site: /Volumes/site-nix/
+  #! site: /Volumes/site-nix/
+  #! site: /home/rpb/sigma/spot/deploy/site
+  site: "@deploy_site"
   # note that redeployment always reruns the conda env update command
+  # the following is a default/null hook (@linux_identity) which, when not
+  #   pointing to a non-null hook, checks if you are on linux and adds the 
+  #   user argument (with UID and GID) to all subtrees in a compose, services 
+  #   tree. this is only necessary on docker for linux, so you can operate as
+  #   a user (even though docker needs to be started by root). on docker for 
+  #   macos, the docker commands seem to run as the user, and not root
+  identity: "@linux_identity"
   script: |
     if [ -d factory ]; then echo "[STATUS] factory already exists" && exit 0; fi
     # this script can repeat to confirm the installation
@@ -176,6 +180,8 @@ deploy_linux_factory:
       - debian_start
       - debian_compilers
       - debian_mysql
+      - debian_apache
+      - debian_image_magick
       - debian_shell_bash
       - make_user
     addendum:
@@ -218,42 +224,14 @@ deploy_linux_factory:
         container_name: factory_site
   command: docker-compose up -d deploy
 
-factory_connect:
-  via: deploy_linux_factory
-  overrides:
-    script: |
-      cd factory
-      make connect actinlink
-    command: docker-compose run site # up -d site
-    compose:
-      version: '3'
-      services:
-        # use: docker-compose run visit
-        site:
-          build: .
-          image: factory:deploy_linux_factory
-          volumes:
-            # note that dot means site here, because we run from there
-            - ./:/home/rpb/extern
-            #! hardcoded for now. use the connection file
-            - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/rpb/extern/factory/connections/actinlink.yaml
-            #! paths used in actinlink.yaml hardcoded above
-            - /Users/rpb/worker/post-factory-demo:/home/rpb/worker/post-factory-demo
-          stdin_open: true
-          tty: true
-          command: ['/bin/bash']
-          ports:
-            - "8888:8888"
-            - "8000:8000"
-          container_name: factory_site
+### PRIMARY USER RECIPES
 
-#! under development. run things in connect first
-#! we need recursion for via! this is very similar to the above
 factory_up:
   via: deploy_linux_factory
   overrides:
-    #command: docker-compose up -d site # up -d site
-    command: docker-compose run --service-ports site # up -d site
+    # use run if you want to visit otherwise use up (see entrypoint also)
+    command: docker-compose run --service-ports site
+    # command: docker-compose up -d site
     compose:
       version: '3'
       services:
@@ -270,19 +248,24 @@ factory_up:
             - /Users/rpb/worker/post-factory-demo:/home/rpb/worker/post-factory-demo
           stdin_open: true
           tty: true
-          #entrypoint: ['/usr/bin/make','-C','~/extern/factory','run','actinlink']
+          # entrypoint: ['/usr/bin/make','-C','~/extern/factory','run','actinlink']
           ports:
-            - "8888:8888"
-            - "8000:8000"
-            - "8001:8001"
+            # host:container
+            # note that these ports must match the actinlink_container connection
+            - "9000:8000"
+            - "9001:8001"
           container_name: factory_site
-          entrypoint: ['/bin/bash','script.sh']
+          # if you want to visit just use bash below and run in the command above
+          entrypoint: ['/bin/bash']
+          # entrypoint: ['/bin/bash','script.sh']
     script: |
       cd factory
       rm -f pid* TASK_QUEUE
-      make connect actinlink
-      make run actinlink public
+      make connect actinlink_container
+      make run actinlink_container public
       sleep infinity
+
+#! need a reaching-into method for changing entrypoint and command to modify the recipe above!
 
 ### LOCAL/NATIVE tests
 ### these tests run inside the parent factory
@@ -309,7 +292,7 @@ no2_prep:
     make 
     make gromacs_config local
     make setup all
-    make set activate_env="../../env/bin/activate py2"
+    make set activate_env="../../env/bin/activate py3"
     echo "ready to run: 'make go protein' at $(pwd)"
 
 demo_omni:
@@ -333,12 +316,13 @@ no3:
 ### these tests run inside a Docker (see above)
 
 no4:
+  #! failing because this depends on gromacs and you need to do a build_full first
   via: deploy_linux_factory
   overrides:
     command: docker-compose run --service-ports deploy
     script: |
       set -e
-      source factory/env/bin/activate py2
+      source factory/env/bin/activate py3
       source /usr/local/gromacs/bin/GMXRC.bash
       this=test-$(date +%Y%m%d%H%M)
       git clone https://github.com/biophyscode/automacs -b ortho_clean $this
