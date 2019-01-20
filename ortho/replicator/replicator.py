@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
-import re
+import re,glob
 
 __all__ = ['repl','pipeline','test_clean','docker_clean']
 
 import ortho
+from ortho import str_types
 from .formula import *
 
 #! no: from ortho import hook_merge
@@ -19,16 +20,24 @@ if False:
 ### READERS
 
 @requires_python('yaml')
-def replicator_read_yaml(source,name=None,args=None,kwargs=None):
+def replicator_read_yaml(sources,name=None,args=None,kwargs=None):
 	"""
 	Read a replicator instruction and send it to the Guide for execution.
 	"""
 	import yaml
-	with open(source) as fp: 
-		# we load into a MultiDict to forbid spaces (replaced with 
-		#   underscores) in top-level dictionary.
-		instruct = MultiDict(base=yaml.load(fp.read()),
-			underscores=True,strict=True)
+
+	incoming = {}
+	for source in sources:
+		with open(source) as fp: 
+			this = yaml.load(fp.read())
+			for key,val in this.items():
+				if key in incoming: 
+					raise Exception('duplicate keys in replicator YAML files (%s): %s'%(source,key))
+				incoming[key] = val
+	# we load into a MultiDict to forbid spaces (replaced with 
+	#   underscores) in top-level dictionary.
+	instruct = MultiDict(base=incoming,
+		underscores=True,strict=True)
 	# special handling
 	reference = {}
 	# previously used custom taxonomy but here we infer it via inspect
@@ -65,6 +74,26 @@ def docker_clean():
 	os.system('docker rm $(docker ps -a -q)')
 	os.system('docker rmi $(docker images -f "dangling=true" -q)')
 
+def many_files(spec):
+	"""
+	Specify one file, a list, or a glob or a list of globs.
+	"""
+	if isinstance(spec,list):
+		missing = [i for i in spec 
+		if not os.path.isfile(i) and not glob.glob(i)]
+		if any(missing): 
+			raise Exception('missing files from %s: %s'%(spec,missing))
+		return list(set([i for j in 
+			[[k] if os.path.isfile(k) else glob.glob(k) for k in spec] 
+			for i in j]))
+	elif isinstance(spec,str_types) and os.path.isfile(spec):
+		return [spec]
+	elif isinstance(spec,str_types):
+		fns = glob.glob(spec)
+		if any(fns): return fns
+		else: raise Exception('cannot find files: %s'%spec)
+	else: raise Exception('cannot intepret file selection: %s'%spec)
+
 def repl(*args,**kwargs):
 	"""
 	Run a test.
@@ -77,11 +106,9 @@ def repl(*args,**kwargs):
 		if 'replicator_recipes' not in ortho.conf:
 			raise Exception('calling repl with args requires the '
 				'"replicator_recipes" variable be set in the config')
-		source = ortho.conf['replicator_recipes']
-		if not os.path.isfile(source):
-			raise Exception('cannot find %s'%source)
+		sources = many_files(ortho.conf['replicator_recipes'])
 		this_test = replicator_read_yaml(
-			name=args[0],args=args[1:],kwargs=kwargs,source=source)
+			name=args[0],args=args[1:],kwargs=kwargs,sources=sources)
 	# specific format uses only kwargs
 	elif (set(kwargs.keys())<={'source','name'} 
 		and 'source' in kwargs 
