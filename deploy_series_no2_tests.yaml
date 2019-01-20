@@ -1,0 +1,65 @@
+
+### LOCAL/NATIVE tests
+### these tests run inside the parent factory
+
+no2:
+  site: test-no2
+  script: |
+    set -e
+    git clone https://github.com/biophyscode/automacs -b ortho test
+    cd test
+    make 
+    make gromacs_config local
+    make setup all
+    #! bug: note that `make go protein` fails in this context but not typically
+    make prep protein
+    python -u script.py
+
+no2_prep:
+  site: test-no2
+  script: |
+    set -e
+    git clone https://github.com/biophyscode/automacs -b ortho test
+    cd test
+    make 
+    make gromacs_config local
+    make setup all
+    make set activate_env="../../env/bin/activate py3"
+    echo "ready to run: 'make go protein' at $(pwd)"
+
+demo_omni:
+  script: |
+    # assumes connections/demo.yaml
+    make connect demo
+
+no3:
+  #! site: test-no3
+  script: |
+    set -e
+    git clone https://github.com/biophyscode/automacs -b ortho_clean test
+    cd test
+    make setup all
+    cd inputs/proteins && git checkout ortho_clean && cd ../..
+    make prep protein
+    python -u script.py
+  site: /Users/rpb/dumbspot
+
+### DOCKER TESTS
+### these tests run inside a Docker (see above)
+
+no4:
+  #! failing because this depends on gromacs and you need to do a build_full first
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run --service-ports deploy
+    script: |
+      set -e
+      source factory/env/bin/activate py3
+      source /usr/local/gromacs/bin/GMXRC.bash
+      this=test-$(date +%Y%m%d%H%M)
+      git clone https://github.com/biophyscode/automacs -b ortho_clean $this
+      cd $this
+      make setup all
+      cd inputs/proteins && git checkout ortho_clean && cd ../..
+      make prep protein
+      #! python -u script.py

@@ -1,0 +1,117 @@
+### SINGULARITY via DOCKER on macos
+
+#! custom for macos right now
+vagrant_setup:
+  site: ~/worker/vagrant-springboard
+  singularity_version: 2.6
+
+docker_singularity:
+  # hook to check mounts if we must run in an external volume
+  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
+  prelim: "@deploy_site"
+  persist: true
+  # use the macos disk image utility to make a case-insensitive volume
+  #! disambiguate this and prelim for deployment on other linux machines
+  site: /Volumes/site-nix/site-factory-linux
+  rebuild: false 
+  #! script, deploy service entrypoint, and the up command with detach (-d)
+  #!   flag are all probably unnecessary. the script runs in detach and the
+  #!   entire purpose of this recipe is to parent the docker_singularity_rebuild
+  #!   and hence set the stage for the other derived recipes
+  script: |
+    echo "docker_singularity is built!"
+  dockerfile:
+    sequence:
+      - stretch
+      - debian_start
+      - debian_compilers
+      - debian_mysql
+      - debian_shell_bash
+      - singularity
+      #! must be root - make_user
+    addendum:
+      #! needs shell substitution
+      - WORKDIR /home/rpb/extern
+  compose:
+    version: '3'
+    services:
+      # use: docker-compose run visit
+      visit:
+        build: .
+        image: factory:docker_singularity
+        volumes:
+          - ./:/home/rpb/extern
+        stdin_open: true
+        tty: true
+        command: ['/bin/bash']
+        ports:
+          - "8888:8888"
+        container_name: docker_singularity_visit
+      deploy:
+        entrypoint: ['/bin/bash','script.sh']
+        build: .
+        image: factory:docker_singularity
+        volumes:
+          - ./:/home/rpb/extern
+        ports:
+          - "8888:8888"
+        container_name: docker_singularity_deploy
+  command: docker-compose up -d deploy
+
+docker_singularity_rebuild:
+  via: docker_singularity
+  overrides:
+    rebuild: true
+  
+docker_singularity_visit:
+  via: docker_singularity
+  overrides:
+    command: docker-compose run --service-ports visit
+
+docker_singularity_makerspace:
+  ### recipe for making Singularity containers
+  via: docker_singularity
+  overrides:
+    command: sudo docker-compose run --service-ports visit
+    compose:
+      version: '3'
+      services:
+        # use: docker-compose run visit
+        visit:
+          build: .
+          image: factory:docker_singularity
+          volumes:
+            - ./:/home/rpb/extern
+          stdin_open: true
+          tty: true
+          command: ['/bin/bash']
+          ports:
+            - "8888:8888"
+          privileged: true
+        deploy:
+          entrypoint: ['/bin/bash','script.sh']
+          build: .
+          image: factory:docker_singularity
+          volumes:
+            - ./:/home/rpb/extern
+          ports:
+            - "8888:8888"
+  notes: |
+    make repl source=deploy_series_no1.yaml name=docker_singularity_makerspace
+    cd /home/rpb/extern/singularity-makerspace
+    singularity image.create container.simg
+    cat > Singularity
+      BootStrap: docker
+      From: centos:centos7
+      OSVersion: 7
+      MirrorURL: http://mirror.centos.org/centos-%{OSVERSION}/%{OSVERSION}/os/$basearch/
+      Include: yum
+      %runscript
+      echo "welcome"
+      exec echo "Hello World" "$@"
+      %post
+      echo "Ready to install software and other dependencies for the container!"
+      yum -y update
+      yum -y install git
+      yum -y groupinstall "Development Tools"
+    singularity build container.simg Singularity

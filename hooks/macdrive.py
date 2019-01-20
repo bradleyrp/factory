@@ -25,6 +25,9 @@ def get_macdrive():
 	if not os.path.ismount(mount_abs): 
 		print('status mounting external drive')
 		os.system('hdiutil attach %s'%source)
+	# the returned path takes the place of the value for  the site when you use
+	#   e.g. site: @deploy_site
+	return mount_abs
 
 def flock_installer():
 	"""Install flock on OSX."""
