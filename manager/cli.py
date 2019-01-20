@@ -312,6 +312,9 @@ def connect(name):
 	"""
 	print('status connecting to %s'%name)
 	specs = get_connections(name)
+	# multiple connections can map to the same project by setting the name here
+	name = specs.pop('name',name)
+	specs['project_name'] = name
 	# substitute PROJECT_NAME with the root
 	if ' ' in name: raise Exception('name cannot contain spaces: %s'%name)
 	for key,val in specs.items():
