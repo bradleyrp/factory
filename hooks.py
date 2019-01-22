@@ -96,6 +96,8 @@ def hook_merge(hook,namespace):
 	"""
 	#! for some reason this has to be imported here?
 	from .config import config_hook_get
-	collected = config_hook_get('replicator_hooks',None)
-	namespace.update(**collected)
+	collected = config_hook_get(hook,None)
+	if collected: 
+		print('status hook_merge collected hooks for "%s": %s'%(hook,list(collected.keys())))
+		namespace.update(**collected)
 	return 

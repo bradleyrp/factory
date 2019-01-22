@@ -12,10 +12,11 @@ from .formula import *
 #!   no: from ortho.hooks import hook_merge
 #!   instead use import ortho then later ortho.hook_merge
 #! turning this off for now because of import issues. needs revisited
-if False:
-	# +++ allow user to hook in other handlers here
-	import ortho
-	ortho.hook_merge(hook='replicator',namespace=globals())
+#if False:
+
+# +++ allow user to hook in other handlers here
+#import ortho
+#ortho.hooks.hook_merge(hook='replicator',namespace=globals())
 
 ### READERS
 
@@ -100,6 +101,24 @@ def repl(*args,**kwargs):
 	Disambiguates incoming test format and sends it to the right reader.
 	Requires explicit kwargs from the command line.
 	"""
+	"""
+	# instructions for extending ReplicatorGuide
+	# see hooks/replicator_alt.py
+	# EXTEND the ReplicatorGuide class
+	# make set_hook replicator="\"{'s':'hooks/replicator_alt.py','f':'update_replicator_guide'}\""
+	# import the class, subclass it, and export that inside a function
+	from ortho.replicator.formula import ReplicatorGuide
+	class ReplicatorGuide(ReplicatorGuide):
+		def new_handler(self,param):
+			# do things and return to ReplicatorGuide(param=1).solve
+			return dict(result=123)
+	def update_replicator_guide(): 
+		# this hook function adds the updated guide
+		return dict(ReplicatorGuide=ReplicatorGuide)
+	"""
+	# +++ allow user to hook in other handlers here
+	import ortho
+	ortho.hooks.hook_merge(hook='replicator',namespace=globals())
 	# allow args to be handled by the interface key for easier CLI
 	if args:
 		if kwargs: raise Exception('cannot use kwargs with args here')
