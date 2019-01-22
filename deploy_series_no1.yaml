@@ -36,11 +36,11 @@ dockerfiles:
   make_user:
     # formats for subs: key, val, python function, builtin function
     subs:
-      user: rpb
-      uid: 501
+      user: user
+      uid: 1000
       user_passwd: secret
-      gid: 20
-      gname: staff
+      gid: 100
+      gname: users
     text: |
       RUN getent group %(gid)s > /dev/null 2>&1 \
           || (groupmod -g %(gid)d %(gname)s)
@@ -76,17 +76,7 @@ dockerfiles:
 macos_unmount:
   call: hdiutil detach /Volumes/site-nix
 
-### DEPLOY IN DOCKER
-
-factory_visit:
-  via: deploy_linux_factory
-  overrides:
-    command: docker-compose run --service-ports visit
-factory_do:
-  #! need recursion so you can use this (see no4 below)
-  via: deploy_linux_factory
-  overrides:
-    command: docker-compose run --service-ports deploy
+### MINOR EXPERIMENTS
 
 factory_notebook:
   via: deploy_linux_factory
@@ -131,8 +121,8 @@ factory_build_full:
         - gromacs-2018.3
         - make_user
       addendum:
-        #! needs shell substitution
-        - WORKDIR /home/rpb/extern
+        #! hardcoded. needs shell substitution
+        - WORKDIR /home/user/extern
 
 ### PRIMARY RECIPE BASE
 
@@ -179,7 +169,6 @@ deploy_linux_factory:
   compose:
     version: '3'
     services:
-      # use: docker-compose run visit
       visit:
         build: .
         image: factory:deploy_linux_factory
@@ -201,16 +190,6 @@ deploy_linux_factory:
           - "8888:8888"
         hostname: factory_remote
         container_name: factory_deploy
-      site:
-        entrypoint: ['/bin/bash']
-        build: .
-        image: factory:deploy_linux_factory
-        volumes:
-          - ./:/home/user/extern
-        ports:
-          - "8000:8000"
-        hostname: factory_site
-        container_name: factory_site
   command: docker-compose up -d deploy
 
 ### PRIMARY USER RECIPES
@@ -219,12 +198,11 @@ factory_up:
   via: deploy_linux_factory
   overrides:
     # use run if you want to visit otherwise use up (see entrypoint also)
-    command: docker-compose run --service-ports site
-    # command: docker-compose up -d site
+    #! see factory visit: command: docker-compose run --service-ports site
+    command: docker-compose up -d site
     compose:
       version: '3'
       services:
-        # use: docker-compose run visit
         site:
           build: .
           image: factory:deploy_linux_factory
@@ -245,8 +223,8 @@ factory_up:
             - "9001:8001"
           container_name: factory_site
           # if you want to visit just use bash below and run in the command above
-          entrypoint: ['/bin/bash']
-          # entrypoint: ['/bin/bash','script.sh']
+          #! see factory visit: entrypoint: ['/bin/bash']
+          entrypoint: ['/bin/bash','script.sh']
     script: |
       cd factory
       rm -f pid* TASK_QUEUE
@@ -254,4 +232,11 @@ factory_up:
       make run actinlink_container public
       sleep infinity
 
-#! need a reaching-into method for changing entrypoint and command to modify the recipe above!
+factory_visit:
+  via: factory_up
+  mods:
+    command: docker-compose run --service-ports site
+    compose:
+      services:
+        site:
+          entrypoint: ['/bin/bash']
