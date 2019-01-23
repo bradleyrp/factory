@@ -206,7 +206,7 @@ class ReplicatorGuide(Handler):
 		#!   for clarity
 		bash_basic(command,cwd=spot.path)
 
-	def via(self,via,overrides=None,mods=None):
+	def via(self,via,overrides=None,mods=None,notes=None):
 		"""
 		Run a replicate with a modification. Extremely useful for DRY.
 		"""
