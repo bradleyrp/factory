@@ -197,8 +197,6 @@ deploy_linux_factory:
 factory_up:
   via: deploy_linux_factory
   overrides:
-    # use run if you want to visit otherwise use up (see entrypoint also)
-    #! see factory visit: command: docker-compose run --service-ports site
     command: docker-compose up -d site
     compose:
       version: '3'
@@ -206,31 +204,18 @@ factory_up:
         site:
           build: .
           image: factory:deploy_linux_factory
-          volumes:
-            # note that dot means site here, because we run from there
-            - ./:/home/user/extern
-            #! hardcoded for now. use the connection file
-            - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/user/extern/factory/connections/actinlink.yaml
-            #! paths used in actinlink.yaml hardcoded above
-            - /Users/rpb/worker/post-factory-demo:/home/user/worker/post-factory-demo
           stdin_open: true
           tty: true
-          # entrypoint: ['/usr/bin/make','-C','~/extern/factory','run','actinlink']
-          ports:
-            # host:container
-            # note that these ports must match the actinlink_container connection
-            - "9000:8000"
-            - "9001:8001"
           container_name: factory_site
-          # if you want to visit just use bash below and run in the command above
-          #! see factory visit: entrypoint: ['/bin/bash']
           entrypoint: ['/bin/bash','script.sh']
+          # add volumes if running a connection
+          volumes:
+            - ./:/home/user/extern
     script: |
       cd factory
       rm -f pid* TASK_QUEUE
-      make connect actinlink_container
-      make run actinlink_container public
-      sleep infinity
+      # make connection goes here
+      # note that factory_up should be used with via/mods to connect a project
 
 factory_visit:
   via: factory_up
@@ -240,3 +225,28 @@ factory_visit:
       services:
         site:
           entrypoint: ['/bin/bash']
+
+### CONNECTIONS
+
+factory_actinlink_up:
+  via: factory_up
+  mods:
+    compose: 
+      services:
+        site:
+          # volumes exposes the connection file
+          volumes:
+            - ./:/home/user/extern
+            - /Users/rpb/worker/factory/connections/actinlink.yaml:/home/user/extern/factory/connections/actinlink.yaml
+            - /Users/rpb/worker/post-factory-demo:/home/user/worker/post-factory-demo
+          # host:container, must match connection file
+          ports: 
+            - "9000:8000"
+            - "9001:8001"
+  overrides:
+    script: |
+      cd factory
+      rm -f pid* TASK_QUEUE
+      make connect actinlink_container
+      make run actinlink_container public
+      sleep infinity
