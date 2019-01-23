@@ -56,7 +56,7 @@ def read_config(source=None,cwd=None,default=None,hook=False,strict=True):
 		# configuration keys starting with the "@" sign are special hooks
 		#   which can either include a direct value or a function to get them
 		if hook==True: hook_handler(result)
-		elif isinstance(hook,str): 
+		elif isinstance(hook,str_types): 
 			hook_handler(result,this=hook,strict=strict)
 		return result
 
