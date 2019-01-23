@@ -132,6 +132,7 @@ def repl(*args,**kwargs):
 	elif (set(kwargs.keys())<={'source','name'} 
 		and 'source' in kwargs 
 		and re.match(r'^(.*)\.(yaml|yml)$',kwargs['source'])):
+		kwargs['sources'] = [kwargs.pop('source')]
 		this_test = replicator_read_yaml(**kwargs)
 	else: raise Exception('unclear request')
 	# run the replicator
