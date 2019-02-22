@@ -6,17 +6,9 @@ vagrant_setup:
   singularity_version: 2.6
 
 docker_singularity:
-  # hook to check mounts if we must run in an external volume
-  #! move this prelim to a macos flavored version via "via" version or it will fail on linux
   persist: true
-  # use the macos disk image utility to make a case-insensitive volume
-  #! disambiguate this and prelim for deployment on other linux machines
   site: "@deploy_site"
   rebuild: false 
-  #! script, deploy service entrypoint, and the up command with detach (-d)
-  #!   flag are all probably unnecessary. the script runs in detach and the
-  #!   entire purpose of this recipe is to parent the docker_singularity_rebuild
-  #!   and hence set the stage for the other derived recipes
   script: |
     echo "docker_singularity is built!"
   dockerfile:
@@ -27,143 +19,46 @@ docker_singularity:
       - debian_mysql
       - debian_shell_bash
       - singularity
-      #! must be root - make_user
     addendum:
       #! needs shell substitution
       - WORKDIR /home/rpb/extern
+  command: docker-compose run --service-ports deploy
   compose:
     version: '3'
     services:
-      # use: docker-compose run visit
-      visit:
-        build: .
-        image: factory:docker_singularity
-        volumes:
-          - ./:/home/rpb/extern
-        stdin_open: true
-        tty: true
-        command: ['/bin/bash']
-        ports:
-          - "8888:8888"
-        container_name: docker_singularity_visit
       deploy:
+        privileged: true
         entrypoint: ['/bin/bash','script.sh']
         build: .
         image: factory:docker_singularity
-        volumes:
-          - ./:/home/rpb/extern
-        ports:
-          - "8888:8888"
         container_name: docker_singularity_deploy
-  command: docker-compose up -d deploy
+        volumes: #! volumes required for script.sh
+          - ./:/home/rpb/extern
+      visit:
+        privileged: true
+        build: .
+        image: factory:docker_singularity
+        stdin_open: true
+        tty: true
+        command: ['/bin/bash']
+        container_name: docker_singularity_visit
+        volumes: #! volumes required for script.sh
+          - ./:/home/rpb/extern
 
-docker_singularity_rebuild:
-  via: docker_singularity
-  overrides:
-    rebuild: true
-  
-docker_singularity_visit:
-  via: docker_singularity
-  overrides:
-    command: docker-compose run --service-ports visit
+### recipes for making Singularity containers
 
-docker_singularity_makerspace:
-  ### recipe for making Singularity containers
+makerspace_build:
   via: docker_singularity
   overrides:
-    command: docker-compose run --service-ports visit
-    compose:
-      version: '3'
-      services:
-        # use: docker-compose run visit
-        visit:
-          build: .
-          image: factory:docker_singularity
-          volumes:
-            - ./:/home/rpb/extern
-          stdin_open: true
-          tty: true
-          command: ['/bin/bash']
-          ports:
-            - "8888:8888"
-          privileged: true
-        deploy:
-          entrypoint: ['/bin/bash','script.sh']
-          build: .
-          image: factory:docker_singularity
-          volumes:
-            - ./:/home/rpb/extern
-          ports:
-            - "8888:8888"
-  notes: |
-    make repl source=deploy_series_no3_singularity_macos.yaml name=docker_singularity_makerspace
-    # above no longer working after splitting sources because it needs dockerfiles
-    make repl docker_singularity_makerspace
-    cd /home/rpb/extern/singularity-makerspace
-    singularity image.create container.simg
-    cat > Singularity
-      BootStrap: docker
-      From: centos:centos7
-      OSVersion: 7
-      MirrorURL: http://mirror.centos.org/centos-%{OSVERSION}/%{OSVERSION}/os/$basearch/
-      Include: yum
-      %runscript
-      echo "welcome"
-      exec echo "Hello World" "$@"
-      %post
-      echo "Ready to install software and other dependencies for the container!"
-      yum -y update
-      yum -y install git
-      yum -y groupinstall "Development Tools"
-    singularity build container.simg Singularity
-
-makerspace_v02:
-  ### recipe for making Singularity containers
-  via: docker_singularity
-  overrides:
-    command: docker-compose run --service-ports visit
-    compose:
-      version: '3'
-      services:
-        # use: docker-compose run visit
-        visit:
-          build: .
-          image: factory:docker_singularity
-          volumes:
-            - ./:/home/rpb/extern
-          stdin_open: true
-          tty: true
-          entrypoint: ['/bin/bash','script.sh']
-          ports:
-            - "8888:8888"
-          privileged: true
     script: |
-      set -e -x
-      cat <<'EOF' > Singularity
-      BootStrap: docker
-      From: centos:centos7
-      OSVersion: 7
-      MirrorURL: http://mirror.centos.org/centos-%{OSVERSION}/%{OSVERSION}/os/$basearch/
-      Include: yum
-      %runscript
-      echo "welcome"
-      exec echo "Hello World" "$@"
-      %post
-      echo "Ready to install software and other dependencies for the container!"
-      yum -y update
-      yum -y install git
-      yum -y groupinstall "Development Tools"
-      yum -y install epel-release
-      yum -y install R
-      EOF
-      # build the static container
-      singularity image.create --help
-      export SIZE=4096
-      singularity image.create --size $SIZE container.simg      
-      singularity build container.simg Singularity
-makerspace_v02_enliven:
-  via: makerspace_v02
+      set -e -x 
+      echo "The makerspace_build recipe should be used by a custom recipe."
+      exit 1
+
+makerspace_enliven:
+  via: makerspace_build
   overrides:
+    #! systematize the container names
     script: |
       set -e -x
       # convert a containter to a writable one
@@ -172,68 +67,13 @@ makerspace_v02_enliven:
       singularity build --writable live.simg container.simg
       # visit at the end
       singularity shell --writable live.simg
-makerspace_v02_visit:
-  via: makerspace_v02
-  mods:
-    compose:
-      services:
-        visit:
-          entrypoint: ['/bin/bash']
 
-# installing velox in R? ??
-makerspace_v03:
-  ### recipe for making Singularity containers
-  via: docker_singularity
+makerspace_visit:
+  via: makerspace_build
+  overrides:
+    command: docker-compose run --service-ports deploy
+
+makerspace_visit_docker:
+  via: makerspace_build
   overrides:
     command: docker-compose run --service-ports visit
-    compose:
-      version: '3'
-      services:
-        # use: docker-compose run visit
-        visit:
-          build: .
-          image: factory:docker_singularity
-          volumes:
-            - ./:/home/rpb/extern
-          stdin_open: true
-          tty: true
-          entrypoint: ['/bin/bash','script.sh']
-          ports:
-            - "8888:8888"
-          privileged: true
-    script: |
-      set -e -x
-      cat <<'EOF' > Singularity
-      BootStrap: docker
-      From: ubuntu:17.10
-      %post
-      apt-get update
-      apt-get install -y software-properties-common
-      # per https://cran.r-project.org/web/packages/velox/README.html
-      add-apt-repository -y ppa:ubuntugis/ubuntugis-unstable
-      apt-get install -y build-essential git
-      apt-get install -y libopenblas-base r-base 
-      apt-get install -y libgdal-dev libproj-dev libgeos-dev libudunits2-dev
-      EOF
-      # build the static container
-      export SIZE=4096
-      singularity image.create --size $SIZE container03.simg
-      singularity build container03.simg Singularity
-makerspace_v03_enliven:
-  via: makerspace_v03
-  overrides:
-    script: |
-      set -e -x
-      # convert a containter to a writable one
-      export SIZE=4096
-      singularity image.create --size $SIZE live03.simg
-      singularity build --writable live03.simg container03.simg
-      # visit at the end
-      singularity shell --writable live03.simg
-makerspace_v03_again:
-  via: makerspace_v03
-  overrides:
-    script: |
-      set -e -x
-      # visit at the end
-      singularity shell --writable live03.simg
