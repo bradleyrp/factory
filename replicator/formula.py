@@ -9,6 +9,7 @@ from ortho.dictionary import MultiDict
 from ortho.bash import bash_basic,bash
 from ortho.handler import Handler,introspect_function
 from ortho.config import read_config
+from ortho.data import delveset,catalog
 
 import re,tempfile,os,copy
 import datetime as dt
@@ -205,7 +206,7 @@ class ReplicatorGuide(Handler):
 		#!   for clarity
 		bash_basic(command,cwd=spot.path)
 
-	def via(self,via,overrides=None):
+	def via(self,via,overrides=None,mods=None,notes=None):
 		"""
 		Run a replicate with a modification. Extremely useful for DRY.
 		"""
@@ -254,6 +255,10 @@ class ReplicatorGuide(Handler):
 			outgoing = copy.deepcopy(self.meta['complete'][via])
 			#! recursion on the "via" formula needs to happen here
 			outgoing.update(**overrides)
+		# the mods keyword can be used to surgically alter the tree of hashes
+		if mods:
+			for path,value in catalog(mods):
+				delveset(outgoing,*path,value=value)
 		getattr(self,fname)(**outgoing)
 
 	def singularity_via_vagrant(self,vagrant_site):
