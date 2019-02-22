@@ -7,6 +7,17 @@ dockerfiles:
     CMD ["bash","script.sh"]
   stretch: |
     FROM debian:stretch
+  centos7: |
+    FROM centos:centos7
+  centos7_dev: |
+    RUN yum update -y
+    RUN yum groupinstall -y 'Development Tools'
+  centos7_singularity3_reqs: |
+    RUN yum install -y openssl-devel 
+    RUN yum install -y libuuid-devel
+    RUN yum install -y libseccomp-devel
+    RUN yum install -y wget
+    RUN yum install -y squashfs-tools
   debian_start: |
     ARG DEBIAN_FRONTEND=noninteractive
     RUN apt-get -y clean
@@ -60,7 +71,7 @@ dockerfiles:
     RUN make -j 2
     RUN make install
     WORKDIR /root
-  singularity: |
+  singularity2: |
     WORKDIR /root
     RUN apt-get install -y squashfs-tools
     RUN apt-get install -y libarchive-dev
@@ -71,58 +82,29 @@ dockerfiles:
     RUN ./configure --prefix=/usr/local
     RUN make
     RUN make install
+  singularity3:
+    ENV VERSION 1.11 
+    ENV OS linux 
+    ENV ARCH amd64
+    WORKDIR /tmp
+    RUN wget https://dl.google.com/go/go$VERSION.$OS-$ARCH.tar.gz
+    RUN tar -C /usr/local -xzf go$VERSION.$OS-$ARCH.tar.gz
+    RUN echo 'export GOPATH=${HOME}/go' >> ~/.bashrc
+    RUN echo 'export PATH=/usr/local/go/bin:${PATH}:${GOPATH}/bin' >> ~/.bashrc
+    RUN source ~/.bashrc
+    RUN mkdir -p $GOPATH/src/github.com/sylabs
+    WORKDIR $GOPATH/src/github.com/sylabs
+    RUN git clone https://github.com/sylabs/singularity.git
+    WORKDIR $GOPATH/src/github.com/sylabs/singularity
+    RUN go get -u -v github.com/golang/dep/cmd/dep
+    WORKDIR $GOPATH/src/github.com/sylabs/singularity
+    RUN ./mconfig
+    RUN make -C builddir
+    RUN make -C builddir install
 
-### macos utilities (see hooks/macdrive.py)
+# macos utilities (see hooks/macdrive.py)
 macos_unmount:
   call: hdiutil detach /Volumes/site-nix
-
-### MINOR EXPERIMENTS
-
-factory_notebook:
-  via: deploy_linux_factory
-  overrides:
-    command: docker-compose up -d deploy
-    script: |
-      cd factory
-      source env/bin/activate py3
-      jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 
-factory_notebook_live:
-  # run the notebook in the foreground
-  via: deploy_linux_factory
-  overrides:
-    command: docker-compose run --service-ports deploy
-    script: |
-      cd factory
-      source env/bin/activate py3
-      jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 
-
-factory_build:
-  # run the build script below to ensure factory exists without rebuilding image
-  via: deploy_linux_factory
-  overrides:
-    command: docker-compose run deploy
-factory_rebuild:
-  # rebuild the container to accomodate changes
-  via: deploy_linux_factory
-  overrides:
-    rebuild: true
-factory_build_full:
-  # an alternate (override) rebuild of the container with more software
-  via: deploy_linux_factory
-  overrides:
-    rebuild: true
-    dockerfile:
-      sequence:
-        - stretch
-        - debian_start
-        - debian_mysql
-        - debian_shell_bash
-        - debian_compilers
-        - gromacs-2018.3
-        - make_user
-      addendum:
-        #! hardcoded. needs shell substitution
-        - WORKDIR /home/user/extern
 
 ### PRIMARY RECIPE BASE
 
@@ -169,17 +151,6 @@ deploy_linux_factory:
   compose:
     version: '3'
     services:
-      visit:
-        build: .
-        image: factory:deploy_linux_factory
-        volumes:
-          - ./:/home/user/extern
-        stdin_open: true
-        tty: true
-        command: ['/bin/bash']
-        ports:
-          - "8888:8888"
-        container_name: factory_visit
       deploy:
         entrypoint: ['/bin/bash','script.sh']
         build: .
@@ -192,7 +163,47 @@ deploy_linux_factory:
         container_name: factory_deploy
   command: docker-compose up -d deploy
 
-### PRIMARY USER RECIPES
+factory_build:
+  # run the build script below to ensure factory exists without rebuilding image
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run deploy
+factory_rebuild:
+  # rebuild the container to accomodate changes
+  via: deploy_linux_factory
+  overrides:
+    rebuild: true
+factory_build_full:
+  # an alternate (override) rebuild of the container with more software
+  via: deploy_linux_factory
+  overrides:
+    rebuild: true
+    dockerfile:
+      sequence:
+        - stretch
+        - debian_start
+        - debian_mysql
+        - debian_shell_bash
+        - debian_compilers
+        - gromacs-2018.3
+        - make_user
+      addendum:
+        - WORKDIR /home/user/extern
+
+factory_notebook:
+  notes: run a notebook
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose up -d deploy
+    script: |
+      cd factory
+      source env/bin/activate py3
+      jupyter notebook --port=8888 --no-browser --ip=0.0.0.0 \
+      --NotebookApp.custom_display_url=http://localhost:8888
+factory_notebook_live:
+  via: factory_notebook
+  mods:
+    command: docker-compose run --service-ports deploy
 
 factory_up:
   via: deploy_linux_factory

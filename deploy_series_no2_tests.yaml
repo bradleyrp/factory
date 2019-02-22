@@ -48,7 +48,7 @@ no3:
 ### these tests run inside a Docker (see above)
 
 no4:
-  #! failing because this depends on gromacs and you need to do a build_full first
+  #! check for a full GROMACS build first?
   via: deploy_linux_factory
   overrides:
     command: docker-compose run --service-ports deploy
@@ -62,4 +62,5 @@ no4:
       make setup all
       cd inputs/proteins && git checkout ortho_clean && cd ../..
       make prep protein
-      #! python -u script.py
+      python -u script.py
+      
