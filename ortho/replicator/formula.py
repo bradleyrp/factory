@@ -169,7 +169,7 @@ class ReplicatorGuide(Handler):
 	@hook_watch('prelim','site','identity',strict=False)
 	def docker_compose(self,compose,dockerfile,site,
 		command,script=None,persist=True,rebuild=True,
-		prelim=None,identity=None):
+		prelim=None,identity=None,indirect=False):
 		"""
 		Prepare a docker-compose folder and run a command in the docker.
 		"""
@@ -178,6 +178,7 @@ class ReplicatorGuide(Handler):
 		#   key to docker compose services lists when running on linux. note
 		#   that the linux check and modification of docker compose file can
 		#   later be moved to a real hook if desired
+		if indirect: raise Exception('you cannot run this! (indirect: true)')
 		is_linux = False
 		try: 
 			check_linux = bash('uname -a',scroll=False)
@@ -270,6 +271,9 @@ class ReplicatorGuide(Handler):
 		if mods:
 			for path,value in catalog(mods):
 				delveset(outgoing,*path,value=value)
+		# via calls docker_compose typically
+		#! make sure the following does not cause conflicts
+		outgoing['indirect'] = False
 		getattr(self,fname)(**outgoing)
 
 	def singularity_via_vagrant(self,vagrant_site):
