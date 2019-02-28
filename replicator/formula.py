@@ -79,15 +79,26 @@ class DockerFileMaker(Handler):
 		"""Assemble a sequence of dockerfiles."""
 		index = MultiDict(base=self.meta['dockerfiles'].dockerfiles,
 			underscores=True)
-		self.dockerfile = '\n'.join([self.refine(index[i]) for i in sequence])
+		self.dockerfile = [] 
+		for item in sequence:
+			item_lookup = index.get(item,None)
+			if not item_lookup:
+				raise Exception('cannot find dockerfile: %s'%item)
+			self.dockerfile.append(self.refine(item_lookup))
+		self.dockerfile = '\n'.join(self.dockerfile)
 		if addendum: 
 			for i in addendum: self.dockerfile += "\n%s"%i
+
+	def raw(self,raw):
+		"""Set a verbatim Dockerfile under the raw key."""
+		self.dockerfile = raw
 
 	def refine(self,this):
 		"""Refine the Dockerfiles."""
 		if isinstance(this,dict): 
-			return DockerFileChunk(**this).text
-		else: return this
+			this = DockerFileChunk(**this).text
+		else: pass
+		return this
 
 ### SUPERVISOR
 
@@ -268,3 +279,11 @@ class ReplicatorGuide(Handler):
 		spot = SpotLocal(site=vagrant_site,persist=True)
 		print(spot.abspath)
 		raise Exception('yay')
+
+def get_jupyter_token(container):
+	"""Check docker logs for a container."""
+	result = bash('docker logs %s'%container,scroll=False)
+	matched = re.findall(r':(\d+)/\?token=(.*?)\s',result['stdout'])
+	if len(matched)==1: raise Exception('cannot locate the token')
+	port,token = int(matched[-1][0]),matched[-1][1]
+	print('status notebook is available at http://localhost:%d/?token=%s'%(port,token))
