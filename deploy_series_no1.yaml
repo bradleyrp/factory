@@ -18,6 +18,8 @@ dockerfiles:
     RUN yum install -y libseccomp-devel
     RUN yum install -y wget
     RUN yum install -y squashfs-tools
+  terminal_colors: |
+    ENV TERM xterm-256color
   debian_start: |
     ARG DEBIAN_FRONTEND=noninteractive
     RUN apt-get -y clean
@@ -82,7 +84,8 @@ dockerfiles:
     RUN ./configure --prefix=/usr/local
     RUN make
     RUN make install
-  singularity3:
+  #! revisit this. see below
+  singularity3_raw: |
     ENV VERSION 1.11 
     ENV OS linux 
     ENV ARCH amd64
@@ -101,6 +104,15 @@ dockerfiles:
     RUN ./mconfig
     RUN make -C builddir
     RUN make -C builddir install
+  singularity3_rpm: |
+    RUN yum install -y epel-release
+    RUN yum install -y golang
+    ENV VERSION=3.1.0
+    WORKDIR /tmp
+    RUN wget https://github.com/sylabs/singularity/releases/download/v${VERSION}/singularity-${VERSION}.tar.gz
+    RUN rpmbuild -tb singularity-${VERSION}.tar.gz
+    RUN rpm -ivh ~/rpmbuild/RPMS/x86_64/singularity-$VERSION-1.el7.x86_64.rpm
+    RUN rm -rf ~/rpmbuild singularity-$VERSION*.tar.gz
 
 # macos utilities (see hooks/macdrive.py)
 macos_unmount:
