@@ -92,7 +92,7 @@ def init_settings(project_name,calculations,calc_spot,post_spot,plot_spot):
 	return settings
 
 def connect_run(project_name,settings_custom,post_spot,plot_spot,calculations,
-	public=False,development=False,sims=None):
+	public=False,development=False,sims=None,meta_filter=None):
 	"""
 	Instantiate a connection. Called by OmniFromFactory.
 	"""
@@ -114,12 +114,20 @@ def connect_run(project_name,settings_custom,post_spot,plot_spot,calculations,
 	if calculations: 
 		modules_calcs_this = {
 			os.path.join('calc',project_name,'calcs'):calculations}
-		try: modules.sync(modules=modules_calcs_this)
+		try: modules.sync(modules=modules_calcs_this,current=True)
 		except: print('warning failed to sync the repo: %s'%
 			modules_calcs_this)
+	# absolute paths
+	plot_spot = os.path.realpath(plot_spot)
+	post_spot = os.path.realpath(post_spot)
 	# update the postprocssing locations
 	ortho.bash('make set post_plot_spot %s'%plot_spot,cwd=calc_root)
 	ortho.bash('make set post_data_spot %s'%post_spot,cwd=calc_root)
+	if meta_filter:
+		ortho.bash('make unset meta_filter',cwd=calc_root)
+		meta_filter = ortho.listify(meta_filter)
+		ortho.bash('make setlist meta_filter %s'%
+			' '.join(meta_filter),cwd=calc_root)
 	# prepare the site, with some yaml keys passed through
 	#! could also pass through database, calc
 	site_setup(project_name,settings_custom=settings_custom,
@@ -131,14 +139,18 @@ class OmniFromFactory(Handler):
 	with settings depending on the connection dictionary.
 	"""
 	def connection_development(self,project_name,
-		calculations,calc_spot,post_spot,plot_spot):
+		calculations,calc_spot,post_spot,plot_spot,meta_filter=None):
 		"""Main handler for the development environment."""
 		settings = init_settings(project_name,
 			calculations,calc_spot,post_spot,plot_spot)
-		site_port = 8000
 		settings['NOTEBOOK_IP'] = 'localhost'
+		settings['extra_allowed_hosts'] = []
+		site_port = 8000
+		settings['NOTEBOOK_PORT'] = site_port+1
+		#! added meta_filter here but not below
 		connect_run(project_name=project_name,settings_custom=settings,
-			post_spot=post_spot,plot_spot=plot_spot,calculations=calculations)
+			post_spot=post_spot,plot_spot=plot_spot,calculations=calculations,
+			meta_filter=meta_filter)
 	def connection_public(self,project_name,
 		calculations,calc_spot,post_spot,plot_spot,public):
 		"""Main handler for the development environment."""
@@ -154,6 +166,8 @@ class OmniFromFactory(Handler):
 		settings['NOTEBOOK_PORT'] = public.get('notebook_port_apparent',
 			public.get('notebook_port',site_port+1))
 		settings['extra_allowed_hosts'] = []
+		#! added meta_filter above but not here
+		#! could we consolidate the connections?
 		connect_run(public=public,
 			project_name=project_name,settings_custom=settings,
 			post_spot=post_spot,plot_spot=plot_spot,calculations=calculations)
