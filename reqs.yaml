@@ -1,6 +1,9 @@
 channels:
   - conda-forge # for ipdb and MDAnalysis
 dependencies:
+  # added mayavi in 2019.03
+  - mayavi
+  # normal requirements
   - pyyaml
   - numpy
   - scipy
