@@ -1,0 +1,79 @@
+/* masonry */
+
+.brick {
+  width: 400px;
+  border-style: solid;
+  border-width: 3px;
+  border-radius: 5px;
+  padding: 10px;
+  margin: 10px;
+  border-color:gray;
+  -webkit-box-sizing: unset;
+  -moz-box-sizing: unset;
+  box-sizing: unset;
+}
+
+.brick-wide2 { width: 850px; }
+
+.brick-left {
+  border-left: solid;
+  border-width: 3px;
+  padding: 10px;
+  margin: 10px;
+  border-color:gray;
+  -webkit-box-sizing: unset;
+  -moz-box-sizing: unset;
+  box-sizing: unset;
+}
+
+.namefocus {
+  text-decoration: underline wavy red;
+  color: red;
+}
+
+.brick .nameunfocus {
+  text-decoration: none;
+}
+
+/* metadata dropdowns */
+
+.panel-heading .accordion-toggle:after {
+    content: "\25BC";
+    float: right;
+    color: gray;
+}
+
+.brick_table td:last-child {
+  width: 100%;
+}
+/* monospace text entry */
+.brick_table td:last-child input[type="text"],textarea {
+  font-family: monospace;
+  font-size: 12pt;
+  width: 100%;
+  resize: none;
+}
+/* simulation detail has monospace labels, no label line breaks */
+.brick_detail {
+  white-space: nowrap;
+  font-family: monospace;
+}
+#id_source { width: 100%; border: 1px solid lightgray; }
+
+.panel-heading .accordion-toggle.collapsed:after {
+    content: "\25BA";
+}
+
+.btn-pad { margin: 10px 10px 10px 10px;}
+
+/* override bootstrap pre for syntax highlighting */
+
+.highlight pre {
+  background-color: white;
+  border-color: white;
+}
+
+.linenos .linenodiv pre { 
+  background-color: white; 
+  border-color: white;
+}
