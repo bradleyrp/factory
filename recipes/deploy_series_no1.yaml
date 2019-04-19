@@ -12,14 +12,20 @@ dockerfiles:
   centos7_dev: |
     RUN yum update -y
     RUN yum groupinstall -y 'Development Tools'
+    RUN yum install -y wget
+    RUN yum install -y which
+    RUN yum install -y vim
+    RUN yum install -y git
+    RUN yum install -y make
+    RUN yum install -y screen
   centos7_singularity3_reqs: |
     RUN yum install -y openssl-devel 
     RUN yum install -y libuuid-devel
     RUN yum install -y libseccomp-devel
-    RUN yum install -y wget
     RUN yum install -y squashfs-tools
-  terminal_colors: |
-    ENV TERM xterm-256color
+  #! probably not possible as root and you get colors as a user in stretch
+  #! terminal_colors: |
+  #!   ENV TERM xterm-256color
   debian_start: |
     ARG DEBIAN_FRONTEND=noninteractive
     RUN apt-get -y clean
