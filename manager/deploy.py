@@ -36,7 +36,8 @@ def get_conda_bin(name):
 	#! repetitive with path_wsgi
 	# get installed from conf
 	installed = ortho.conf.get('installed',{})
-	if len(installed)!=1: raise Exception('develpment')
+	if len(installed)!=1: 
+		raise Exception('development: failed to get the env %s'%name)
 	this_env = list(installed.values())[0]
 	path = os.path.join(this_env['where'],'envs',this_env['name'],'bin',name)
 	if not os.path.isfile(path):

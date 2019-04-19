@@ -13,7 +13,7 @@ def read_connection(*args):
 	toc = {}
 	for arg in args:
 		with open(arg) as fp: 
-			contents = yaml.load(fp.read())
+			contents = yaml.safe_load(fp.read())
 			for key,val in contents.items():
 				if key in toc: 
 					raise Exception(('found key %s in the toc already. '
