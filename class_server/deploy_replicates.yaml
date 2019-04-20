@@ -1,0 +1,64 @@
+factory_server_base:
+  site: "@deploy_site"
+  persist: true
+  rebuild: false
+  script: |
+    # inside the "site" at this point
+    mkdir -p server
+    cd server
+    if [ -d factory ]; then echo "[STATUS] factory already exists" && exit 0; fi
+    # this script can repeat to confirm the installation
+    #! git clone https://github.com/bradleyrp/factory factory
+    git clone https://github.com/biophyscode/factory factory
+    cd factory
+    git pull
+    if [ ! -f Miniconda3-latest-Linux-x86_64.sh ]; then 
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+      ln -s Miniconda3-latest-Linux-x86_64.sh miniconda.sh
+    fi
+    # bootstrap the config
+    make
+    # make the environment or update if reqs.yaml has changed
+    #! make env conda_py3
+    make set species anaconda
+    make set anaconda_location=./Miniconda3-latest-Linux-x86_64.sh
+    make set automacs="http://github.com/biophyscode/automacs" 
+    make set omnicalc="http://github.com/biophyscode/omnicalc"
+    make setup
+    exit
+  dockerfile:
+    #sequence:
+    #  - stretch
+    #  - debian_start
+    #  - debian_compilers
+    #  - debian_mysql
+    #  - debian_apache
+    #  - debian_image_magick
+    #  - debian_shell_bash
+    #  - make_user
+    #addendum:
+    #  - WORKDIR /home/user/extern
+    sequence:
+      - stretch
+      - debian_start
+      - debian_mysql
+      - debian_shell_bash
+      - debian_compilers
+      - debian_apache
+      - gromacs-2018.3
+      - make_user
+    addendum:
+      - WORKDIR /home/user/extern
+  command: docker-compose run site
+  compose:
+    version: '3'
+    services:
+      site:
+        build: .
+        entrypoint: ['/bin/bash','script.sh']
+        #! should this be custom? always match the recipe? how to handle a library of recipes?
+        #!   note that if this image exists rebuild is redundant so make it false by default?
+        #!   or does this risk losing touch with whether it works or not
+        image: factory:factory_server_base
+        volumes:
+          - ./:/home/user/extern
