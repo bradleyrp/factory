@@ -1,0 +1,12 @@
+
+containers:
+  number: 8
+
+#site:
+#  confirm:
+#    macdrive_paths:
+#      source: 
+#        ~/worker/site-nix.dmg
+#    "@deploy_site":
+#      s: "hooks/macdrive.py"
+#      f: "get_macdrive"

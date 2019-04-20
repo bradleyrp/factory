@@ -1,0 +1,69 @@
+# Dockerfile components
+dockerfiles:
+  copy_run_script: |
+    COPY script.sh script.sh
+    CMD ["bash","script.sh"]
+  make_user:
+    # formats for subs: key, val, python function, builtin function
+    subs:
+      user: user
+      uid: 1000
+      user_passwd: secret
+      gid: 100
+      gname: users
+    text: |
+      RUN getent group %(gid)s > /dev/null 2>&1 \
+          || (groupmod -g %(gid)d %(gname)s)
+      RUN useradd -m -u %(uid)d -g %(gid)d %(user)s
+      RUN echo '%(user)s:%(user_passwd)s' | chpasswd
+      USER %(user)s
+      WORKDIR /home/%(user)s
+  stretch: |
+    FROM debian:stretch
+  centos7: |
+    FROM centos:centos7
+  centos7_dev: |
+    RUN yum update -y
+    RUN yum groupinstall -y 'Development Tools'
+    RUN yum install -y wget
+    RUN yum install -y which
+    RUN yum install -y vim
+    RUN yum install -y git
+    RUN yum install -y make
+    RUN yum install -y screen
+  debian_start: |
+    ARG DEBIAN_FRONTEND=noninteractive
+    RUN apt-get -y clean
+    RUN apt-get -y update
+    RUN apt-get install -y git make wget vim screen
+    RUN apt-get install -y procps
+    RUN apt-get install -y python python-dev
+    ENV PYTHONIOENCODING UTF-8
+  debian_mysql: |
+    RUN apt-get install -y mysql-server default-libmysqlclient-dev
+  debian_shell_bash: |
+    SHELL ["/bin/bash", "--login", "-c"]
+  debian_compilers: |
+    RUN apt-get install -y cmake
+    RUN apt-get install -y build-essential
+    RUN apt-get install -y m4
+    RUN apt-get install -y automake
+    RUN apt-get install -y libtool
+  debian_expose_ports: |
+    EXPOSE 22
+    EXPOSE 8000
+    EXPOSE 8888
+  debian_apache:
+    RUN apt-get install -y apache2 apache2-dev
+  gromacs-2018.3: |
+    WORKDIR /root
+    RUN apt-get install -y libfftw3-dev
+    RUN wget ftp://ftp.gromacs.org/pub/gromacs/gromacs-2018.3.tar.gz
+    RUN tar xvf gromacs-2018.3.tar.gz
+    WORKDIR /root/gromacs-2018.3
+    RUN mkdir build
+    WORKDIR /root/gromacs-2018.3/build
+    RUN cmake /root/gromacs-2018.3
+    RUN make -j 2
+    RUN make install
+    WORKDIR /root
