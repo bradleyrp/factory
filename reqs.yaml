@@ -32,3 +32,5 @@ dependencies:
   - flask
   # factory interface
   - beautifulsoup4
+  # new requirement in django
+  - sqlparse
