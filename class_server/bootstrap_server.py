@@ -25,24 +25,26 @@ replicate_template = """
   mods:
     compose: 
       services:
-        site:
+        %(name)s_service:
           volumes:
             - ./:/home/user/extern
             - %(connections)s:/home/user/extern/server/factory/connections
           ports: 
-            - "%(port_site)d:8000"
-            - "%(port_note)d:8001"
+            - "%(port_site)d:%(port_site)d"
+            - "%(port_note)d:%(port_note)d"
           # entrypoint: ['/bin/bash']
           entrypoint: ['/bin/bash','script.sh']
           container_name: %(name)s
+          image: factory:factory_server_base
   overrides:
     # toggle this and above to run in foreground or background
-    command: docker-compose up -d site
-    # command: docker-compose run --service-ports site
+    command: docker-compose -p p_%(name)s up -d %(name)s_service 
+    # command: docker-compose run --service-ports %(name)s_service
     script: |
       cd server/factory
+      source /usr/local/gromacs/bin/GMXRC
       rm -f pid* TASK_QUEUE
-      make connect %(name)s
+      make connect %(name)s public
       make run %(name)s public
       sleep infinity
 """
@@ -66,6 +68,59 @@ connection_template = """
     credentials: {'stat':'mech'}
 """
 
+connection_template_legacy = """
+# FACTORY PROJECT (the base case example "demo")
+%(name)s:
+  # include this project when reconnecting everything
+  enable: true 
+  site: site/PROJECT_NAME  
+  calc: calc/PROJECT_NAME
+  repo: http://github.com/biophyscode/omni-basic
+  database: data/PROJECT_NAME/db.factory.sqlite3
+  post_spot: data/PROJECT_NAME/post
+  plot_spot: data/PROJECT_NAME/plot
+  simulation_spot: data/PROJECT_NAME/sims
+  development: True
+  cluster: cluster/cluster-%(name)s
+  gromacs_config: gromacs_config.py
+  # serve the factory by running "make connect <name> public" and later "make run <name> public"
+  public:
+    port: %(port_site)s
+    notebook_port: %(port_note)s
+    # use "notebook_hostname" if you have a router or zeroes if using docker
+    notebook_hostname: '0.0.0.0'
+    # you must replace the IP address below with yours
+    hostname: ['158.130.113.128','127.0.0.1']
+    credentials: {'%(user)s':'%(pass)s'}
+  # import previous data or point omnicalc to new simulations, each of which is called a "spot"
+  # note that prepared slices from other integrators e.g. NAMD are imported via post with no naming rules
+  spots:
+    # colloquial name for the default "spot" for new simulations given as simulation_spot above
+    sims:
+      # name downstream postprocessing data according to the spot name (above) and simulation folder (top)
+      # the default namer uses only the name (you must generate unique names if importing from many spots)
+      namer: "lambda name,spot=None: name"
+      # parent location of the spot_directory (may be changed if you mount the data elsewhere)
+      route_to_data: data/PROJECT_NAME
+      # path of the parent directory for the simulation data
+      spot_directory: sims
+      # rules for parsing the data in the spot directories
+      regexes:
+        # each simulation folder in the spot directory must match the top regex
+        top: '(.+)'
+        # each simulation folder must have trajectories in subfolders that match the step regex (can be null)
+        # note: you must enforce directory structure here with not-slash
+        step: '([stuv])([0-9]+)-([^\/]+)'
+        # each part regex is parsed by omnicalc
+        part: 
+          xtc: 'md\.part([0-9]{4})\.xtc'
+          trr: 'md\.part([0-9]{4})\.trr'
+          edr: 'md\.part([0-9]{4})\.edr'
+          tpr: 'md\.part([0-9]{4})\.tpr'
+          # specify a naming convention for structures to complement the trajectories
+          structure: '(system|system-input|structure)\.(gro|pdb)'
+"""
+
 class Site(Handler):
 	def confirm(self,confirm):
 		"""
@@ -80,17 +135,19 @@ class Site(Handler):
 		return True
 
 class Containers(Handler):
-	def main(self,number):
-		start_port = 9001
+	def main(self,number,passwords={}):
+		start_port = 9002
 		name = 'c%02d'
 		connections_dn = os.path.join(os.getcwd(),'class_server','connections')
+		if not os.path.isdir(connections_dn):
+			os.mkdir(connections_dn)
 		with open('class_server/deploy_loop.yaml','w') as fp:
 			for num in range(1,1+number):
 				name_this = name%num
 				print('status preparing %s'%name_this)
 				detail = {'name':name_this,
-					'port_site':start_port+num*2+0,
-					'port_note':start_port+num*2+1,
+					'port_site':start_port+(num-1)*2+0,
+					'port_note':start_port+(num-1)*2+1,
 					'connections':connections_dn}
 				fp.write('\n'+replicate_template%detail)
 		connection_fn = os.path.join(
@@ -100,9 +157,12 @@ class Containers(Handler):
 			for num in range(1,1+number):
 				name_this = name%num
 				detail = {
-					'port_note':start_port+num*2+2,
+					'port_site':start_port+(num-1)*2+0,
+					'port_note':start_port+(num-1)*2+1,
+					'user':passwords.get(name_this,{}).get('name','detailed'),
+					'pass':passwords.get(name_this,{}).get('pass','balance'),
 					'name':name_this}
-				fp.write('\n'+connection_template%detail)
+				fp.write('\n'+connection_template_legacy%detail)
 
 def class_server_setup(arg):
 	"""

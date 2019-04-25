@@ -1,6 +1,10 @@
 
 containers:
   number: 8
+  passwords:
+    c08: 
+      name: central
+      pass: dogma
 
 #site:
 #  confirm:

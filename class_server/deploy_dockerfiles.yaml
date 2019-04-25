@@ -34,7 +34,7 @@ dockerfiles:
   debian_start: |
     ARG DEBIAN_FRONTEND=noninteractive
     RUN apt-get -y clean
-    RUN apt-get -y update
+    RUN apt-get -y update --fix-missing
     RUN apt-get install -y git make wget vim screen
     RUN apt-get install -y procps
     RUN apt-get install -y python python-dev
