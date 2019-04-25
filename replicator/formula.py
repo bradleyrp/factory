@@ -198,7 +198,8 @@ class ReplicatorGuide(Handler):
 			#! do something with result? right now this is just a do hook
 		dfm = DockerFileMaker(meta=self.meta,**dockerfile)
 		spot = SpotLocal(site=site,persist=persist)
-		with open(os.path.join(spot.path,'Dockerfile'),'w') as fp: 
+		dockerfile_fn = os.path.join(spot.path,'Dockerfile')
+		with open(dockerfile_fn,'w') as fp: 
 			fp.write(dfm.dockerfile)
 		# add the user to all docker-compose.yml services on Linux
 		if is_linux:
@@ -216,12 +217,14 @@ class ReplicatorGuide(Handler):
 						'refuse to override this')%(service,
 						compose['services']['container_name']))
 				else: compose['services'][service]['container_name'] = cname
-		with open(os.path.join(spot.path,'docker-compose.yml'),'w') as fp:
+		compose_fn = os.path.join(spot.path,'docker-compose.yml')
+		with open(compose_fn,'w') as fp:
 			fp.write(yaml.dump(compose))
 		# script is optional. it only runs if you run a docker command below
 		#   which also depends on it via an entrypoint
 		if script:
-			with open(os.path.join(spot.path,'script.sh'),'w') as fp: 
+			script_fn = os.path.join(spot.path,'script.sh')
+			with open(script_fn,'w') as fp: 
 				fp.write(script)
 		if rebuild: 
 			cmd = 'docker-compose build'
@@ -235,8 +238,14 @@ class ReplicatorGuide(Handler):
 		#!   somewhat more elegant? this could be done with another method
 		#!   for clarity
 		bash_basic(command,cwd=spot.path)
+		# clean up
+		#! note that this is a design choice
+		if True:
+			if script: os.remove(script_fn)
+			os.remove(dockerfile_fn)
+			os.remove(compose_fn)
 
-	def via(self,via,overrides=None,mods=None,notes=None):
+	def via(self,via,overrides=None,mods=None,notes=None,cname=None):
 		"""
 		Run a replicate with a modification. Extremely useful for DRY.
 		"""
@@ -292,6 +301,8 @@ class ReplicatorGuide(Handler):
 		# via calls docker_compose typically
 		#! make sure the following does not cause conflicts
 		outgoing['indirect'] = False
+		#! pass cname from CLI to the target function
+		if cname: outgoing['cname'] = cname
 		getattr(self,fname)(**outgoing)
 
 	def singularity_via_vagrant(self,vagrant_site):
