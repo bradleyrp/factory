@@ -70,7 +70,7 @@ webdev:
 ubuntu_root: 
   notes: |
     OBJECTIVE: provide a place to test root packge installations in ubuntu 
-    retire this in favor of adding sudo to the standard webdev recipe
+    DEV: retire this in favor of adding sudo to the standard webdev recipe
   persist: true
   site: "@deploy_site"
   rebuild: false
