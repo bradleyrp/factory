@@ -58,7 +58,6 @@ webdev:
     We allow sudo here so this should not be used in production.
   persist: true
   site: "@deploy_site"
-  rebuild: false
   dockerfile:
     sequence:
       - bionic
@@ -77,31 +76,11 @@ webdev:
         volumes:
           - ./devspot/dev-node-v01:/home/user/dev
 
-ubuntu_root: 
-  notes: |
-    OBJECTIVE: provide a place to test root packge installations in ubuntu 
-    Note that this is largely superceded by the use of sudo for convenience.
-  persist: true
-  site: "@deploy_site"
-  rebuild: false
-  dockerfile:
-    sequence:
-      - bionic
-      - ubuntu_build
-  command: docker-compose run deploy
-  compose:
-    version: '3'
-    services:
-      deploy:
-        build: .
-        image: factory:ubuntu_root
-
 e01:
   notes: |
     OBJECTIVE: Generic web development.
     Currently marked "e01" for "explore".
-  persist: true
-  cleanup: false
+    Points to several projects in the development spot.
   site: "@deploy_site"
   command: docker-compose run --service-ports deploy
   compose:
@@ -117,8 +96,6 @@ e01:
           - 5000:5000
           - 8000:8000
           - 4200:4200
-        expose:
-          - 4200
         hostname: localhost
 
 e01p2:
@@ -152,8 +129,6 @@ e01p2:
           container_name: e01p2_deploy
           ports: 
             - 5000:5000
-          expose: 
-            - 5000
         mongo:
           image: mongo
           restart: always
