@@ -57,16 +57,19 @@ class Runner:
 
 class ReplicatorSpecial(Handler):
 
-	def dockerfiles(self,dockerfiles):
+	def nothing_special(self,**kwargs):
+		"""The null handler for recipe files."""
+		self.kwargs = kwargs
+		self.specials = {}
+
+	def dockerfiles(self,dockerfiles,**kwargs):
 		# unorthodox: this function overwrites itself with its key
 		#   note that this is a neat way to hook something: we expect the 
 		#   ReplicatorSpecial to get a portion of a YAML file and just add
 		#   it to the class right here, however the way this is called from
 		#   replicator_read_yaml means we can easily process it here
-		self.dockerfiles = dockerfiles
-
-	#! UNDER CONSTRUCTION def interface(self,interface):
-	#! import ipdb;ipdb.set_trace()
+		self.specials = dict(dockerfiles=dockerfiles)
+		self.kwargs = kwargs
 
 class DockerFileChunk(Handler):
 
@@ -77,7 +80,7 @@ class DockerFileMaker(Handler):
 
 	def sequence(self,sequence,addendum=None):
 		"""Assemble a sequence of dockerfiles."""
-		index = MultiDict(base=self.meta['dockerfiles'].dockerfiles,
+		index = MultiDict(base=self.meta['dockerfiles'],
 			underscores=True)
 		self.dockerfile = [] 
 		for item in sequence:
