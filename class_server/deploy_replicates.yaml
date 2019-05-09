@@ -62,3 +62,12 @@ factory_server_base:
         image: factory:factory_server_base
         volumes:
           - ./:/home/user/extern
+
+#! explain the fix with mayavi
+factory_server_base_fix:
+  via: factory_server_base
+  mods: 
+    compose:
+      services:
+        site:
+          entrypoint: ['/bin/bash']
