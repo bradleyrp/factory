@@ -56,6 +56,13 @@ webdev:
       USER user
       WORKDIR /home/user
       #! note: you need a login shell to use nvm or node
+      # section: expose many ports
+      #! note the port expose commands were for testing only
+      EXPOSE 8000
+      EXPOSE 4200
+      EXPOSE 5000
+      EXPOSE 8888
+      EXPOSE 3000
   command: docker-compose run --service-ports deploy
   compose:
     version: '3'
@@ -110,6 +117,7 @@ e01:
     OBJECTIVE: Generic web development.
     Currently marked "e01" for "explore".
   persist: true
+  cleanup: false
   site: "@deploy_site"
   command: docker-compose run --service-ports deploy
   compose:
@@ -125,6 +133,9 @@ e01:
           - 5000:5000
           - 8000:8000
           - 4200:4200
+        expose:
+          - 4200
+        hostname: localhost
 
 e01p2:
   notes: |
@@ -155,6 +166,10 @@ e01p2:
           environment: 
             STACK_NAME: e01p2
           container_name: e01p2_deploy
+          ports: 
+            - 5000:5000
+          expose: 
+            - 5000
         mongo:
           image: mongo
           restart: always
