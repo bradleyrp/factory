@@ -171,8 +171,8 @@ class ReplicatorGuide(Handler):
 
 	@hook_watch('prelim','site','identity',strict=False)
 	def docker_compose(self,compose,dockerfile,site,
-		command,script=None,persist=True,rebuild=True,
-		prelim=None,identity=None,indirect=False,cname=None):
+		command,script=None,persist=True,rebuild=True,cleanup=True,
+		prelim=None,identity=None,indirect=False,cname=None,notes=None):
 		"""
 		Prepare a docker-compose folder and run a command in the docker.
 		"""
@@ -196,10 +196,13 @@ class ReplicatorGuide(Handler):
 		if prelim:
 			result = read_config(hook=prelim).get(prelim,prelim)
 			#! do something with result? right now this is just a do hook
-		dfm = DockerFileMaker(meta=self.meta,**dockerfile)
 		spot = SpotLocal(site=site,persist=persist)
-		with open(os.path.join(spot.path,'Dockerfile'),'w') as fp: 
-			fp.write(dfm.dockerfile)
+		# added a switch in case no dockerfile build is happening
+		if dockerfile:
+			dfm = DockerFileMaker(meta=self.meta,**dockerfile)
+			dockerfile_fn = os.path.join(spot.path,'Dockerfile')
+			with open(dockerfile_fn,'w') as fp: 
+				fp.write(dfm.dockerfile)
 		# add the user to all docker-compose.yml services on Linux
 		if is_linux:
 			for key in compose.get('services',{}):
@@ -216,14 +219,17 @@ class ReplicatorGuide(Handler):
 						'refuse to override this')%(service,
 						compose['services']['container_name']))
 				else: compose['services'][service]['container_name'] = cname
-		with open(os.path.join(spot.path,'docker-compose.yml'),'w') as fp:
+		compose_fn = os.path.join(spot.path,'docker-compose.yml')
+		with open(compose_fn,'w') as fp:
 			fp.write(yaml.dump(compose))
 		# script is optional. it only runs if you run a docker command below
 		#   which also depends on it via an entrypoint
 		if script:
-			with open(os.path.join(spot.path,'script.sh'),'w') as fp: 
+			script_fn = os.path.join(spot.path,'script.sh')
+			with open(script_fn,'w') as fp: 
 				fp.write(script)
-		if rebuild: 
+		# added a switch in case no dockerfile build is happening
+		if dockerfile and rebuild: 
 			cmd = 'docker-compose build'
 			print('status from %s running command %s'%(spot.path,cmd))
 			bash_basic('docker-compose build',cwd=spot.path)
@@ -234,9 +240,28 @@ class ReplicatorGuide(Handler):
 		#!   made the rebuild True when no script or command. this might be
 		#!   somewhat more elegant? this could be done with another method
 		#!   for clarity
+		#! failures during rebuild still deposit you in the previous container
+		#!   and since this is mildly useful sometimes, we allow it anyway
 		bash_basic(command,cwd=spot.path)
+		# clean up
+		#! note that this is a design choice
+		if cleanup:
+			if script: os.remove(script_fn)
+			try: os.remove(dockerfile_fn)
+			except: pass
+			try: os.remove(compose_fn)
+			except: pass
 
-	def via(self,via,overrides=None,mods=None,notes=None):
+	def docker_compose_no_build(self,compose,site,
+		command,script=None,persist=True,rebuild=True,cleanup=True,
+		prelim=None,identity=None,indirect=False,cname=None,notes=None):
+		return self.docker_compose(dockerfile=None,
+			compose=compose,site=site,command=command,
+			script=script,persist=persist,rebuild=rebuild,cleanup=cleanup,
+			prelim=prelim,identity=identity,indirect=indirect,cname=cname,
+			notes=notes)
+
+	def via(self,via,overrides=None,mods=None,notes=None,cname=None):
 		"""
 		Run a replicate with a modification. Extremely useful for DRY.
 		"""
@@ -292,6 +317,8 @@ class ReplicatorGuide(Handler):
 		# via calls docker_compose typically
 		#! make sure the following does not cause conflicts
 		outgoing['indirect'] = False
+		#! pass cname from CLI to the target function
+		if cname: outgoing['cname'] = cname
 		getattr(self,fname)(**outgoing)
 
 	def singularity_via_vagrant(self,vagrant_site):

@@ -63,4 +63,35 @@ no4:
       cd inputs/proteins && git checkout ortho_clean && cd ../..
       make prep protein
       python -u script.py
-      
+
+no5:
+  # make a protein simulation in a project
+  via: deploy_linux_factory
+  overrides:
+    command: docker-compose run deploy
+    script: |
+      set -e
+      source factory/env/bin/activate py3
+      source /usr/local/gromacs/bin/GMXRC.bash
+      cd factory
+      #! requires proteins.yaml
+      make connect proteins
+      #! a temporary measure before we add back simulations
+      mkdir -p data/proteins/sims
+      cd data/proteins/sims
+      this=villin-rp02
+      git clone https://github.com/biophyscode/automacs -b ortho_clean $this
+      cd $this
+      make setup all
+      cd inputs/proteins && git checkout ortho_clean && cd ../..
+      make prep protein
+      python -u script.py
+  mods:
+    compose:
+      services:
+        deploy:
+          #! entrypoint: ['/bin/bash','-l']
+          volumes:
+            - ./:/home/user/extern
+            - /Users/rpb/worker/factory/connections/proteins.yaml:/home/user/extern/factory/connections/proteins.yaml
+  #! under construction !!!

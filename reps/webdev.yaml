@@ -1,0 +1,200 @@
+webdev: 
+  notes: |
+    This recipe is a basis for various kinds of web development.
+    We install a minimal ubuntu, with latest python and control over node.
+    Be sure to use a login shell via entrypoint if you want to use node.
+    We allow sudo here so this should not be used in production.
+  persist: true
+  site: "@deploy_site"
+  rebuild: false
+  dockerfile:
+    raw: |
+      FROM ubuntu:bionic
+      # section: basic requirements
+      ENV DEBIAN_FRONTEND noninteractive
+      RUN apt-get -y clean
+      RUN apt-get -y update
+      RUN apt-get install -y --no-install-recommends apt-utils
+      RUN apt-get install -y build-essential
+      RUN apt-get install -y git
+      RUN apt-get install -y make
+      RUN apt-get install -y wget
+      RUN apt-get install -y curl
+      RUN apt-get install -y vim
+      RUN apt-get install -y jq
+      RUN apt-get install -y libssl-dev
+      # section: latest python3
+      RUN apt-get install -y python3
+      # redundant if this is latest
+      RUN apt-get install -y python3 python3-dev python3-pip python3-venv
+      RUN apt-get install -y python3.7 python3.7-dev python3.7-venv
+      # note that the latest python is the default after update-alternatives
+      RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.6 1
+      RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 2
+      # section: install nvm and node as root
+      RUN mkdir /usr/local/nvm
+      RUN mkdir /usr/local/node
+      # note that nvm typically installs to ~/.nvm
+      # note that nvm is typically installed by users, not root
+      ENV NVM_DIR /usr/local/nvm
+      RUN export nvm_ver=$(curl -sSl \
+        https://api.github.com/repos/nvm-sh/nvm/releases/latest \
+        | jq -r ".name") \
+        && curl -sSl \
+        "https://raw.githubusercontent.com/creationix/nvm/$nvm_ver/install.sh" \
+        | /bin/bash
+      RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm install node"
+      RUN cp /usr/local/nvm/nvm.sh /etc/profile.d/z10-nvm.sh
+      # section: make_user with sudo
+      RUN getent group 100 > /dev/null 2>&1 || (groupmod -g 100 users)
+      RUN useradd -m -u 1000 -g 100 user
+      RUN echo 'user:secret' | chpasswd
+      #! beware: use of sudo is a security risk here
+      RUN apt-get install -y sudo
+      RUN sudo adduser user sudo
+      RUN touch ~/.sudo_as_admin_successful
+      USER user
+      WORKDIR /home/user
+      #! note: you need a login shell to use nvm or node
+      # section: expose many ports
+      #! note the port expose commands were for testing only
+      EXPOSE 8000
+      EXPOSE 4200
+      EXPOSE 5000
+      EXPOSE 8888
+      EXPOSE 3000
+  command: docker-compose run --service-ports deploy
+  compose:
+    version: '3'
+    services:
+      deploy:
+        build: .
+        image: factory:webdev
+        entrypoint: ['/bin/bash','-l']
+        volumes:
+          - ./devspot/dev-node-v01:/home/user/dev
+
+ubuntu_root: 
+  notes: |
+    OBJECTIVE: provide a place to test root packge installations in ubuntu 
+    DEV: retire this in favor of adding sudo to the standard webdev recipe
+  persist: true
+  site: "@deploy_site"
+  rebuild: false
+  dockerfile:
+    raw: |
+      FROM ubuntu:bionic
+      # section: basic requirements
+      ENV DEBIAN_FRONTEND noninteractive
+      RUN apt-get -y clean
+      RUN apt-get -y update
+      RUN apt-get install -y --no-install-recommends apt-utils
+      RUN apt-get install -y build-essential
+      RUN apt-get install -y git
+      RUN apt-get install -y make
+      RUN apt-get install -y wget
+      RUN apt-get install -y curl
+      RUN apt-get install -y vim
+      RUN apt-get install -y jq
+      RUN apt-get install -y libssl-dev
+      # section: latest python3
+      RUN apt-get install -y python3
+      RUN apt-get install -y python3.7 # redundant if this is latest
+      RUN apt-get install -y python3-dev python3-pip python3-venv
+      # note that the latest python is the default after update-alternatives
+      RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.6 1
+      RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 2
+  command: docker-compose run deploy
+  compose:
+    version: '3'
+    services:
+      deploy:
+        build: .
+        image: factory:ubuntu_root
+
+e01:
+  notes: |
+    OBJECTIVE: Generic web development.
+    Currently marked "e01" for "explore".
+  persist: true
+  cleanup: false
+  site: "@deploy_site"
+  command: docker-compose run --service-ports deploy
+  compose:
+    version: '3'
+    services:
+      deploy:
+        entrypoint: ['/bin/bash','-l']
+        #! update the name if you add more stuff
+        image: factory:webdev
+        volumes:
+          - ./devspot/e01:/home/user/dev
+        ports: 
+          - 5000:5000
+          - 8000:8000
+          - 4200:4200
+        expose:
+          - 4200
+        hostname: localhost
+
+e01p2:
+  notes: |
+    SWARM: use this with the swarm command below.
+      Requires swarm via `docker swarm init`.
+      Assumes swarm naming: the deploy application finds mongo at `e01p2_mongo`.
+      Note: the STACK_NAME in the deploy environment must be the swarm name.
+      Shutdown with `docker swarm rm e01p2`.
+      Ignore warnings for container_name which is used for compose only.
+    COMPOSE: use this with the compose command below.
+      A modification for the above that works with compose.
+      The e01p2 recipe uses `docker swarm init` and this one requires normal operation.
+      Normal operation from swarm requires: `docker swarm leave --force`.
+      Stop at the site with `docker-compose stop`.
+      Ignore warnings for restart which is used for swarm.
+    DEV: we need to make recipes that inherit mods. right now the swarm/compose methods all use the same mods, but you cannot use `via` to inherit the mods from e01p2 if you make an e01p2std that uses compose
+  via: e01
+  mods:
+    # turn off cleanup to get the docker information you need
+    cleanup: False
+    compose:
+      services:
+        deploy:
+          entrypoint: ['/bin/bash','script.sh']
+          volumes:
+            - ./script.sh:/home/user/script.sh
+            - ./devspot/e01:/home/user/dev
+          environment: 
+            STACK_NAME: e01p2
+          container_name: e01p2_deploy
+          ports: 
+            - 5000:5000
+          expose: 
+            - 5000
+        mongo:
+          image: mongo
+          restart: always
+          environment:
+            MONGO_INITDB_ROOT_USERNAME: root
+            MONGO_INITDB_ROOT_PASSWORD: example
+          container_name: e01p2_mongo
+        mongo-express:
+          image: mongo-express
+          restart: always
+          ports:
+            - 8081:8081
+          environment:
+            ME_CONFIG_MONGODB_ADMINUSERNAME: root
+            ME_CONFIG_MONGODB_ADMINPASSWORD: example
+          container_name: e01p2_mongo-express
+      version: '3.1'
+    script: |
+      #!/bin/bash
+      set -e -x
+      cd dev/proj02
+      source venv/bin/activate 
+      cd FlaskWithMongoDB
+      export FLASK_ENV=development FLASK_APP=app.py 
+      flask run --host=0.0.0.0
+    #! two recipes in one because `via` does not do cascading mods
+    command: docker stack deploy -c docker-compose.yml e01p2
+    #! command: docker-compose up -d
