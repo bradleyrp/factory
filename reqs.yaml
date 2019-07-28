@@ -1,34 +1,29 @@
 channels:
-  - conda-forge # for ipdb and MDAnalysis
+  - defaults
 dependencies:
-  # added mayavi in 2019.03
-  - mayavi
-  # normal requirements
   - pyyaml
-  - numpy
+  #! scipy errors require lower numpy: https://github.com/scikit-learn-contrib/hdbscan/issues/272
+  - numpy=1.16.0
   - scipy
   - matplotlib>2
-  - ipdb # requires conda-forge in channels
+  - conda-forge::ipdb
   - numpydoc
-  # a caution on conda: using pil here and everything gets downgraded to 2.7
-  - pillow # for omnicalc
+  - pillow # for omnicalc (avoid pil or downgrades to python 2.7)
   - h5py # for omnicalc
-  - scikit-learn # for some omnicalc calculations
+  - scikit-learn # for some omnicalc extensions 
   - MDAnalysis
+  - git
+  - pip
   - pip:
     - duecredit # silence warnings in MDAnalysis
     - brewer2mpl # for some omnicalc codes
-    # factory requirements
     - ipython[notebook] # for factory
     - jupyter_contrib_nbextensions # for factory
-    #!!! putting this here on 2018.12.13. probably need to check apache2 and apache2-devel
-    - mod_wsgi
-  # factory requirements
-  # serve django via apache (requires apache2-devel rpm because no conda package for py2 yet)
-  # removed requirement "mod_wsgi" here because it requires apache2-devel on rpm systems to be useful
-  - django-extensions # requires conda forge
-  - jupyter_contrib_nbextensions # ???
-  # experimental
+    #! putting this here on 2018.12.13. probably need to check apache2 and apache2-devel
+    #! mod_wsgi was available via conda in python 2
+    #! - mod_wsgi
+  - conda-forge::django-extensions
+  - jupyter_contrib_nbextensions
   - flask
   # factory interface
   - beautifulsoup4

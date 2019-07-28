@@ -49,6 +49,9 @@ def collect_functions(verbose=False,strict=False):
 	funcs,funcs_directory = {},{}
 	# start with the basic utility functions specified at the top
 	funcs = dict([(expose_aliases.get(k,k),globals()[k]) for k in expose_funcs])
+	#! add the original names for the aliases in case they are necessary
+	#! this is important if you make an env with name env because the folder precludes make env
+	for key,val in expose_aliases.items(): funcs[key] = globals()[key]
 	sources = conf.get('commands',[])  # pylint: disable=undefined-variable
 	# accrue functions over sources sequentially
 	for source in sources:

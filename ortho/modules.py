@@ -3,9 +3,10 @@
 from __future__ import print_function
 import os
 from .bash import bash
-from .requires import requires_program
+from .requires import requires_program,requires_version
 
 @requires_program('git')
+@requires_version('git>=2')
 def sync(**kwargs):
 	"""
 	Ensure modules are fresh.
@@ -22,11 +23,14 @@ def sync(**kwargs):
 		#! check address?
 		address = mod.pop('address')
 		# clone if missing
-		if not os.path.isdir(spot): bash('git clone %s %s'%(address,spot),scroll=True,tag='[BASH] | ')
+		if not os.path.isdir(spot): 
+			bash('git clone %s %s'%(address,spot),scroll=True,
+				tag='[BASH] | ',announce=True)
 		# check branch
 		branch = mod.pop('branch',None)
 		if branch:
-			branch_result = bash('git -C %s rev-parse --abbrev-ref HEAD'%spot,scroll=False)
+			branch_result = bash('git -C %s rev-parse --abbrev-ref HEAD'%spot,
+				scroll=False,announce=True)
 			stderr = branch_result['stderr']
 			if stderr: raise Exception(stderr)
 			this_branch = branch_result['stdout'].strip()

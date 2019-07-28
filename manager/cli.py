@@ -92,7 +92,7 @@ def init_settings(project_name,calculations,calc_spot,post_spot,plot_spot):
 	return settings
 
 def connect_run(project_name,settings_custom,post_spot,plot_spot,calculations,
-	public=False,development=False,sims=None,meta_filter=None):
+	public=False,development=False,sims=None,meta_filter=None,omnicalc=None):
 	"""
 	Instantiate a connection. Called by OmniFromFactory.
 	"""
@@ -104,7 +104,7 @@ def connect_run(project_name,settings_custom,post_spot,plot_spot,calculations,
 		if not os.path.isdir(dn): mkdirs(dn)
 	calc_root = os.path.join('calc',project_name)
 	# clone omnicalc into the calculation folder
-	modules_this = {calc_root:
+	modules_this = {calc_root:omnicalc if omnicalc else
 		config.get('omnicalc',default_omnicalc_repo)}
 	try: modules.sync(modules=modules_this,current=True)
 	except Exception as e: 
@@ -132,6 +132,14 @@ def connect_run(project_name,settings_custom,post_spot,plot_spot,calculations,
 	#! could also pass through database, calc
 	site_setup(project_name,settings_custom=settings_custom,
 		public=public,development=development)
+	# propagate the flag to activate the environment
+	spec_py3 = config.get('installed',{}).get('conda_py3',{})
+	if spec_py3:
+		activate_path = os.path.realpath(
+			os.path.join(spec_py3['where'],'bin','activate'))
+		ortho.bash('make set activate_env="%s py3"'%activate_path,cwd=calc_root)
+	#! currently we only pass the conda_py3 environment
+	else: pass
 
 class OmniFromFactory(Handler):
 	"""
@@ -139,7 +147,7 @@ class OmniFromFactory(Handler):
 	with settings depending on the connection dictionary.
 	"""
 	def connection_development(self,project_name,
-		calculations,calc_spot,post_spot,plot_spot,meta_filter=None):
+		calculations,calc_spot,post_spot,plot_spot,omnicalc=None,meta_filter=None):
 		"""Main handler for the development environment."""
 		settings = init_settings(project_name,
 			calculations,calc_spot,post_spot,plot_spot)
@@ -150,9 +158,10 @@ class OmniFromFactory(Handler):
 		#! added meta_filter here but not below
 		connect_run(project_name=project_name,settings_custom=settings,
 			post_spot=post_spot,plot_spot=plot_spot,calculations=calculations,
-			meta_filter=meta_filter)
+			meta_filter=meta_filter,omnicalc=omnicalc)
 	def connection_public(self,project_name,
-		calculations,calc_spot,post_spot,plot_spot,public):
+		calculations,calc_spot,post_spot,plot_spot,public,
+		omnicalc=None,meta_filter=None):
 		"""Main handler for the development environment."""
 		# initialize settings (repetitive with connection_development above)
 		settings = init_settings(project_name,
@@ -170,7 +179,8 @@ class OmniFromFactory(Handler):
 		#! could we consolidate the connections?
 		connect_run(public=public,
 			project_name=project_name,settings_custom=settings,
-			post_spot=post_spot,plot_spot=plot_spot,calculations=calculations)
+			post_spot=post_spot,plot_spot=plot_spot,meta_filter=meta_filter,
+			calculations=calculations,omnicalc=omnicalc)
 
 class OmniFromFactoryDEPRECATED(Handler):
 	"""

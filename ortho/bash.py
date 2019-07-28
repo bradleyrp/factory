@@ -45,7 +45,7 @@ def bash_newliner(line_decode,log=None):
 	return line_here
 
 def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
-	announce=False,local=False,scroll_log=True):
+	announce=False,local=False,scroll_log=True,strict=False,silent=False):
 	"""
 	Run a bash command.
 	Development note: tee functionality would be useful however you cannot use pipes with subprocess here.
@@ -80,8 +80,9 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 			if scroll:
 				empty = '' if sys.version_info<(3,0) else b''
 				for line in iter(proc.stdout.readline,empty):
-					sys.stdout.write((tag if tag else '')+line.decode('utf-8'))
-					sys.stdout.flush()
+					if not silent:
+						sys.stdout.write((tag if tag else '')+line.decode('utf-8'))
+						sys.stdout.flush()
 				proc.wait()
 				if proc.returncode:
 					raise Exception('see above for error. bash return code %d'%proc.returncode)
@@ -152,8 +153,8 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 		else: stdout,stderr = proc.communicate(input=inpipe.encode('utf-8'))
 	else: raise Exception('invalid options')
 	if not scroll and stderr: 
-		if stdout: print('error','stdout: %s'%stdout.decode('utf-8').strip('\n'))
-		if stderr: print('error','stderr: %s'%stderr.decode('utf-8').strip('\n'))
+		if stdout and not silent: print('error','stdout: %s'%stdout.decode('utf-8').strip('\n'))
+		if stderr and not silent: print('error','stderr: %s'%stderr.decode('utf-8').strip('\n'))
 		raise Exception('bash returned error state')
 	# we have to wait or the returncode below is None
 	# note that putting wait here means that you get a log file with the error 
@@ -162,13 +163,15 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 	if proc.returncode: 
 		if log: raise Exception('bash error, see %s'%log)
 		else: 
-			if stdout:
+			if stdout and not silent:
 				print('error','stdout:')
 				print(stdout.decode('utf-8').strip('\n'))
-			if stderr:
+			if stderr and not silent:
 				print('error','stderr:')
 				print(stderr.decode('utf-8').strip('\n'))
-			raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
+			if strict:
+				raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
+			else: pass
 	if scroll==True: 
 		proc.stdout.close()
 		if not merge_stdout_stderr: proc.stderr.close()
@@ -176,7 +179,7 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 	if not scroll:
 		if stderr: stderr = stderr.decode('utf-8')
 		if stdout: stdout = stdout.decode('utf-8')
-	return None if scroll else {'stdout':stdout,'stderr':stderr}
+	return None if scroll else {'stdout':stdout,'stderr':stderr,'return':proc.returncode}
 
 class TeeMultiplexer:
 	"""
