@@ -24,6 +24,7 @@ dependencies:
     #! - mod_wsgi
   - conda-forge::django-extensions
   - jupyter_contrib_nbextensions
+  - sphinx
   - flask
   # factory interface
   - beautifulsoup4
