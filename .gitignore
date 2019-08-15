@@ -1,0 +1,18 @@
+.pipeline_up_to_date
+calc
+config.json
+docs_*
+env
+logs
+pack
+*.pyc
+connections
+.ipynb_checkpoints
+#! temporary files ignored during development
+manager/legacy
+senv
+miniconda.sh
+site
+data/
+pid.*.lock
+class_server/deploy_loop.yaml
