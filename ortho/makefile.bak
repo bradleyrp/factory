@@ -1,8 +1,10 @@
 
-### makeface (MAKEfile interFACE)
+### makeface (MAKEfile interFACE) ortho-connect
 ### by Ryan Bradley, distributed under copyleft
 ### a crude but convenient way of making CLIs for python
 ### this file requires a minimal makeface.py and the ortho library
+### importing ortho bootstraps this makefile if absent
+### consider using the script-connect makeface as an alternative
 
 # set the shell (sh lacks source)
 SHELL:=/bin/bash

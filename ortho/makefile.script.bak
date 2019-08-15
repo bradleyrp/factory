@@ -1,0 +1,29 @@
+
+### makeface (MAKEfile interFACE) script-connect
+### by Ryan Bradley, distributed under copyleft
+### complements ortho/makefile.bak by routing all make commands to a script
+
+MAKEFLAGS+=-s
+RUN_ARGS:=$(wordlist 1,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+CMD_CALL:=$(word 1,$(RUN_ARGS))
+CMD_TAIL=$(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS))
+# first arguments are routed to ./fac
+$(word 1,$(RUN_ARGS)):
+	echo "[STATUS] make will run: ./fac $@ $(CMD_TAIL)"
+	./fac $@ $(CMD_TAIL)
+# tailing arguments are not valid targets
+$(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS)):
+# always execute
+.PHONY: touchup
+touchup:
+ifeq ($(RUN_ARGS),)
+	@echo "\n[STATUS] usage: make <argument> ..."
+	@echo "[STATUS] this makefile wraps ./fac"
+	@echo "[STATUS] the ./fac script runs in a configurable environment"
+	@echo "[STATUS] use either make or ./fac with the following usage notes\n"
+	./fac -h
+endif
+# forget flags for recursive make calls
+unexport MAKEFLAGS
+unexport RUN_ARGS
+

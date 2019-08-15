@@ -30,7 +30,7 @@ expose = {
 	'dev':['tracebacker','debugger'],
 	'dictionary':['DotDict','MultiDict'],
 	'environments':['environ','env_list','register_extension','load_extension'],
-	'handler':['Handler'],
+	'handler':['Handler','introspect_function'],
 	'hooks':['hook_merge'],
 	# note that you cannot have identical names for the module and a function
 	'hypos':['hypothesis','sweeper'],
@@ -45,7 +45,8 @@ expose = {
 	'reexec':['iteratively_execute','interact'],
 	'requires':['requires_program','requires_python','requires_python_check',
 		'is_terminal_command'],
-	'timer':['time_limit','TimeoutException'],}
+	'timer':['time_limit','TimeoutException'],
+	'statetools':['Cacher','Parser','StateDict',]}
 
 # note that packages which use ortho can just import the items above directly
 #   however ortho submodules have to import from the correct submodule `e.g. from .misc import str_types`
