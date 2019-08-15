@@ -8,12 +8,14 @@ from ortho.requires import requires_python,requires_python_check
 from ortho.dictionary import MultiDict
 from ortho.bash import bash_basic,bash
 from ortho.handler import Handler,introspect_function
-from ortho.config import read_config
+from ortho.config import read_config,config_hook_get
 from ortho.data import delveset,catalog
+from ortho.misc import listify
 
 import re,tempfile,os,copy
 import datetime as dt
 import uuid
+import shutil
 
 class SpotLocal:
 	"""Make a local directory."""
@@ -175,7 +177,8 @@ class ReplicatorGuide(Handler):
 	@hook_watch('prelim','site','identity',strict=False)
 	def docker_compose(self,compose,dockerfile,site,
 		command,script=None,persist=True,rebuild=True,cleanup=True,
-		prelim=None,identity=None,indirect=False,cname=None,notes=None):
+		prelim=None,identity=None,indirect=False,cname=None,
+		volumes=None,files=None,notes=None):
 		"""
 		Prepare a docker-compose folder and run a command in the docker.
 		"""
@@ -200,12 +203,20 @@ class ReplicatorGuide(Handler):
 			result = read_config(hook=prelim).get(prelim,prelim)
 			#! do something with result? right now this is just a do hook
 		spot = SpotLocal(site=site,persist=persist)
+		if files and not dockerfile:
+			raise Exception('files must accompany a dockerfile')
 		# added a switch in case no dockerfile build is happening
 		if dockerfile:
 			dfm = DockerFileMaker(meta=self.meta,**dockerfile)
 			dockerfile_fn = os.path.join(spot.path,'Dockerfile')
 			with open(dockerfile_fn,'w') as fp: 
 				fp.write(dfm.dockerfile)
+		#! we should only copy files if we need to, if the build needs to happen
+		if files:
+			for fn in files:
+				print('status copying %s to %s'%(fn,spot.path))
+				shutil.copyfile(fn,os.path.join(spot.path,
+					os.path.basename(fn)))
 		# add the user to all docker-compose.yml services on Linux
 		if is_linux:
 			for key in compose.get('services',{}):
@@ -222,6 +233,30 @@ class ReplicatorGuide(Handler):
 						'refuse to override this')%(service,
 						compose['services']['container_name']))
 				else: compose['services'][service]['container_name'] = cname
+		"""
+		manage volumes
+			...!!!
+		"""
+		if volumes:
+			# volumes can be hooks
+			volumes_this = dict([(k,config_hook_get(v,v)) 
+				for k,v in volumes.items()])
+			# assemble external volumes
+			services = compose.get('services',[])
+			for service in services:
+				vols = compose['services'][service].get('volumes',[])
+				if isinstance(vols,dict):
+					new_volumes = []
+					for key,val in vols.items():
+						base = volumes_this[key]
+						vals = listify(val)
+						for val in vals:
+							# we prepend the volumes because the left of the 
+							#   volume mapping is the host
+							new_volumes.append(os.path.join(base,val))
+					compose['services'][service]['volumes'] = new_volumes
+				# setting volumes to dict signals this override
+				else: pass
 		compose_fn = os.path.join(spot.path,'docker-compose.yml')
 		with open(compose_fn,'w') as fp:
 			fp.write(yaml.dump(compose))
@@ -232,19 +267,21 @@ class ReplicatorGuide(Handler):
 			with open(script_fn,'w') as fp: 
 				fp.write(script)
 		# added a switch in case no dockerfile build is happening
-		if dockerfile and rebuild: 
+		if (dockerfile and rebuild):
 			cmd = 'docker-compose build'
 			print('status from %s running command %s'%(spot.path,cmd))
+			#! this should raise an exception on failure or else run tries again
 			bash_basic('docker-compose build',cwd=spot.path)
 		# no need to log this since it manipulates a presumably 
 		#   persistent set of files
-		print('status running command %s'%command)
+		print('status from %s running command: %s'%(spot.path,command))
 		#! note that we could use docker_compose just for building if we 
 		#!   made the rebuild True when no script or command. this might be
 		#!   somewhat more elegant? this could be done with another method
 		#!   for clarity
 		#! failures during rebuild still deposit you in the previous container
 		#!   and since this is mildly useful sometimes, we allow it anyway
+		#! this requires os.system for the docker-compose command?
 		bash_basic(command,cwd=spot.path)
 		# clean up
 		#! note that this is a design choice
@@ -298,22 +335,23 @@ class ReplicatorGuide(Handler):
 		else: raise Exception('error in resolving "via" path')
 		fname = self._classify(*self.meta['complete'][first].keys())
 		if fname=='via': 
-			raise Exception('eldest parent of this "via" graph needs a parent: %s'%str(paths_this))
+			raise Exception(
+				'eldest parent of this "via" graph needs a parent: %s'%
+				str(paths_this))
 		outgoing = copy.deepcopy(self.meta['complete'][first])
 		for stage in paths_this[1:]:
-			outgoing.update(**copy.deepcopy(self.meta['complete'][stage].get('overrides',{})))
+			outgoing.update(**copy.deepcopy(self.meta['complete'][
+				stage].get('overrides',{})))
+			# the following ensures that mods are recursive
+			mods_upstream = self.meta['complete'][stage].get('mods',{})
+			if mods_upstream:
+				for path,value in catalog(mods_upstream):
+					delveset(outgoing,*path,value=value)
 		# for the simplest case we must apply the overrides
 		outgoing.update(**overrides)
-		#!!! this needs tested!
-		#!  deprecated method with no recursion
-		if False:
-			if via not in self.meta['complete']: 
-				raise Exception('reference to replicate %s is missing'%via)
-			fname = self.classify(*self.meta['complete'][via].keys())
-			outgoing = copy.deepcopy(self.meta['complete'][via])
-			#! recursion on the "via" formula needs to happen here
-			outgoing.update(**overrides)
 		# the mods keyword can be used to surgically alter the tree of hashes
+		# this application of mods acts on the mods for the recipe itself
+		#   while the mods_upstream (see above) makes it recursive
 		if mods:
 			for path,value in catalog(mods):
 				delveset(outgoing,*path,value=value)

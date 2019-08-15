@@ -34,7 +34,7 @@ def replicator_read_yaml(sources,name=None,args=None,kwargs=None):
 	incoming,special = {},{}
 	for source in sources:
 		with open(source) as fp: 
-			this = yaml.load(fp.read())
+			this = yaml.load(fp.read(),Loader=yaml.Loader)
 			this_reduced = ReplicatorSpecial(**this)
 			if this_reduced.specials:
 				special[source] = this_reduced.specials
@@ -57,11 +57,15 @@ def replicator_read_yaml(sources,name=None,args=None,kwargs=None):
 	development goal is to put this into another generalized handler
 	"""
 	dockerfiles_merged = {}
+	dockerfile_layers_history = []
 	for key,val in special.items():
 		for layer_name,chunk in val.get('dockerfiles',{}).items():
+			dockerfile_layers_history.append((key,layer_name))
 			if layer_name in dockerfiles_merged:
+				print('warning dockerfile chunks from: %s'%
+					dockerfile_layers_history)
 				raise Exception('dockerfile name collision: %s'%layer_name)
-			dockerfiles_merged[layer_name] = chunk
+			else: dockerfiles_merged[layer_name] = chunk
 	# save the resulting dockerfiles
 	reference = {'dockerfiles':dockerfiles_merged}
 	# end of special dockerfile handling
@@ -77,7 +81,6 @@ def replicator_read_yaml(sources,name=None,args=None,kwargs=None):
 	elif name: test_name = name
 	else: raise Exception('source %s is empty'%source)
 	if test_name not in instruct: 
-		import ipdb;ipdb.set_trace()
 		raise Exception('cannot find replicate %s'%test_name)
 	test_detail = instruct[test_name]
 	reference['complete'] = instruct

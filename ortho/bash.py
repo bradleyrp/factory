@@ -214,4 +214,10 @@ def bash_basic(cmd,cwd,log=None):
 		cmd_tee =  '%(cmd)s > >(tee -a %(log)s) 2> >(tee -a %(log)s >&2)'%dict(
 			log=log,cmd=cmd)
 		ortho.bash(command=cmd_tee,cwd=cwd)
+	#! previously: 
 	else: os.system('cd %s && %s'%(cwd,cmd))
+	#! trying to catch errors by using the regular bash command
+	#!   however consider that perhaps os.system is favored for some reason?
+	#! else: ortho.bash(cmd,cwd=cwd)
+	#! note that the docker commands were not working with the regular 
+	#!   bash for some reason so we use system
