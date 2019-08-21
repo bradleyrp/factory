@@ -1,0 +1,1 @@
+This code is licensed under GPLv3 or later.
