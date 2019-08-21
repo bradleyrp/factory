@@ -204,6 +204,7 @@ def logger(cache):
 class Parser:
     """
     Convert all methods in a subclass into argparse and run with cacher.
+    Note that you cannot use arbitrary parameters via **kwargs.
     """
     __metaclass__ = Singleton
     # protected functions from Cacher hidden from argparse

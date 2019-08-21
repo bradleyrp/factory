@@ -14,7 +14,9 @@ $(word 1,$(RUN_ARGS)):
 # tailing arguments are not valid targets
 $(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS)):
 # always execute
-.PHONY: touchup
+# include the run arguments otherwise make will ignore the recipe if the name
+#   of the recipe is the same as a folder (i.e. conda)
+.PHONY: touchup $(word 1,$(RUN_ARGS))
 touchup:
 ifeq ($(RUN_ARGS),)
 	@echo "\n[STATUS] usage: make <argument> ..."

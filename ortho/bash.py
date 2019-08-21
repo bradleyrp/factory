@@ -7,7 +7,8 @@ import os,sys,subprocess,io,time,re
 import threading
 if (sys.version_info > (3, 0)): import queue  # pylint: disable=import-error
 else: import Queue as queue
-import ortho
+from .dev import tracebacker
+import tempfile
 
 def command_check(command):
 	"""Run a command and see if it completes with returncode zero."""
@@ -210,5 +211,25 @@ def bash_basic(cmd,cwd,log=None):
 		# via https://stackoverflow.com/questions/692000
 		cmd_tee =  '%(cmd)s > >(tee -a %(log)s) 2> >(tee -a %(log)s >&2)'%dict(
 			log=log,cmd=cmd)
-		ortho.bash(command=cmd_tee,cwd=cwd)
+		bash(command=cmd_tee,cwd=cwd)
 	else: os.system('cd %s && %s'%(cwd,cmd))
+
+#! via community-collections
+def shell_script(script, subshell=None, bin='bash', strict=True):
+    """Run an anonymous bash script."""
+    # strict is not connected
+    if not subshell:
+        subshell = lambda x: x
+    out = script.strip()
+    print('status executing the following script')
+    print('\n'.join(['| '+i for i in out.splitlines()]))
+    with tempfile.NamedTemporaryFile(delete=False) as fp:
+        fp.write(out.encode())
+        fp.close()
+    try:
+        bash(subshell('%s %s' % (bin, fp.name)))
+    except Exception as e:
+        tracebacker(e)
+        return False
+    else:
+        return True
