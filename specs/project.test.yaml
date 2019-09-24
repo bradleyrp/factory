@@ -1,0 +1,8 @@
+lib: lib.automacs
+function: install_automacs
+path: ~/worker/site
+spec:
+  name: automacs
+  source: 
+    address: "https://github.com/biophyscode/automacs"
+    branch: ortho_clean
