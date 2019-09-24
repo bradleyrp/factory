@@ -1,0 +1,7 @@
+# This is the standard ("std") environment we install in the factory.
+name: std
+dependencies:
+  - pyyaml
+  - numpy
+  - ipdb
+  - snakemake
