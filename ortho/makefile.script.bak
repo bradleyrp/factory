@@ -22,7 +22,7 @@ ifeq ($(RUN_ARGS),)
 	@echo "\n[STATUS] usage: make <argument> ..."
 	@echo "[STATUS] this makefile wraps ./fac"
 	@echo "[STATUS] the ./fac script runs in a configurable environment"
-	@echo "[STATUS] use either make or ./fac with the following usage notes\n"
+	@echo "[STATUS] use \`make\` or \`./fac\` with the following usage\n"
 	./fac -h
 endif
 # forget flags for recursive make calls

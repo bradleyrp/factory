@@ -1,4 +1,0 @@
-name: std
-dependencies:
-  - pyyaml
-  - numpy

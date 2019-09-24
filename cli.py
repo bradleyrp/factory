@@ -14,14 +14,15 @@ import os,re
 
 import ortho
 from ortho import bash
-from ortho import Cacher,Parser,StateDict,requires_python
+from ortho import Cacher,Parser,StateDict
+from ortho import requires_python,requires_python_check
 from ortho import conf,treeview
 from ortho import Handler
 from ortho.installers import install_miniconda
 
 # manage the state
 #! how does this work? test it.
-global_debug = False
+global_debug = True
 state = StateDict(debug=global_debug)
 
 def update_factory_env_cursor(spot):
@@ -62,20 +63,38 @@ class Conda(Handler):
         # get the prefix for the file to update the cursor
         with open(file) as fp: reqs = fp.read()
         # get the name with a regex
-        name = re.match(r'name:\s+([^\s\n]+)',reqs).group(1)
+        name = re.findall(r'name:\s+(.*?)(?:\s|\n|\Z)',reqs)
+        if len(name)!=1: raise Exception('cannot identify a name in %s'%file)
+        else: name = name[0]
         # +++ assume name is the install location in conda/envs
         env_spot = os.path.join(os.getcwd(),'conda','envs',name)
         update_factory_env_cursor(env_spot)
-        
-@Cacher(
-    cache_fn='cache.json',
-    closer=cache_closer,
-    cache=state,)
+
+class Action(Handler):
+    requires_python('ipdb')
+    def basic(self,lib,path,function,spec={}):
+        #! note that the replicator has a method for this
+        path = os.path.abspath(os.path.expanduser(path))
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        this = ortho.importer(lib)
+        spec['spot'] = path
+        this[function](**spec) 
+   
+#! we are not using the cache for now
+#!   @Cacher(
+#!       cache_fn='cache.json',
+#!       closer=cache_closer,
+#!       cache=state,)
 
 class Interface(Parser):
     """
     A single call to this interface.
     """
+
+    def _try_except(self,exception): 
+        # include this function to throw legitimate errors
+        raise exception
 
     def _get_settings(self):
         import yaml
@@ -103,13 +122,25 @@ class Interface(Parser):
         Recover the ortho targets.
         We use the script-connect makefile but some ortho functions are
         available with the ortho-connect makefile.
-        Only single-word arguments can pass through
-        We cannot name this function "ortho" or make will ignore it.
-        Dev note: rename this ortho and fix the above problem.
-        Send "help" to get the equivalent of `make ortho` which returns targets.
+        Dev note: only single-word arguments can pass through.
+        Use the `help` argument to see the available targets.
         """
         if arg=='help': arg = ''
         ortho.bash('make --file ortho/makefile.bak'+(' '+arg if arg else ''))
+
+
+    def do(self,what):
+        """
+        Create something from a spec.
+        """
+        #! we cannot use the requires_python decorator with Parser
+        requires_python_check('ipdb','yaml')
+        import yaml
+        if os.path.isfile(what):
+            with open(what) as fp:
+                spec = yaml.load(fp.read(),Loader=yaml.Loader)
+            Action(**spec).solve
+        else: raise Exception('unclear what: %s'%what)
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface

@@ -32,7 +32,7 @@ if [[ "$1" == "envrun" ]]; then
 elif [[ "$1" == "run" ]]; then
    PATH=$PYENV/bin:$PATH
    ${@:2}
-# standard interface
+# standard interface does not have the full environment
 else 
   $PYENV_CALL -B cli.py $@
 fi
