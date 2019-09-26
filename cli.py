@@ -80,7 +80,11 @@ class Action(Handler):
         this = ortho.importer(lib)
         spec['spot'] = path
         this[function](**spec) 
-   
+    def script(self,script):
+        #! highly dangerous. unprotected execution!
+        #!   consider using the replicator instead?
+        exec(script)
+
 #! we are not using the cache for now
 #!   @Cacher(
 #!       cache_fn='cache.json',
