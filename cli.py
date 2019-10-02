@@ -78,7 +78,11 @@ class Action(Handler):
         this = ortho.importer(lib)
         spec['spot'] = path
         this[function](**spec) 
-   
+    def script(self,script):
+        #! highly dangerous. unprotected execution!
+        #!   consider using the replicator instead?
+        exec(script)
+
 class Interface(Parser):
     """
     A single call to this interface.

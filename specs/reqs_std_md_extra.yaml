@@ -1,7 +1,11 @@
-# This is the standard ("std") environment we install in the factory.
+# This is the standard ("std") environment with extras for MD simulations.
 name: std
 dependencies:
   - pyyaml
   - numpy
-  - ipdb
-  - snakemake
+  - conda-forge::ipdb
+  - salilab::modeller
+  - pip
+  - pip:
+    - snakemake
+    - biopython
