@@ -5,3 +5,9 @@ dependencies:
   - numpy
   - ipdb
   - snakemake
+  - pip
+  - pip: 
+    # documentation tools
+    - sphinx
+    - recommonmark
+    - numpydoc
