@@ -9,3 +9,7 @@ dependencies:
   - pip:
     - snakemake
     - biopython
+    # documentation tools
+    - sphinx
+    - recommonmark
+    - numpydoc
