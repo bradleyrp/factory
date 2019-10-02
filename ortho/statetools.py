@@ -257,7 +257,9 @@ class Parser:
                         sub.add_argument('--%s' % arg, dest=arg,
                                          action='store_true')
                     sub.set_defaults(**{arg: val})
-                elif isinstance(val, str_types):
+                # we treat the None as if it is expecting an argument
+                #   so that you can use None to rely on default kwargs
+                elif isinstance(val, str_types) or isinstance(val, type(None)):
                     sub.add_argument('--%s' % arg,
                                      dest=arg, default=val, type=str,
                                      help='Default for "%s": "%s".' %
