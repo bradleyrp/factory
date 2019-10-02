@@ -24,6 +24,7 @@ Development note: this could be parted out to the appropriate ortho submodules.
 
 import os
 import sys
+import re
 import argparse
 import json
 import time
@@ -211,6 +212,25 @@ class Parser:
     protected_functions = ['closer', 'errorclear', 'establish']
     parser_order = False
 
+    def _preproc(self):
+        """
+        Convert alternate syntax key=val to --key val. The former is used
+        by the makefile interface. When this function runs, we clean up
+        the sys.argv so that either make or the direct interface can be used
+        in exactly the same way. This is nondestructive to sys.argv because
+        Parser is a singleton. Note that you still cannot use --key val with
+        make but otherwise the make and direct syntax are identical.
+        """
+        regex_alt = '^(?:--)?(.+)=(.+)$'
+        revised = []
+        for item in sys.argv:
+            match = re.match(regex_alt,item)
+            if match:
+                revised.append('--%s'%match.group(1))
+                revised.append(match.group(2))
+            else: revised.append(item)
+        sys.argv = revised
+
     def __init__(self, parser_order=None):
         subject = self
         subcommand_names = [
@@ -219,6 +239,8 @@ class Parser:
             # hide functions with underscores and ignore a closer for Cacher
             and not func.startswith('_')
             and not func in self.protected_functions]
+        # preprocess the arguments
+        self._preproc()
         # under development: need a custom ordering!
         if self.parser_order:
             subcommand_names = (
@@ -264,6 +286,12 @@ class Parser:
                                      dest=arg, default=val, type=str,
                                      help='Default for "%s": "%s".' %
                                      (arg, str(val)))
+                #!!!
+                elif isinstance(val, int):
+                    sub.add_argument('--%s' % arg,
+                                     dest=arg, default=int(val), type=int,
+                                     help='Default for "%s": "%s".' %
+                                     (arg, int(val)))
                 else:
                     # development error if you use an invalid type in a parser
                     raise Exception(

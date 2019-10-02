@@ -3,14 +3,16 @@
 ### by Ryan Bradley, distributed under copyleft
 ### complements ortho/makefile.bak by routing all make commands to a script
 
-MAKEFLAGS+=-s
+# silent
+MAKEFLAGS+=-s 
+MAKEFLAGS_OUT = $(filter-out --,$(filter-out s,$(MAKEFLAGS)))
 RUN_ARGS:=$(wordlist 1,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 CMD_CALL:=$(word 1,$(RUN_ARGS))
 CMD_TAIL=$(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS))
 # first arguments are routed to ./fac
 $(word 1,$(RUN_ARGS)):
-	echo "[STATUS] make will run: ./fac $@ $(CMD_TAIL) ${MAKEFLAGS}"
-	./fac $@ $(CMD_TAIL) ${MAKEFLAGS}
+	echo "[STATUS] make will run: ./fac $@ $(CMD_TAIL) $(MAKEFLAGS_OUT)"
+	./fac $@ $(CMD_TAIL) ${MAKEFLAGS_OUT}
 # tailing arguments are not valid targets
 $(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS)):
 # always execute
