@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-#! yo make conda is busted! it uses the folder of the same name!
-
 """
 Use with `./fac` or `make`.
 The first time you import the ortho module it will bootstrap a makefile.
@@ -14,7 +12,7 @@ import os,re
 
 import ortho
 from ortho import bash
-from ortho import Cacher,Parser,StateDict
+from ortho import Parser,StateDict
 from ortho import requires_python,requires_python_check
 from ortho import conf,treeview
 from ortho import Handler
@@ -81,16 +79,11 @@ class Action(Handler):
         spec['spot'] = path
         this[function](**spec) 
    
-#! we are not using the cache for now
-#!   @Cacher(
-#!       cache_fn='cache.json',
-#!       closer=cache_closer,
-#!       cache=state,)
-
 class Interface(Parser):
     """
     A single call to this interface.
     """
+    # we are not using the Cacher interface at this point, only Parser
 
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
@@ -128,7 +121,6 @@ class Interface(Parser):
         if arg=='help': arg = ''
         ortho.bash('make --file ortho/makefile.bak'+(' '+arg if arg else ''))
 
-
     def do(self,what):
         """
         Create something from a spec.
@@ -141,6 +133,12 @@ class Interface(Parser):
                 spec = yaml.load(fp.read(),Loader=yaml.Loader)
             Action(**spec).solve
         else: raise Exception('unclear what: %s'%what)
+
+    def build_docs(self,source='',build=''):
+        kwargs = {}
+        if source: kwargs['source'] = source
+        if build: kwargs['build'] = build
+        ortho.documentation.build_docs(**kwargs)
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface
