@@ -5,7 +5,7 @@
 
 # silent
 MAKEFLAGS+=-s 
-MAKEFLAGS_OUT = $(filter-out --,$(filter-out s,$(MAKEFLAGS)))
+MAKEFLAGS_OUT = $(filter-out -- s,$(MAKEFLAGS))
 RUN_ARGS:=$(wordlist 1,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 CMD_CALL:=$(word 1,$(RUN_ARGS))
 CMD_TAIL=$(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS))
