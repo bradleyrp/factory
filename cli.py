@@ -9,6 +9,7 @@ ortho-connect makefile) and the Parser. This is the preferred CLI method.
 """
 
 import os,re
+import yaml
 
 import ortho
 from ortho import bash
@@ -69,6 +70,7 @@ class Conda(Handler):
         update_factory_env_cursor(env_spot)
 
 class Action(Handler):
+    """Generic state-based code."""
     requires_python('ipdb')
     def basic(self,lib,path,function,spec={}):
         #! note that the replicator has a method for this
@@ -128,14 +130,31 @@ class Interface(Parser):
     def do(self,what):
         """
         Create something from a spec.
+        This is the PRIMARY INTERFACE to most features.
         """
         #! we cannot use the requires_python decorator with Parser
         requires_python_check('ipdb','yaml')
+        #!!! requires the EcoSystem. import it here
         import yaml
         if os.path.isfile(what):
-            with open(what) as fp:
-                spec = yaml.load(fp.read(),Loader=yaml.Loader)
-            Action(**spec).solve
+            with open(what) as fp: text = fp.read()
+
+            # spec = yaml.load(text,Loader=yaml.Loader)
+            from lib.yaml_mods import YAMLTagIgnorer
+            # the YAMLTagIgnorer decorates a placeholder tree with _has_tag
+            spec = yaml.load(text,Loader=YAMLTagIgnorer)
+            # detect any tags
+            tagged = any(route[-1]=='_has_tag' and val==True 
+                for route,val in ortho.catalog(spec)) 
+            # note that we could add some kind of protection here
+            if tagged:
+                print('status found a spec with YAML tags')
+                spec = yaml.load(text,Loader=yaml.Loader)
+                print('status finished with YAML spec')
+            # standard execution
+            else: 
+                spec = yaml.load(text,Loader=yaml.Loader)
+                Action(**spec).solve
         else: raise Exception('unclear what: %s'%what)
 
     def build_docs(self,source='',build=''):
