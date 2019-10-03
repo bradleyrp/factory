@@ -1,0 +1,12 @@
+# spec to install gromacs
+_: !!python/module:lib.spack
+spack: !SpackManager
+  source: !ortho_sync
+    "./spack":
+      address: "https://github.com/spack/spack"
+      branch: master
+  packages:
+    - gromacs
+    - another
+  spot: ./apps
+  env: ./spack/std_env
