@@ -1,0 +1,15 @@
+# This is the standard ("std") environment we install in the factory.
+# note that reqs_std_md_extra.yaml should inherit from here
+name: dev
+dependencies:
+  - pyyaml
+  - numpy
+  - conda-forge::ipdb
+  #! - bioconda::snakemake
+  - conda-forge::jupyterlab
+  - pip
+  - pip: 
+    # documentation tools
+    - sphinx
+    - recommonmark
+    - numpydoc
