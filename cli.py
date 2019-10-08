@@ -8,8 +8,7 @@ Note that this CLI interface uses the script-connect makefile (not the
 ortho-connect makefile) and the Parser. This is the preferred CLI method.
 """
 
-import os,re
-import yaml
+import os,re,shutil,json
 
 import ortho
 from ortho import bash
@@ -58,7 +57,7 @@ class Conda(Handler):
         print('status checking for miniconda')
         self._install_check()
         print('status updating environment from %s'%file)
-        bash('conda/bin/conda env update --file %s'%file)
+        bash('conda/bin/conda env update --file %s'%file,announce=True)
         # get the prefix for the file to update the cursor
         with open(file) as fp: reqs = fp.read()
         # get the name with a regex
@@ -127,7 +126,7 @@ class Interface(Parser):
         if arg=='help': arg = ''
         ortho.bash('make --file ortho/makefile.bak'+(' '+arg if arg else ''))
 
-    def do(self,what):
+    def do(self,what,debug=False):
         """
         Create something from a spec.
         This is the PRIMARY INTERFACE to most features.
@@ -150,6 +149,13 @@ class Interface(Parser):
             if tagged:
                 print('status found a spec with YAML tags')
                 spec = yaml.load(text,Loader=yaml.Loader)
+                #!!! resolve, possibly in parallel? attributes and keys however
+                #! putting a pin in this cat = [(route,val) for route,val in ortho.catalog(spec) if True]
+                #! import ipdb;ipdb.set_trace()
+                if debug: 
+                    #! cleaner option is needed here
+                    import ipdb;ipdb.set_trace()
+                    #! fix this. rescue self.debug()
                 print('status finished with YAML spec')
             # standard execution
             else: 
@@ -162,6 +168,43 @@ class Interface(Parser):
         if source: kwargs['source'] = source
         if build: kwargs['build'] = build
         ortho.documentation.build_docs(**kwargs)
+
+    def nuke(self,sure=False):
+        """Reset everything. Useful for testing."""
+        from ortho import confirm
+        dns = ['apps','spack','conda']
+        links = ['.envcursor']
+        if sure or confirm('okay to nuke everything?'):
+            for dn in dns:
+                if os.path.isdir(dn): 
+                    print('removing tree: %s'%dn)
+                    shutil.rmtree(dn)
+            for link in links:
+                if os.path.islink(link):
+                    print('unsetting %s'%link)
+                    os.unlink(link)
+
+    def envs(self):
+        """
+        Useful help for activating environments. Called by env.sh.
+        """
+        try_this = 'try ./fac conda <requirements>'
+        if not os.path.isfile('conda/bin/activate'):
+            raise Exception('conda is not installed. '+try_this)
+        toc = bash('conda/bin/conda-env list --json',scroll=False)
+        them = json.loads(toc['stdout']).get('envs',[])
+        base_dn = os.path.join(os.getcwd(),'conda','envs')
+        them = [os.path.relpath(i,base_dn) for i in them]
+        if not them:
+            raise Exception('cannot find environments. '+try_this)
+        print('status available environments:')
+        for t in them: 
+            if t.startswith('..'): continue
+            print('status  %s'%t)
+        print('status activate an environment with: '
+            'source env.sh <name>')
+        print('status or use: source conda/bin/activate conda/envs/<name>')
+        print('status deactivate with: conda deactivate')
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface

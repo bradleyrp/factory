@@ -46,12 +46,13 @@ def bash_newliner(line_decode,log=None):
 	return line_here
 
 def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
-	announce=False,local=False,scroll_log=True):
+	announce=False,v=False,local=False,scroll_log=True):
 	"""
 	Run a bash command.
 	Development note: tee functionality would be useful however you cannot use pipes with subprocess here.
 	Vital note: log is relative to the current location and not the cwd.
 	"""
+	announce = announce or v
 	if announce: 
 		print('status',
 			'ortho.bash%s runs command: %s'%(' (at %s)'%cwd if cwd else '',str(command)))

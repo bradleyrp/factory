@@ -2,11 +2,47 @@
 _: !!python/module:lib.spack
 spack: !SpackManager
   source: !ortho_sync
-    "./spack":
-      address: "https://github.com/spack/spack"
+    spack:
+      spot: "./spack"
+      address: https://github.com/spack/spack
       branch: master
-  packages:
-    - gromacs
-    - another
-  spot: ./apps
-  env: ./spack/std_env
+  apps: !spack_tree &apps
+    spot: ./apps
+  envs: 
+    # - !spack_env
+    #   apps: *apps
+    #   spot: ./spack/env_base 
+    #   spack:
+    #     packages:
+    #       pkg-config:
+    #         paths:
+    #           pkg-config@0.29.2: /usr/local/bin/pkg-config
+    #         buildable: false
+    #     specs: 
+    #       - gcc@7.4.0
+    #- !spack_env
+    #  apps: *apps
+    #  spot: ./spack/env_gromacs 
+    #  spack:
+    #    packages:
+    #      # issue: mojave fails to build pkg-config. install with brew
+    #      # do not forget to install xcode on macos
+    #      pkg-config arch=darwin-mojave-x86_64: 
+    #        buildable: false
+    #        paths:
+    #          pkg-config: /usr/local
+    #    specs: 
+    #      - gromacs@2019.3 ^pkg-config
+    - !spack_env
+      apps: *apps
+      spot: ./spack/env_gromacs 
+      spack:
+        packages:
+          # issue: mojave fails to build pkg-config. install with brew
+          # do not forget to install xcode on macos
+          pkg-config arch=darwin-mojave-x86_64: 
+            buildable: false
+            paths:
+              pkg-config: /usr/local
+        specs: 
+          - gromacs@2019.3 ^pkg-config

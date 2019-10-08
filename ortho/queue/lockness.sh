@@ -7,6 +7,7 @@ logfile ${SCREEN_LOG_QUEUE:-log-task-queue}
 EOF
 if [ -z "$STY" ]; then 
 exec screen -c $tmp_screen_rc -Ldm -S factory /bin/bash "$0"
+# the following does not appear to work, perhaps move it below
 rm $tmp_screen_rc 
 fi
 
@@ -43,7 +44,7 @@ echo "[CLUSTER] checking locks"
 set -e
 scriptname=$(basename $0)
 lock=${LOCK_FILE:-"LOCK.${scriptname}"}
-pipe_name=TASK_QUEUE
+pipe_name=${PIPE_FILE:-"TASK_QUEUE"}
 trap "rm -f $lock $pipe_name" EXIT
 exec 200>$lock
 $FLOCK_CMD -n 200 || exit 1
@@ -56,6 +57,8 @@ echo "echo quit > $pipe_name" 1>&200
 echo "[CLUSTER] beginning to listen"
 set -o errexit
 set -o nounset
+# cleanup the screen rc file
+rm -f $tmp_screen_rc 
 # create a named pipe
 if [[ ! -e $pipe_name ]]; then 
 	mkfifo $pipe_name 
@@ -71,6 +74,6 @@ do
   fi
   echo "[CLUSTER] start job $jobstamp"
   echo "[CLUSTER] job command is \"$job\""
-  (eval "$job")
+  (eval "$job" || echo "FAILED")
   echo "[CLUSTER] end job $jobstamp"
 done

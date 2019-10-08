@@ -7,13 +7,17 @@ def simple_task_queue(**kwargs):
 	"""
 	A minimal task queue.
 	"""
+	queue_fn = kwargs.pop('task_queue','TASK_QUEUE')
 	lock_file = kwargs.pop('lock','LOCK.lockness.sh')
 	log_file = kwargs.pop('log','screenlog')
+	if os.path.isfile(queue_fn): 
+		print('status task queue is already running!')
+		return
 	# hook for flock which installs it if necessary on macos
 	flock_bin = ortho.config_hook_get('flock1','flock')
-	ortho.bash(('FLOCK_CMD=%s SCREEN_LOG_QUEUE=%s LOCK_FILE=%s '
+	ortho.bash(('PIPE_FILE=%s FLOCK_CMD=%s SCREEN_LOG_QUEUE=%s LOCK_FILE=%s '
 		'bash ortho/queue/lockness.sh')%
-		(flock_bin,log_file,lock_file),announce=True)
+		(queue_fn,flock_bin,log_file,lock_file),announce=True)
 	print('status task queue is running!')
 	#! need a lock file and a log file
 	return {'lock':lock_file,'log':log_file}
@@ -36,7 +40,8 @@ def launch(*args,**kwargs):
 		raise Exception(
 			'cannot mix command with other arguments: %s and %s'%(args,kwargs))
 	if not command:
-		command = ' '.join([i for i in ['make',form_args,form_kwargs] if i])
+		#! removed a make at the beginning of the list
+		command = ' '.join([i for i in [form_args,form_kwargs] if i])
 	if cwd: command = 'cd %s && %s'%(cwd,command)
 	ortho.bash('echo "%s" > %s'%(command,queue_fn),announce=True)
 

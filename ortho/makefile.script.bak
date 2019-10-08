@@ -21,10 +21,12 @@ $(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS)):
 .PHONY: touchup $(word 1,$(RUN_ARGS))
 touchup:
 ifeq ($(RUN_ARGS),)
-	@echo -e "\n[STATUS] usage: make <argument> ..."
+	@echo
+	@echo '[STATUS] usage: make <argument> ...'
 	@echo "[STATUS] this makefile wraps ./fac"
 	@echo "[STATUS] the ./fac script runs in a configurable environment"
-	@echo -e "[STATUS] use \`make\` or \`./fac\` with the following usage\n"
+	@echo '[STATUS] use `make` or `./fac` with the following usage'
+	@echo
 	./fac -h
 endif
 # forget flags for recursive make calls
