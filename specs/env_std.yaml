@@ -12,3 +12,6 @@ dependencies:
     - sphinx
     - recommonmark
     - numpydoc
+    # linting
+    - pylama
+    - flake8
