@@ -25,7 +25,7 @@ git clone http://github.com/bradleyrp/factory -b streamline
 cd factory
 make conda specs/env_std_md_extra.yaml # 
 make do specs/install_gromacs_native.yaml 
-source local/
+source ./local/env_gromacs_std.sh/
 make do specs/install_automacs.yaml
 make -C automacs setup akll
 mkdir -p data
