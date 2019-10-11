@@ -20,15 +20,21 @@ git subtree --prefix=ortho push ortho-up master
 This branch is cloned via `git clone https://github.com/bradleyrp/factory -b streamline`. Find a central location to install it.
 
 ~~~
-cd ~/work
 git clone http://github.com/bradleyrp/factory -b streamline
 cd factory
-make conda specs/env_std_md_extra.yaml # 
+make conda specs/env_std_md_extra.yaml  
 make do specs/install_gromacs_native.yaml 
-source ./local/env_gromacs_std.sh/
+# wait until screen-install-gromacs.log disappears
+# if you have a modeller license
+make do specs/config_modeller_license.yaml
+# load the environment every time
+source ./local/env_gromacs_std.sh
+# install automacs once
 make do specs/install_automacs.yaml
-make -C automacs setup akll
+# fetch automacs experiments
+make -C automacs setup all
 mkdir -p data
+# choose a name for the simulation
 make -C $AMXROOT tether $PWD/data/v002
 cd data/v002
 make clean sure && make remote protein
