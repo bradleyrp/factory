@@ -137,8 +137,6 @@ class Interface(Parser):
         import yaml
         if os.path.isfile(what):
             with open(what) as fp: text = fp.read()
-
-            # spec = yaml.load(text,Loader=yaml.Loader)
             from lib.yaml_mods import YAMLTagIgnorer
             # the YAMLTagIgnorer decorates a placeholder tree with _has_tag
             spec = yaml.load(text,Loader=YAMLTagIgnorer)
@@ -149,9 +147,6 @@ class Interface(Parser):
             if tagged:
                 print('status found a spec with YAML tags')
                 spec = yaml.load(text,Loader=yaml.Loader)
-                #!!! resolve, possibly in parallel? attributes and keys however
-                #! putting a pin in this cat = [(route,val) for route,val in ortho.catalog(spec) if True]
-                #! import ipdb;ipdb.set_trace()
                 if debug: 
                     #! cleaner option is needed here
                     import ipdb;ipdb.set_trace()
@@ -205,6 +200,11 @@ class Interface(Parser):
             'source env.sh <name>')
         print('status or use: source conda/bin/activate conda/envs/<name>')
         print('status deactivate with: conda deactivate')
+
+    def sim(self,path):
+        """Create a simulation from a remote automacs."""
+        #! remote automacs location is hardcoded now
+        bash('make -C ../automacs tether %s'%os.path.abspath(path))
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface

@@ -1,0 +1,27 @@
+_: !!python/module:ortho.replicator.replicator_dev
+#! no multiple recipe feature yet
+
+t01: !replicate
+  docker_container: factory:cc00
+  docker_volume: t01-factory-tests-a01
+  #! had to kickstart this with: docker run -it -v t01-factory-tests:/home/user/outside factory:cc00 bash ; cd ~/outside ; sudo chown user:users . -R
+  script: |
+    #!/bin/bash
+    set -e
+    #! make the root programmatic
+    ROOT=/home/user/outside
+    cd $ROOT
+    # assume incoming user is root and target is user
+    chown user:users -R .
+    su user
+    export ROOT=/home/user/outside
+    cd $ROOT
+    if [ ! -d spack ]; then git clone http://github.com/spack/spack; fi
+    mkdir -p env
+    cd env
+    echo -e '#!/bin/bash\n'"source $ROOT/spack/share/spack/setup-env.sh" > go.sh
+    source go.sh
+    echo "spack: {concretization: separately, mirrors: {}, repos: [], upstreams: {}, modules: {enable: []}, definitions: [], packages: {}, config: {}, specs: ['gromacs@2019.3'], view: false}" > spack.yaml
+    spack concretize -f
+    time spack install --no-checksum
+

@@ -27,21 +27,4 @@ class YAMLTagIgnorer(yaml.SafeLoader):
         return {'_has_tag':True}
 
 # the YAMLTagIgnorer is constructed on any tag.
-
 YAMLTagIgnorer.add_multi_constructor('',YAMLTagIgnorer.check_tags)
-
-if 0:
-    class Selector(object):
-        def __init__(self):
-            print('HI')
-
-    #! trying to do --- !select to part out the yaml file with make do specs/tests_multi.yaml
-
-    def constructor(loader, node) :
-        raise Exception('fdsfa')
-        fields = loader.construct_mapping(node)
-        import ipdb;ipdb.set_trace()
-        print('HIIII')
-        return Test(**fields)
-    yaml.add_constructor('!select', constructor)
-    #!? https://stackoverflow.com/questions/7224033/default-constructor-parameters-in-pyyamlsaf

@@ -1,0 +1,3 @@
+_: !!python/module:lib.installer
+t01: !!python/object:lib.installer.Program
+  a: 1

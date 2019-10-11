@@ -11,6 +11,9 @@ class OrthoSync(YAMLObjectInit):
 	yaml_tag = '!ortho_sync'
 	def __init__(self,**kwargs):
 		self.sources = kwargs
+		if kwargs.get('until',False): return
+		else: self._run()
+	def _run(self):
 		# reformulate the modules
 		kwargs_out = {}
 		for key in kwargs:
