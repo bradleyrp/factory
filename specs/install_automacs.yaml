@@ -1,3 +1,8 @@
-_: !!python/module:lib.installer
-t01: !!python/object:lib.installer.Program
-  a: 1
+_: !!python/module:lib.spack
+#! move the sync somewhere else
+automacs: !ortho_sync
+  spack:
+    spot: "./automacs"
+    address: https://github.com/bradleyrp/automacs
+    branch: ortho_clean
+

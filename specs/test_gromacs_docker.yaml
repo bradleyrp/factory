@@ -24,4 +24,3 @@ t01: !replicate
     echo "spack: {concretization: separately, mirrors: {}, repos: [], upstreams: {}, modules: {enable: []}, definitions: [], packages: {}, config: {}, specs: ['gromacs@2019.3'], view: false}" > spack.yaml
     spack concretize -f
     time spack install --no-checksum
-

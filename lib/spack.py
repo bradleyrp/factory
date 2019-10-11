@@ -16,12 +16,12 @@ class OrthoSync(YAMLObjectInit):
 	def _run(self):
 		# reformulate the modules
 		kwargs_out = {}
-		for key in kwargs:
-			spot = kwargs[key]['spot']
+		for key in self.sources:
+			spot = self.sources[key]['spot']
 			if spot in kwargs_out:
 				raise Exception('repeated key: %s'%spot)
 			kwargs_out[spot] = dict([(i,j) 
-				for i,j in kwargs[key].items()
+				for i,j in self.sources[key].items()
 				if i!='spot'])
 		ortho.sync(modules=kwargs_out)
 

@@ -4,7 +4,8 @@ dependencies:
   - pyyaml
   - numpy
   - conda-forge::ipdb
-  - salilab::modeller
+  - conda-forge::flock
+  - salilab::modeller #! extra
   - pip
   - pip:
     - snakemake
@@ -13,3 +14,6 @@ dependencies:
     - sphinx
     - recommonmark
     - numpydoc
+    # linting
+    - pylama
+    - flake8

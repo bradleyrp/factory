@@ -6,6 +6,7 @@ dependencies:
   - numpy
   - conda-forge::ipdb
   - conda-forge::flock
+  - git
   - pip
   - pip: 
     # documentation tools

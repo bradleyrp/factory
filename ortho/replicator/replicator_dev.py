@@ -5,7 +5,7 @@ Replicator REDEVELOPMENT
 Rebuild a replicator feature to replace ortho.replicator, specifically `repl`.
 """
 
-import os,re,tempfile,subprocess
+import os,re,tempfile,subprocess,string
 #! refer to ortho by name for top-level imports simplified by init?
 from ..bash import bash
 from ..dictionary import DotDict
@@ -104,6 +104,45 @@ class DockerExecution(Handler):
 		"""Scripts pass through to the function that calls docker."""
 		return dict(script=script,kind='script')
 
+# template for a script that screens itself
+screen_maker = """#!/bin/bash
+
+set -x
+export SCREEN_CONF_TMP=screen-%(screen_name)s.tmp
+export SCREEN_LOG=%(screen_log)s
+#! is this too recursive?
+export BOOTSTRAP_SCRIPT=$(mktemp)
+
+# generate a BASH script that screens itself
+cat <<'EOF_OUT'> $BOOTSTRAP_SCRIPT
+#!/bin/bash
+# run in a screen with specific log file
+# typically: TMPDIR="./" tmp_screen_rc=$(mktemp)
+tmp_screen_rc=$SCREEN_CONF_TMP
+echo "[STATUS] temporary screenrc at $tmp_screen_rc"
+
+# the bootstrap script writes a conf to set screen logfile
+cat <<EOF> $tmp_screen_rc
+logfile ${SCREEN_LOG:-log-screen}
+EOF
+
+# ensure that the script screens itself
+if [ -z "$STY" ]; then 
+echo "[STATUS] executing in a screen"
+exec screen -c $tmp_screen_rc -Ldm -S %(screen_name)s /bin/bash "$0"
+fi
+set -e
+
+# KERNEL
+%(contents)s
+
+EOF_OUT
+
+# run the script which screens itself
+bash $BOOTSTRAP_SCRIPT
+#! cannot remove $SCREEN_CONF_TMP for some reason so we do it later
+"""
+
 class ReplicateCore(Handler):
 	"""
 	DEV: replacement for the replicator functions
@@ -144,6 +183,36 @@ class ReplicateCore(Handler):
 			proc.communicate(script.encode())
 		# standard execution
 		else: bash(cmd,scroll=True,v=True)
+	def screen(self,screen,script,**kwargs):
+		"""
+		Run something in a screen.
+		"""
+		print('status starting a screen named: %s'%screen)
+		spot = kwargs.pop('spot',None)
+		if kwargs: raise Exception('unprocessed kwargs: %s'%str(kwargs))
+		# prepare a location
+		if spot and not os.path.isdir(spot): os.mkdir(spot)
+		elif not spot: spot = './'
+		# detect string interpolation
+		#! finish this feature! protect against wonky scripts
+		if 0:
+			formatter = string.Formatter()
+			reqs = formatter.parse(script)
+			import ipdb;ipdb.set_trace()
+		script = script%dict(spot=os.path.abspath(spot))
+		# prepare the execution script
+		screen_log = os.path.join(os.getcwd(),'screen-%s.log'%screen)
+		detail = dict(screen_name=screen,contents=script,screen_log=screen_log)
+		with tempfile.NamedTemporaryFile(delete=False) as fp:
+			tmp_fn = fp.name
+			fp.write((screen_maker%detail).encode())
+			fp.close()
+		print('status executing temporary script: %s'%tmp_fn)
+		bash('bash %s'%tmp_fn,v=True)
+		if os.path.isfile(tmp_fn): os.remove(tmp_fn)
+		tmp_screen_conf = 'screen-%s.tmp'%screen
+		#! the following caused a race condition
+		# if os.path.isfile(tmp_screen_conf): os.remove(tmp_screen_conf)
 
 class Replicate(YAMLObjectInit):
 	"""Wrap a handler with a yaml recipe."""
