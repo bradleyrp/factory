@@ -45,4 +45,7 @@ def install_miniconda(spot):
     Install miniconda from a temporary directory using a script.
     """
     script = (install_miniconda_script % {'miniconda_path':spot})
-    return shell_script(script)
+    # use of the logfile ensures this is safe for Python 2
+    fn_log = 'log-install-miniconda'
+    result = shell_script(script,log=fn_long)
+    if os.path.isfile('log-install-miniconda'): os.remove(fn_log)
