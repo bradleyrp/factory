@@ -16,7 +16,9 @@ from ortho import Parser,StateDict
 from ortho import requires_python,requires_python_check
 from ortho import conf,treeview
 from ortho import Handler
+from ortho import tracebacker
 from ortho.installers import install_miniconda
+
 
 # manage the state
 #! how does this work? test it.
@@ -92,6 +94,7 @@ class Interface(Parser):
 
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
+        tracebacker(exception)
         raise exception
 
     def _get_settings(self):
@@ -205,6 +208,13 @@ class Interface(Parser):
         """Create a simulation from a remote automacs."""
         #! remote automacs location is hardcoded now
         bash('make -C ../automacs tether %s'%os.path.abspath(path))
+
+    def repl(self,name,rebuild=False):
+        """Connect to ortho.replicator."""
+        print('status calling ortho.replicator')
+        args = [name]
+        if rebuild: args += ['rebuild']
+        replicator.repl(*args)
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface
