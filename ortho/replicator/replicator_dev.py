@@ -6,6 +6,7 @@ Rebuild a replicator feature to replace ortho.replicator, specifically `repl`.
 """
 
 import os,re,tempfile,subprocess,string
+import yaml
 #! refer to ortho by name for top-level imports simplified by init?
 from ..bash import bash
 from ..dictionary import DotDict
@@ -143,6 +144,19 @@ bash $BOOTSTRAP_SCRIPT
 #! cannot remove $SCREEN_CONF_TMP for some reason so we do it later
 """
 
+class ScriptPrelim(Handler):
+	def fileprep(self,files=None,specs=None):
+		staged = {}
+		# specs are yaml trees that are dumped to files
+		if specs:
+			for name,tree in specs.items():
+				with tempfile.NamedTemporaryFile(delete=False) as fp:
+					tmp_fn = fp.name
+					fp.write(yaml.dump(tree).encode())
+					fp.close()
+				staged[name] = tmp_fn
+		return staged
+
 class ReplicateCore(Handler):
 	"""
 	DEV: replacement for the replicator functions
@@ -189,7 +203,9 @@ class ReplicateCore(Handler):
 		"""
 		print('status starting a screen named: %s'%screen)
 		spot = kwargs.pop('spot',None)
-		if kwargs: raise Exception('unprocessed kwargs: %s'%str(kwargs))
+		# spillover kwargs go to a ScriptPrelim class
+		if kwargs: prelim = ScriptPrelim(**kwargs).solve
+		else: prelim = {}
 		# prepare a location
 		if spot and not os.path.isdir(spot): os.mkdir(spot)
 		elif not spot: spot = './'
@@ -200,6 +216,19 @@ class ReplicateCore(Handler):
 			reqs = formatter.parse(script)
 			import ipdb;ipdb.set_trace()
 		script = script%dict(spot=os.path.abspath(spot))
+		# add staged variables to the script
+		if prelim:
+			staged_flag = 'staged here'
+			if not re.search(r'#\s*%s\s*'%staged_flag,script):
+				raise Exception('we have variables for injection into your '
+					'script. please include a comment "%s" in the script'%
+					staged_flag)
+			else:
+				#! scape sequences below
+				variable_injection = '# injected variables\n' + \
+					'\n'.join(['%s="%s"'%(i,j) for i,j in prelim.items()])+'\n'
+				script = re.sub(r'#\s*%s\s*'%staged_flag,
+					variable_injection,script)
 		# prepare the execution script
 		screen_log = os.path.join(os.getcwd(),'screen-%s.log'%screen)
 		detail = dict(screen_name=screen,contents=script,screen_log=screen_log)
@@ -213,6 +242,36 @@ class ReplicateCore(Handler):
 		tmp_screen_conf = 'screen-%s.tmp'%screen
 		#! the following caused a race condition
 		# if os.path.isfile(tmp_screen_conf): os.remove(tmp_screen_conf)
+	def direct(self,script,spot,**kwargs):
+		"""
+		Run a script directly.
+		"""
+		spot = kwargs.pop('spot',None)
+		if kwargs: prelim = ScriptPrelim(**kwargs).solve
+		else: prelim = {}
+		# prepare a location
+		if spot and not os.path.isdir(spot): os.mkdir(spot)
+		elif not spot: spot = './'
+		script = script%dict(spot=os.path.abspath(spot))
+		# add staged variables to the script
+		if prelim:
+			staged_flag = 'staged here'
+			if not re.search(r'#\s*%s\s*'%staged_flag,script):
+				raise Exception('we have variables for injection into your '
+					'script. please include a comment "%s" in the script'%
+					staged_flag)
+			else:
+				#! scape sequences below
+				variable_injection = '# injected variables\n' + \
+					'\n'.join(['%s="%s"'%(i,j) for i,j in prelim.items()])+'\n'
+				script = re.sub(r'#\s*%s\s*'%staged_flag,
+					variable_injection,script)
+		with tempfile.NamedTemporaryFile(delete=False) as fp:
+			tmp_fn = fp.name
+			fp.write(script.encode())
+			fp.close()
+		print('status executing temporary script: %s'%tmp_fn)
+		bash('bash %s'%tmp_fn,v=True)
 
 class Replicate(YAMLObjectInit):
 	"""Wrap a handler with a yaml recipe."""
