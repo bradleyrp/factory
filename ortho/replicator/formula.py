@@ -223,6 +223,7 @@ class ReplicatorGuide(Handler):
 						compose['services']['container_name']))
 				else: compose['services'][service]['container_name'] = cname
 		compose_fn = os.path.join(spot.path,'docker-compose.yml')
+		print('status using compose file: %s'%compose_fn)
 		with open(compose_fn,'w') as fp:
 			fp.write(yaml.dump(compose))
 		# script is optional. it only runs if you run a docker command below
