@@ -85,12 +85,21 @@ class Action(Handler):
         #! highly dangerous. unprotected execution!
         #!   consider using the replicator instead?
         exec(script)
+    def command(self,command,**kwargs):
+        import ipdb;ipdb.set_trace()
+
+class User(Handler):
+    def update_config(self,config):
+        """Alter the local config."""
+        ortho.conf.update(**config)
+        ortho.write_config(ortho.conf)
 
 class Interface(Parser):
     """
     A single call to this interface.
     """
-    # we are not using the Cacher interface at this point, only Parser
+    # cli extensions add functions to the interface automatically
+    subcommander = ortho.conf.get('cli_extensions',{})
 
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
@@ -129,7 +138,7 @@ class Interface(Parser):
         if arg=='help': arg = ''
         ortho.bash('make --file ortho/makefile.bak'+(' '+arg if arg else ''))
 
-    def do(self,what,debug=False):
+    def do(self,what,debug=False,**kwargs):
         """
         Create something from a spec.
         This is the PRIMARY INTERFACE to most features.
@@ -157,7 +166,11 @@ class Interface(Parser):
                 print('status finished with YAML spec')
             # standard execution
             else: 
+                import ipdb;ipdb.set_trace()
                 spec = yaml.load(text,Loader=yaml.Loader)
+                if kwargs and 'kwargs' in spec:
+                    raise Exception('collision')
+                    spec['kwargs'] = kwargs['kwargs']
                 Action(**spec).solve
         else: raise Exception('unclear what: %s'%what)
 
@@ -214,7 +227,17 @@ class Interface(Parser):
         print('status calling ortho.replicator')
         args = [name]
         if rebuild: args += ['rebuild']
-        replicator.repl(*args)
+        ortho.replicator.repl(*args)
+
+    def use(self,what):
+        """Update the config with a prepared set of changes."""
+        requires_python_check('yaml')
+        import yaml
+        if os.path.isfile(what):
+            with open(what) as fp: text = fp.read()
+            changes = yaml.load(text,Loader=yaml.SafeLoader)
+            User(**changes).solve
+        else: raise Exception('unclear what: %s'%what)
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface
