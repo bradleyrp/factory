@@ -211,6 +211,9 @@ class Parser:
     # protected functions from Cacher hidden from argparse
     protected_functions = ['closer', 'errorclear', 'establish']
     parser_order = False
+    # hooks for special instructions from a subclass
+    subcommander = []
+    ortho_conf = None
 
     def _preproc(self):
         """
@@ -252,8 +255,25 @@ class Parser:
             title='subcommands',
             description='Valid subcommands:',
             help='Use the help flag (-h) for more details on each subcommand.')
-        for name in subcommand_names:
-            func = getattr(self, name)
+
+        # the subcommander list notes functions which have special setups
+        specials = {}
+        if self.subcommander:
+            from .imports import importer
+            for name,target in self.subcommander.items():
+                try: 
+                    mod_target,func_name = re.match(
+                        r'^(.+)\.(.*?)$',target).groups()
+                    specials[name] = importer(mod_target)[func_name]
+                except: raise Exception('cannot import %s'%target)
+        collide_special = [i for i in specials if i in subcommand_names]
+        if any(collide_special):
+            raise Exception(
+                'special CLI function collisions: %s'%collide_special)
+        # loop over subcommands
+        for name in subcommand_names+list(specials.keys()):
+            if name in specials: func = specials[name]
+            else: func = getattr(self,name)
             detail = {}
             if hasattr(func, '__doc__'):
                 detail['help'] = func.__doc__
@@ -269,6 +289,7 @@ class Parser:
                 inspected['args'] = inspected['args'][1:]
             for arg in inspected['args']:
                 sub.add_argument(arg)
+            #! note that this indentation is unspeakably ugly!
             for arg in inspected['kwargs'].keys():
                 val = inspected['kwargs'][arg]
                 if isinstance(val, bool):
