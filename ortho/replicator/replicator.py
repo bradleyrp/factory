@@ -34,7 +34,7 @@ def replicator_read_yaml(sources,name=None,args=None,kwargs=None):
 	incoming,special = {},{}
 	for source in sources:
 		with open(source) as fp: 
-			this = yaml.load(fp.read())
+			this = yaml.load(fp.read(),Loader=yaml.Loader)
 			this_reduced = ReplicatorSpecial(**this)
 			if this_reduced.specials:
 				special[source] = this_reduced.specials
