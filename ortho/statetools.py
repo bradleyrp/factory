@@ -231,6 +231,9 @@ class Parser:
             if match:
                 revised.append('--%s'%match.group(1))
                 revised.append(match.group(2))
+            # special handling for the 'help' keyword
+            elif item=='help':
+                revised.append('-h')
             else: revised.append(item)
         sys.argv = revised
 
