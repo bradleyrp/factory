@@ -19,4 +19,5 @@ class OrthoSync(YAMLObjectInit):
 			kwargs_out[spot] = dict([(i,j) 
 				for i,j in self.sources[key].items()
 				if i!='spot'])
-		ortho.sync(modules=kwargs_out)
+		from ortho import sync
+		sync(modules=kwargs_out)

@@ -138,7 +138,7 @@ class Interface(Parser):
         if arg=='help': arg = ''
         ortho.bash('make --file ortho/makefile.bak'+(' '+arg if arg else ''))
 
-    def do(self,what,debug=False,**kwargs):
+    def do(self,what,debug=False):
         """
         Create something from a spec.
         This is the PRIMARY INTERFACE to most features.
@@ -166,11 +166,14 @@ class Interface(Parser):
                 print('status finished with YAML spec')
             # standard execution
             else: 
-                import ipdb;ipdb.set_trace()
                 spec = yaml.load(text,Loader=yaml.Loader)
+                """
+                #! previously tried to pass through **kwargs above to here
+                #!   but the parser then always required a kwargs
                 if kwargs and 'kwargs' in spec:
                     raise Exception('collision')
                     spec['kwargs'] = kwargs['kwargs']
+                """
                 Action(**spec).solve
         else: raise Exception('unclear what: %s'%what)
 
