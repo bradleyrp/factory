@@ -1,4 +1,15 @@
-template_basic:
+
+# Install programs with spack.
+# To use: `make use specs/cli_spack.yaml`
+# To run: `make spack_tree specs/spack_tree.yaml gromacs_gcc6`
+
+# spack clone parent (for this file)
+spot: ./local
+# spack environments (for this file)
+spot_envs: ./local/envs_spack
+
+# template for spack.yaml used below
+template_basic: 
   concretization: separately
   mirrors: {}
   repos: []
@@ -11,12 +22,15 @@ template_basic:
     checksum: false
   specs: []
   view: false
-spot: ./localx
-seq01:
+
+gromacs_gcc6:
+  notes: |
+    This sequence installs gcc 6 which is necessary for compiling for skylake.
+    Then it compiles gromacs with gcc 6 and little else.
   envs:
-    env_gcc_6.4.0: 
+    - name: env_gcc_6.4.0
       via: template_basic
       specs: ['gcc@6.4.0']
-    env_gromacs:
+    - name: env_gromacs
       via: template_basic
       specs: ['gromacs@2019.3%gcc@6.4.0']
