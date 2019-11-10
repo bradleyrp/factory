@@ -1,0 +1,22 @@
+template_basic:
+  concretization: separately
+  mirrors: {}
+  repos: []
+  upstreams: {}
+  modules:
+    enable: []
+  definitions: []
+  packages: {}
+  config: 
+    checksum: false
+  specs: []
+  view: false
+spot: ./localx
+seq01:
+  envs:
+    env_gcc_6.4.0: 
+      via: template_basic
+      specs: ['gcc@6.4.0']
+    env_gromacs:
+      via: template_basic
+      specs: ['gromacs@2019.3%gcc@6.4.0']

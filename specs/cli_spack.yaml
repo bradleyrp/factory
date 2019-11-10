@@ -1,3 +1,4 @@
 config:
   cli_extensions:
     spack_env: lib.spack.spack_env_maker
+    spack_seq: lib.spack.spack_seq_maker

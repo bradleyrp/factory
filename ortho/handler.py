@@ -172,7 +172,7 @@ class Handler(object):
 			print('debug internals are: %s'%self._internals)
 			raise Exception((
 				'Name collisions in %s (Handler) method '
-				'arguments: %s. See internals above.')%(
+				'arguments: %s. See _internals above.')%(
 					self.__class__.__name__,collisions))
 		fallbacks = []
 	def __init__(self,*args,**kwargs):

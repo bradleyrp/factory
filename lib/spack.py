@@ -6,90 +6,31 @@ import yaml
 from lib.yaml_mods import YAMLObjectInit
 from ortho import Handler
 
-class OrthoSync(YAMLObjectInit):
-	"""Trivial wrapper around ortho sync."""
-	#! find a more elegant, perhaps automatic way to do this? or is this a hook?
-	yaml_tag = '!ortho_sync'
-	def __init__(self,**kwargs):
-		self.sources = kwargs
-		if kwargs.get('until',False): return
-		else: self._run()
-	def _run(self):
-		# reformulate the modules
-		kwargs_out = {}
-		for key in self.sources:
-			spot = self.sources[key]['spot']
-			if spot in kwargs_out:
-				raise Exception('repeated key: %s'%spot)
-			kwargs_out[spot] = dict([(i,j) 
-				for i,j in self.sources[key].items()
-				if i!='spot'])
-		ortho.sync(modules=kwargs_out)
-
-class SpackManager(YAMLObjectInit):
-	yaml_tag = '!SpackManager'
-	def __init__(self,source,apps,envs):
-		"""
-		Deploy spack.
-		"""
-		print('status starting SpackManager')
-		# the source should be an !ortho_sync to clone spack
-		self.source = source
-		self.envs = envs
-		self.apps = apps
-		# this root object is prepared last so we actually install the 
-		#   environments here, passing down the source
-		for env in self.envs: 
-			env.go(source=self.source)
-
-class SpackEnvManager(YAMLObjectInit):
-	yaml_tag = '!spack_env'
-	def __init__(self,spack,spot,apps):
-		self.spack = spack
-		self.spot = spot
-		self.apps = apps
-	def go(self,source):
-		"""
-		Execute a spack installation in a spack environment.
-		"""
-		print('status starting SpackEnvManager: %s'%self.spot)
-		# get the prefix for the environment
-		self.source = source
-		self.prefix = '. %s && '%(
-			os.path.join(os.getcwd(),self.source.sources['spack']['spot'],
-			'share/spack/setup-env.sh'))
-		# make the environment folder
-		if not os.path.isdir(self.spot):
-			os.mkdir(self.spot)
-		# augment the environment
-		self.spack['config'] = {
-			'install_tree':self.apps.spot,
-			'checksum':False,} 
-		with open(os.path.join(self.spot,'spack.yaml'),'w') as fp:
-			yaml.dump({'spack':self.spack},fp)
-		ortho.bash(self.prefix+' spack install',
-			cwd=self.spot,log='log-spack')
-
-class SpackTree(yaml.YAMLObject):
-	yaml_tag = '!spack_tree'
-	def __init__(self,spot):
-		self.spot = spot
-		if not os.path.isdir(self.spot):
-			os.mkdir(self.env)
-
-#!!! redeveloping here
-
-def spack_clone(where='local'):
+def spack_clone(where=None):
 	"""
 	Clone a copy of spack for local use.
 	"""
+	where = where or 'local'
 	os.makedirs(where,exist_ok=True)
 	if where.split(os.path.sep)[-1]=='spack':
 		raise Exception('invalid path cannot end in "spack": %s'%where)
 	ortho.bash('git clone https://github.com/spack/spack',cwd=where)
 	#! should we have a central conf registrar?
 	ortho.conf['spack'] = os.path.realpath(os.path.join(where,'spack'))
+	# +++ add spack location to the conf
 	ortho.write_config()
+	#! should we confirm the spack clone and commit?
+	return ortho.conf['spack']
+
+def get_spack(where=None):
+	"""
+	Ensure that we have an active copy of spack.
+	"""
+	# get spack and clone it again if missing
+	spack = ortho.conf.get('spack',None)
+	if not spack or not os.path.isdir(spack): 
+		return spack_clone(where=None)
+	else: return spack
 
 class SpackEnvMaker(Handler):
 	def _run_via_spack(self,spack_spot,env_spot,command):
@@ -106,7 +47,7 @@ class SpackEnvMaker(Handler):
 
 def spack_env_maker(what):
 	"""
-	Install a spack environment.
+	Command line interface to install a spack environment.
 	"""
 	spack = ortho.conf.get('spack',None)
 	if not spack: spack_clone()
@@ -114,3 +55,42 @@ def spack_env_maker(what):
 		instruct = yaml.load(fp,Loader=yaml.SafeLoader)
 	print(instruct)
 	SpackEnvMaker(spack_spot=spack,**instruct).solve
+
+class SpackSeq(Handler):
+	def seq_envs(self,envs):
+		"""
+		Install a sequence of spack environments.
+		"""
+		# set the spack spot in the tree to override default
+		#! should the user also set the spot from the CLI?
+		spack_dn = get_spack(where=self.meta.get('spot'))
+		import ipdb;ipdb.set_trace()
+
+class SpackSeqSub(Handler):
+	_internals = {'name':'basename','meta':'meta'}
+	def subselect(self,name,tree):
+		self.name = name
+		self.tree = tree
+		self.deploy = SpackSeq(meta=tree,**tree[name])
+		return self
+
+def spack_seq_maker(what,name):
+	"""
+	Install a sequence of spack environments.
+	"""
+	print('status installing spack seq from %s with name %s'%(what,name))
+	"""
+	reqs:
+		lib/spack.py
+		specs/spack_tree.yaml
+		specs/cli_spack.yaml
+	use this with:
+		make use specs/cli_spack.yaml
+		make spack_seq specs/spack_tree.yaml seq01
+	pseudocode:
+		command provides a file and a name
+		file and name go to a subselector handler which just applies one
+	"""
+	with open(what) as fp: tree = yaml.load(fp,Loader=yaml.SafeLoader)
+	this = SpackSeqSub(name=name,tree=tree).solve
+	import ipdb;ipdb.set_trace()
