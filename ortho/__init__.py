@@ -38,7 +38,7 @@ expose = {
 	'unit_tester':['unit_tester'],
 	'misc':['listify','unique','uniform','treeview','str_types',
 		'string_types','say','ctext','confirm','status','Observer',
-		'compare_dicts','Hook','mkdirs'],
+		'compare_dicts','Hook','mkdirs','path_resolver'],
 	'modules':['sync'],
 	'packman':['packs','github_install'],
 	'ports':['check_port'],
