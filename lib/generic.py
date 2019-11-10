@@ -21,3 +21,27 @@ class OrthoSync(YAMLObjectInit):
 				if i!='spot'])
 		from ortho import sync
 		sync(modules=kwargs_out)
+
+### YAML examples
+
+class ExampleYAMLClass(YAMLObjectInit):
+	"""An example class called via yaml."""
+	yaml_tag = "!example_yaml_class"
+	def __init__(self,*args,**kwargs):
+		print(('status created %s object with: '
+			'args = %s and kwargs = %s'%(self.__class__.__name__,
+				str(args),str(kwargs))))
+		self.args = args
+		self.kwargs = kwargs
+		# cli.Interface.do discards the object so we take action here
+		self.method()
+	def method(self):
+		"""Example method."""
+		print('status example method for %s'%self)
+		print('status the object is: %s'%str(self.__dict__))
+
+def example_yaml_function(*args,**kwargs):
+	"""An example function called via yaml."""
+	print('args = %s and kwargs = %s'%(str(args),str(kwargs)))
+	# the following return value goes back to cli.Interface.do and is unused
+	return 'meaningless'

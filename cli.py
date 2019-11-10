@@ -161,19 +161,14 @@ class Interface(Parser):
                 spec = yaml.load(text,Loader=yaml.Loader)
                 if debug: 
                     #! cleaner option is needed here
+                    #! only works with ./fac --debug
                     import ipdb;ipdb.set_trace()
                     #! fix this. rescue self.debug()
                 print('status finished with YAML spec')
             # standard execution
             else: 
                 spec = yaml.load(text,Loader=yaml.Loader)
-                """
-                #! previously tried to pass through **kwargs above to here
-                #!   but the parser then always required a kwargs
-                if kwargs and 'kwargs' in spec:
-                    raise Exception('collision')
-                    spec['kwargs'] = kwargs['kwargs']
-                """
+                #! previously tried to add **kwargs from do to spec['kwargs']
                 Action(**spec).solve
         else: raise Exception('unclear what: %s'%what)
 
