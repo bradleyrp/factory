@@ -19,4 +19,4 @@ class_server/deploy_loop.yaml
 conda/
 cache.json
 .envcursor
-local
+local*/
