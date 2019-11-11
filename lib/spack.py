@@ -145,13 +145,15 @@ class SpackSeqSub(Handler):
 def spack_tree(what,name):
 	"""
 	Install a sequence of spack environments.
+	"""
+	notes = """
 		reqs:
 			lib/spack.py
 			specs/spack_tree.yaml
 			specs/cli_spack.yaml
 		use:
 			make use specs/cli_spack.yaml
-			make spack_seq specs/spack_tree.yaml seq01
+			make spack_tree specs/spack_tree.yaml seq01
 		pseudocode:
 			command provides a file and a name
 			name is a key in the file
@@ -161,7 +163,7 @@ def spack_tree(what,name):
 		clean:
 			rm -rf config.json local && python -c "import ortho;ortho.conf['replicator_recipes'] = 'specs/recipes/*.yaml';ortho.write_config(ortho.conf)" && make use specs/cli_spack.yaml
 		test:
-			make spack_seq specs/spack_tree.yaml gromacs_gcc6
+			make spack_tree specs/spack_tree.yaml gromacs_gcc6
 	"""
 	print('status installing spack seq from %s with name %s'%(what,name))
 	with open(what) as fp: 

@@ -88,9 +88,14 @@ class Action(Handler):
     def command(self,command,**kwargs):
         import ipdb;ipdb.set_trace()
 
-class User(Handler):
+class MakeUse(Handler):
     def update_config(self,config):
         """Alter the local config."""
+        # unroll the config so we merge without overwrites
+        #   otherwise repeated `make use` would override not accumulate changes
+        unrolled = ortho.catalog(config)
+        for route,val in unrolled:
+            ortho.delveset(ortho.conf,*route,value=val)
         ortho.conf.update(**config)
         ortho.write_config(ortho.conf)
 
@@ -100,6 +105,7 @@ class Interface(Parser):
     """
     # cli extensions add functions to the interface automatically
     subcommander = ortho.conf.get('cli_extensions',{})
+    free_functions = ortho.conf.get('cli_free_functions',{})
 
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
@@ -234,7 +240,7 @@ class Interface(Parser):
         if os.path.isfile(what):
             with open(what) as fp: text = fp.read()
             changes = yaml.load(text,Loader=yaml.SafeLoader)
-            User(**changes).solve
+            MakeUse(**changes).solve
         else: raise Exception('unclear what: %s'%what)
 
 if __name__ == '__main__':
