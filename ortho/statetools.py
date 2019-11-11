@@ -297,25 +297,26 @@ class Parser:
         Call a function with arbitrary parameters
         This function recovers the ortho.cli functionality.
         """
+        print("status calling a function with arbitrary arguments")
         #! could we allow functions to mark themselves for this feature?
         #!   with a decorator or possibly automatically detect it?
         call_script,name,tail = sys.argv[0],sys.argv[1],sys.argv[2:]
         if call_script!='cli.py': raise Exception('arrived here from unknown')
         func = self._get_function(name)
         # we inspect the function again but we could have saved it earlier
-        inspected = introspect_function(func)
-        #! for now we insist that all free functions use the standard signature
-        #!   i.e. `*args,**kwargs` but this can be made flexible later on
-        std_sig = {'args':('args','kwargs'),'kwargs':{},'**':['kwargs']}
-        if inspected!=std_sig:
-            raise Exception('free functions called by Parser must use '
-                'the standard signature: `*args,**kwargs`')
+        inspected = introspect_function(func,check_varargs=True)
         # add this free function to the subparsers to prevent a known_args error
+        detail = {}
+        if hasattr(func, '__doc__'):
+            print('status instructions follow:\n')
+            print('\n'.join(['  %s'%i for i in func.__doc__.splitlines()]))
         sub = self.subparsers.add_parser(name)
+        # leave early if we are looking for help otherwise confusing usage notes
+        if '-h' in sys.argv: return
         known_args,unknown = self.parser.parse_known_args()
         # example call: ./fac function arg0 arg1 --key1 val1 --key2 val2
-        # pair the keys and values before loading them into the parser
         unknown_paired = []
+        # pair the keys and values before loading them into the parser
         for ii in range(len(unknown)):
             item = unknown[ii]
             if item.startswith(("-","--")) and ii==len(unknown)-1:
@@ -327,18 +328,36 @@ class Parser:
                 unknown_paired.append((unknown[ii-1],item))
             elif item.startswith(("-","--")): pass
             else: unknown_paired.append((item,None))
+        # if the function expects variable arguments we collapse all arguments
+        if inspected.get('*') and any([j==None for i,j in unknown_paired]):
+            sub.add_argument('args',nargs='*')
+            has_varargs = True
+            star_args = [i for i,j in unknown_paired if j==None]
+        else: 
+            has_varargs = False
+            star_args = None
         anum = 1
         for key,val in unknown_paired:
-            if val==None:
+            if val==None and not has_varargs:
                 sub.add_argument('arg_%d'%anum)
                 anum += 1
             else:
                 sub.add_argument(key,default=val)
         # connect the function to the parser
         sub.set_defaults(func=func)
-        # now that we have prepared the parser we add the functrion and call
+        # now that we have prepared the parser we add the function and call
         args = self.parser.parse_args()
-        self._call(args)
+        # star arguments have to be passed separately
+        if star_args: 
+            # the following looks convoluted because it is but it tests fine:
+            #   ./fac docker spack specs/spack_tree.yaml seq01 a=1
+            #   shows up in the docker extension to a Parser
+            #   with the three correct arguments and kwargs a=1
+            args.__dict__.pop('args')
+            # args are routed to keyword arguments via attributesin the parse
+            for item in star_args: args.__dict__.pop(item)
+            self._call(args,star_args=star_args)
+        else: self._call(args)
 
     def __init__(self, parser_order=None):
         subcommand_names = [
@@ -411,11 +430,12 @@ class Parser:
                     self._try_else()
         return
 
-    def _call(self, args):
+    def _call(self,args,star_args=None):
         """Main execution loop for a subcommand with handler and else"""
         func = args.func
-        delattr(args, 'func')
-        func(**vars(args))
+        delattr(args,'func')
+        if star_args: func(*star_args,**vars(args))
+        else: func(**vars(args))
 
     def debug(self):
         """
