@@ -96,7 +96,6 @@ class MakeUse(Handler):
         unrolled = ortho.catalog(config)
         for route,val in unrolled:
             ortho.delveset(ortho.conf,*route,value=val)
-        ortho.conf.update(**config)
         ortho.write_config(ortho.conf)
 
 class Interface(Parser):
@@ -105,7 +104,6 @@ class Interface(Parser):
     """
     # cli extensions add functions to the interface automatically
     subcommander = ortho.conf.get('cli_extensions',{})
-    free_functions = ortho.conf.get('cli_free_functions',{})
 
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
