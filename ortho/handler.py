@@ -12,8 +12,13 @@ def introspect_function(func,**kwargs):
 		'function introspection received a string instead of a function '
 		'indicating that we have gleaned the function without importing it. '
 		'this indicates an error which requires careful debugging.'))
+	#! message is unused
+	check_varargs = kwargs.pop('check_varargs',False)
+	if kwargs: raise Exception('kwargs: %s'%kwargs)
 	# getargspec will be deprecated by Python 3.6
 	if sys.version_info<(3,3): 
+		if check_varargs: raise Exception(
+			'variable argument checking not implemented in old python')
 		if isinstance(func,str_types): raise Exception(messsage)
 		args,varargs,varkw,defaults = inspect.getargspec(func)
 		if defaults: 
@@ -29,9 +34,13 @@ def introspect_function(func,**kwargs):
 		keywords = [(key,val.default) for key,val in sig.parameters.items() 
 			if val.default!=inspect._empty]
 		packed['kwargs'] = dict(keywords)
+		#! probably only one double star is allowed anyway so list is confusing
 		double_star = [i for i in sig.parameters 
 			if str(sig.parameters[i]).startswith('**')]
 		if double_star: packed['**'] = double_star
+		if check_varargs:
+			varargs = inspect.getfullargspec(func).varargs
+			if varargs: packed['*'] = varargs
 		return packed
 
 class Handler(object):

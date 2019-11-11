@@ -37,17 +37,15 @@ from .misc import str_types,say
 from .dev import tracebacker
 
 class Singleton(type):
-
     # via https://stackoverflow.com/a/42239713
+    #! use with `__metaclass__ = Singleton` however this fails
     def __init__(cls, name, bases, dict):
         super(Singleton, cls).__init__(name, bases, dict)
         cls._instance = None
-
     def __call__(cls, *args, **kw):
         if cls._instance is None:
             cls._instance = super(Singleton, cls).__call__(*args, **kw)
         return cls._instance
-
 
 class Cacher(object):
     """
@@ -211,9 +209,9 @@ class Parser:
     # protected functions from Cacher hidden from argparse
     protected_functions = ['closer', 'errorclear', 'establish']
     parser_order = False
-    # hooks for special instructions from a subclass
+    # hooks for special instructions from a subclass or free functions
     subcommander = []
-    ortho_conf = None
+    free_functions = []
 
     def _preproc(self):
         """
@@ -237,11 +235,115 @@ class Parser:
             else: revised.append(item)
         sys.argv = revised
 
+    def _get_function(self,name):
+        """Look up a function locally or from an extension."""
+        if name in self.specials: func = self.specials[name]
+        else: func = getattr(self,name)
+        return func
+
+    def _function_to_subcommand(self,name):
+        """
+        Convert a subcommand to an argparse function.
+        """
+        func = self._get_function(name)
+        detail = {}
+        if hasattr(func, '__doc__'):
+            detail['help'] = func.__doc__
+        sub = self.subparsers.add_parser(name,**detail)
+        # introspection
+        inspected = introspect_function(func)
+        if ('func' in inspected['args']
+                or 'func' in inspected['kwargs']):
+            raise Exception('cannot use the argument func in %s'%name)
+        # temporary fix for introspect_function issue
+        if (sys.version_info < (3,3) and len(inspected['args']) > 0
+                and inspected['args'][0] == 'self'):
+            inspected['args'] = inspected['args'][1:]
+        for arg in inspected['args']:
+            sub.add_argument(arg)
+        for arg in inspected['kwargs'].keys():
+            val = inspected['kwargs'][arg]
+            if isinstance(val, bool):
+                if val:
+                    sub.add_argument('--no-%s'%arg,dest=arg,
+                        action='store_false')
+                else:
+                    sub.add_argument('--%s'%arg,dest=arg,
+                        action='store_true')
+                sub.set_defaults(**{arg:val})
+            # we treat the None as if it is expecting an argument
+            #   so that you can use None to rely on default kwargs
+            elif isinstance(val, str_types) or isinstance(val, type(None)):
+                sub.add_argument('--%s'%arg,
+                    dest=arg, default=val, type=str,
+                    help='Default for "%s": "%s".' %
+                    (arg,str(val)))
+            elif isinstance(val, int):
+                sub.add_argument('--%s'%arg,
+                    dest=arg, default=int(val),type=int,
+                    help='Default for "%s": "%s".'%
+                    (arg,int(val)))
+            else:
+                # development error if you use an invalid type in a parser
+                raise Exception(
+                    ('cannot automatically make a parser '
+                     'from argument to "%s": "%s" (default "%s")')%(
+                     name, arg, str(val)))
+        # set the function
+        sub.set_defaults(func=func)
+
+    def _call_free_function(self):
+        """
+        Call a function with arbitrary parameters
+        This function recovers the ortho.cli functionality.
+        """
+        #! could we allow functions to mark themselves for this feature?
+        #!   with a decorator or possibly automatically detect it?
+        call_script,name,tail = sys.argv[0],sys.argv[1],sys.argv[2:]
+        if call_script!='cli.py': raise Exception('arrived here from unknown')
+        func = self._get_function(name)
+        inspected = introspect_function(func)
+        #! for now we insist that all free functions use the standard signature
+        #!   i.e. `*args,**kwargs` but this can be made flexible later on
+        std_sig = {'args':('args','kwargs'),'kwargs':{},'**':['kwargs']}
+        if inspected!=std_sig:
+            raise Exception('free functions called by Parser must use '
+                'the standard signature: `*args,**kwargs`')
+        # add this free function to the subparsers to prevent a known_args error
+        sub = self.subparsers.add_parser(name)
+        known_args,unknown = self.parser.parse_known_args()
+        # example call: ./fac function arg0 arg1 --key1 val1 --key2 val2
+        # pair the keys and values before loading them into the parser
+        unknown_paired = []
+        for ii in range(len(unknown)):
+            item = unknown[ii]
+            print(item)
+            if item.startswith(("-","--")) and ii==len(unknown)-1:
+                raise Exception('keyword at the end: %s'%str(unknown))
+            elif ii>0 and unknown[ii-1].startswith(("-","--")): 
+                if item.startswith(("-","--")):
+                    raise Exception('repeated keywords with no values: %s'%
+                        str(unknown))
+                unknown_paired.append((unknown[ii-1],item))
+            elif item.startswith(("-","--")): pass
+            else: unknown_paired.append((item,None))
+        anum = 1
+        for key,val in unknown_paired:
+            if val==None:
+                sub.add_argument('arg_%d'%anum)
+                anum += 1
+            else:
+                sub.add_argument(key,default=val)
+        # connect the function to the parser
+        sub.set_defaults(func=func)
+        # now that we have prepared the parser we add the functrion and call
+        args = self.parser.parse_args()
+        self._call(args)
+
     def __init__(self, parser_order=None):
-        subject = self
         subcommand_names = [
-            func for func in dir(subject)
-            if callable(getattr(subject, func))
+            func for func in dir(self)
+            if callable(getattr(self,func))
             # hide functions with underscores and ignore a closer for Cacher
             and not func.startswith('_')
             and not func in self.protected_functions]
@@ -252,93 +354,55 @@ class Parser:
             subcommand_names = (
                 [i for i in subcommand_names if i in parser_order] +
                 [i for i in subcommand_names if i not in parser_order])
-        parser = argparse.ArgumentParser(
+        self.parser = argparse.ArgumentParser(
             description='Community Collections Manager.')
-        subparsers = parser.add_subparsers(
+        self.subparsers = self.parser.add_subparsers(
             title='subcommands',
             description='Valid subcommands:',
             help='Use the help flag (-h) for more details on each subcommand.')
-
-        # the subcommander list notes functions which have special setups
-        specials = {}
+        # the subcommander list points to external functions
+        self.specials = {}
         if self.subcommander:
             from .imports import importer
             for name,target in self.subcommander.items():
                 try: 
                     mod_target,func_name = re.match(
                         r'^(.+)\.(.*?)$',target).groups()
-                    specials[name] = importer(mod_target)[func_name]
+                    self.specials[name] = importer(mod_target)[func_name]
                 except: raise Exception('cannot import %s'%target)
-        collide_special = [i for i in specials if i in subcommand_names]
+        collide_special = [i for i in self.specials if i in subcommand_names]
         if any(collide_special):
             raise Exception(
                 'special CLI function collisions: %s'%collide_special)
-        # loop over subcommands
-        for name in subcommand_names+list(specials.keys()):
-            if name in specials: func = specials[name]
-            else: func = getattr(self,name)
-            detail = {}
-            if hasattr(func, '__doc__'):
-                detail['help'] = func.__doc__
-            sub = subparsers.add_parser(name, **detail)
-            # introspection
-            inspected = introspect_function(func)
-            if ('func' in inspected['args']
-                    or 'func' in inspected['kwargs']):
-                raise Exception('cannot use the argument func in %s' % name)
-            # temporary fix for introspect_function issue
-            if (sys.version_info < (3, 3) and len(inspected['args']) > 0
-                    and inspected['args'][0] == 'self'):
-                inspected['args'] = inspected['args'][1:]
-            for arg in inspected['args']:
-                sub.add_argument(arg)
-            #! note that this indentation is unspeakably ugly!
-            for arg in inspected['kwargs'].keys():
-                val = inspected['kwargs'][arg]
-                if isinstance(val, bool):
-                    if val:
-                        sub.add_argument('--no-%s' % arg, dest=arg,
-                                         action='store_false')
-                    else:
-                        sub.add_argument('--%s' % arg, dest=arg,
-                                         action='store_true')
-                    sub.set_defaults(**{arg: val})
-                # we treat the None as if it is expecting an argument
-                #   so that you can use None to rely on default kwargs
-                elif isinstance(val, str_types) or isinstance(val, type(None)):
-                    sub.add_argument('--%s' % arg,
-                                     dest=arg, default=val, type=str,
-                                     help='Default for "%s": "%s".' %
-                                     (arg, str(val)))
-                #!!!
-                elif isinstance(val, int):
-                    sub.add_argument('--%s' % arg,
-                                     dest=arg, default=int(val), type=int,
-                                     help='Default for "%s": "%s".' %
-                                     (arg, int(val)))
-                else:
-                    # development error if you use an invalid type in a parser
-                    raise Exception(
-                        ('cannot automatically make a parser '
-                         'from argument to "%s": "%s" (default "%s")') % (
-                         name, arg, str(val)))
-            # set the function
-            sub.set_defaults(func=func)
-        args = parser.parse_args()
+        # loop over subcommands excluding free functions
+        for name in subcommand_names+list(self.specials.keys()):
+            # free functions are added here
+            if name in self.free_functions:
+                func = self._get_function(name)
+                detail = {}
+                if hasattr(func, '__doc__'):
+                    detail['help'] = func.__doc__
+                sub = self.subparsers.add_parser(name,**detail)
+            else: self._function_to_subcommand(name)
+        # divert free functions here (note sys.argv[0]=='cli.py')
+        if len(sys.argv)>1 and sys.argv[1] in self.free_functions:
+            self._call_free_function()
+            return
+        # if we have a standard function we continue with argparse
+        args = self.parser.parse_args()
         # print help if no function
-        if not hasattr(args, 'func'):
-            parser.print_help()
+        if not hasattr(args,'func'):
+            self.parser.print_help()
         # separate cacher before execute
         else:
             # we protect the main execution loop with a handler here
-            try:
-                self._call(args)
+            try: self._call(args)
             except Exception as e:
-                if hasattr(self, '_try_except'):
-                    # traceback is necessary here or raise is not useful
+                # traceback is necessary here or raise is not useful
+                if hasattr(self,'_try_except'): 
                     self._try_except(exception=e)
-            else:
-                if hasattr(self, '_try_else'):
+            else: 
+                if hasattr(self,'_try_else'): 
                     self._try_else()
         return
 
@@ -364,7 +428,6 @@ class Parser:
         readline.parse_and_bind("tab: complete")
         code.interact(local=vars, banner='')
 
-
 class Convey(object):
     """
     Class decorator which supplies a cache and associated functions.
@@ -381,7 +444,6 @@ class Convey(object):
                 setattr(cls, key, getattr(self, key))
         Convey.__name__ = cls.__name__
         return Convey
-
 
 class StateDict(dict):
     """
