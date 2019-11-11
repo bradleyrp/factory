@@ -302,6 +302,7 @@ class Parser:
         call_script,name,tail = sys.argv[0],sys.argv[1],sys.argv[2:]
         if call_script!='cli.py': raise Exception('arrived here from unknown')
         func = self._get_function(name)
+        # we inspect the function again but we could have saved it earlier
         inspected = introspect_function(func)
         #! for now we insist that all free functions use the standard signature
         #!   i.e. `*args,**kwargs` but this can be made flexible later on
@@ -317,7 +318,6 @@ class Parser:
         unknown_paired = []
         for ii in range(len(unknown)):
             item = unknown[ii]
-            print(item)
             if item.startswith(("-","--")) and ii==len(unknown)-1:
                 raise Exception('keyword at the end: %s'%str(unknown))
             elif ii>0 and unknown[ii-1].startswith(("-","--")): 
@@ -374,15 +374,20 @@ class Parser:
         if any(collide_special):
             raise Exception(
                 'special CLI function collisions: %s'%collide_special)
-        # loop over subcommands excluding free functions
-        for name in subcommand_names+list(self.specials.keys()):
-            # free functions are added here
-            if name in self.free_functions:
-                func = self._get_function(name)
+        # loop over subcommands excluding specials
+        for name in subcommand_names:
+            self._function_to_subcommand(name)
+        for name in self.specials.keys():
+            # check if special functions have arbitrary arguments
+            func = self._get_function(name)
+            inspected = introspect_function(func,check_varargs=True)
+            # if we find the star then it has variable arguments
+            if inspected.get('*'):
                 detail = {}
                 if hasattr(func, '__doc__'):
                     detail['help'] = func.__doc__
                 sub = self.subparsers.add_parser(name,**detail)
+                self.free_functions.append(name)
             else: self._function_to_subcommand(name)
         # divert free functions here (note sys.argv[0]=='cli.py')
         if len(sys.argv)>1 and sys.argv[1] in self.free_functions:
