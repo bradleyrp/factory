@@ -307,7 +307,7 @@ class Parser:
         inspected = introspect_function(func,check_varargs=True)
         # add this free function to the subparsers to prevent a known_args error
         detail = {}
-        if hasattr(func, '__doc__'):
+        if hasattr(func,'__doc__') and '-h' in sys.argv:
             print('status instructions follow:\n')
             print('\n'.join(['  %s'%i for i in func.__doc__.splitlines()]))
         sub = self.subparsers.add_parser(name)
