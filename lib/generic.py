@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 from lib.yaml_mods import YAMLObjectInit
+from ortho import Handler,requires_python_check
+import copy
 
 class OrthoSync(YAMLObjectInit):
 	"""Trivial wrapper around ortho sync."""
@@ -21,6 +23,33 @@ class OrthoSync(YAMLObjectInit):
 				if i!='spot'])
 		from ortho import sync
 		sync(modules=kwargs_out)
+
+### specification file patterns
+
+class FileNameSubSelector(Handler):
+	_internals = {'name':'basename','meta':'meta'}
+	defaults = {} # placeholder for later
+	Target = None
+	def subselect(self,file,name,**kwargs):
+		"""
+		This handler implements the file/name pattern.
+		"""
+		requires_python_check('yaml')
+		import yaml
+		#! from SpackSeqSub, replace it!
+		with open(file) as fp: 
+			tree = yaml.load(fp,Loader=yaml.SafeLoader)
+		self.name = name
+		# builtin defaults from a dictionary above
+		self.tree = copy.deepcopy(self.defaults)
+		self.tree.update(**tree)
+		self.deploy = self.Target(meta=self.tree,**tree[name],**kwargs)
+		return self
+
+class RunScript(Handler):
+	def script(self,script,spot=None):
+		from ortho.replicator.replicator_dev import ReplicateCore
+		ReplicateCore(script=script,spot=spot)
 
 ### YAML examples
 
