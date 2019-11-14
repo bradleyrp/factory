@@ -1,0 +1,17 @@
+hello:
+  script: |
+    #!/bin/bash
+    echo "HELLO WORLD"
+delay:
+  script: |
+    #!/bin/bash
+    # require a spot 
+    #! enforce the spot requirement
+    cd %(spot)s
+    echo "output example" > output
+    echo "HELLO WORLD. sleep now"
+    echo $PWD
+    sleep 60
+    echo "wake and exit"
+uname:
+  script: uname -a
