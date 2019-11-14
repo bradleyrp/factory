@@ -19,7 +19,6 @@ from ortho import Handler
 from ortho import tracebacker
 from ortho.installers import install_miniconda
 
-
 # manage the state
 #! how does this work? test it.
 global_debug = True
@@ -108,7 +107,7 @@ class Interface(Parser):
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
         tracebacker(exception)
-        raise exception
+        #! previously: `raise exception` but this caused repeats
 
     def _get_settings(self):
         import yaml
@@ -123,6 +122,7 @@ class Interface(Parser):
 
     def conda(self,file):
         """Update or install a conda environment."""
+        #? consider adding this to `make do` via yaml tag
         Conda(file=file).solve
 
     def update_conda(self):
@@ -240,6 +240,16 @@ class Interface(Parser):
             changes = yaml.load(text,Loader=yaml.SafeLoader)
             MakeUse(**changes).solve
         else: raise Exception('unclear what: %s'%what)
+
+    def script(self,file,name,spot=None):
+        """
+        Run a script with the file/name pattern.
+        """
+        from lib.generic import FileNameSubSelector
+        from lib.generic import RunScript
+        # compose the RunScript in the FileNameSubSelector pattern
+        class This(FileNameSubSelector): Target = RunScript
+        This(file=file,name=name,spot=spot)
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface
