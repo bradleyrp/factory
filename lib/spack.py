@@ -16,7 +16,7 @@ from ortho import delveset
 #! note that there is no CLI override yet
 spack_tree_defaults = {
 	'spot':'./local',
-	'spot_envs':'./localx/envs_spac',}
+	'spot_envs':'./local/envs_spack',}
 
 #! config mappings see "+++ add" below and consider standardizing this?
 #!   spot in spack tree > spack in the config
