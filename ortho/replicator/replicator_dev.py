@@ -12,7 +12,8 @@ from ..bash import bash
 from ..dictionary import DotDict
 from ..yaml_mods import YAMLObjectInit
 from ..handler import Handler
-from ..requires import requires_program
+from ..requires import requires_program,is_terminal_command
+from ..misc import path_resolver
 
 class Volume(Handler):
 	"""
@@ -28,6 +29,8 @@ class Volume(Handler):
 			out = bash('docker volume create %s'%docker,scroll=False,v=True)
 		else: print('status found docker volume %s'%docker)
 		return dict(name=docker,args='-v %s:%%s'%docker)
+	def local(self,root):
+		import ipdb;ipdb.set_trace()
 
 #! abandoned
 class VolumeWrap(YAMLObjectInit):
@@ -36,7 +39,7 @@ class VolumeWrap(YAMLObjectInit):
 	def __init__(self,**kwargs):
 		self.volume = VolumeCore(**kwargs).solve
 
-#! abandoned		
+#! abandoned
 class Executor(YAMLObjectInit):
 	yaml_tag = '!executor'
 	def __init__(self,sequence): 
@@ -79,7 +82,6 @@ class DockerContainer(Handler):
 		elif repo==None and (None,name) in avail:
 			return name
 		else: 
-			import ipdb;ipdb.set_trace()
 			raise Exception('cannot find image: %s in repo: %s'%(name,repo))
 
 class DockerExecution(Handler):
@@ -119,7 +121,7 @@ cat <<'EOF_OUT'> $BOOTSTRAP_SCRIPT
 #!/bin/bash
 # run in a screen with specific log file
 # typically: TMPDIR="./" tmp_screen_rc=$(mktemp)
-tmp_screen_rc=$SCREEN_CONF_TMP
+export tmp_screen_rc=$SCREEN_CONF_TMP
 echo "[STATUS] temporary screenrc at $tmp_screen_rc"
 
 # the bootstrap script writes a conf to set screen logfile
@@ -134,14 +136,21 @@ exec screen -c $tmp_screen_rc -Ldm -S %(screen_name)s /bin/bash "$0"
 fi
 set -e
 
+# prelim%(prelim)s
+
 # KERNEL
 %(contents)s
 
+# post%(post)s
+
+# clean up the temporary files inside the screened execution
+trap "{ rm -f $SCREEN_CONF_TMP $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT
+
+# end of the screen
 EOF_OUT
 
 # run the script which screens itself
 bash $BOOTSTRAP_SCRIPT
-#! cannot remove $SCREEN_CONF_TMP for some reason so we do it later
 """
 
 class ScriptPrelim(Handler):
@@ -161,13 +170,15 @@ class ReplicateCore(Handler):
 	"""
 	DEV: replacement for the replicator functions
 	"""
-	@requires_program('docker')
 	def docker_container_volume(self,
 		docker_container,docker_volume,**kwargs):
 		"""
 		Run a one-liner command in docker.
 		Not suitable for complex bash commands.
 		"""
+		#! retire this after re-factor below
+		# you cannot use decorators with Handler
+		is_terminal_command('docker')
 		# step 1: assemble the volume
 		self.spot = Volume(docker=docker_volume).solve
 		if self.spot.get('args',None):
@@ -197,6 +208,52 @@ class ReplicateCore(Handler):
 			proc.communicate(script.encode())
 		# standard execution
 		else: bash(cmd,scroll=True,v=True)
+	def _docker(self,volume={}):
+		"""
+		Run a one-liner command in docker.
+		Not suitable for complex bash commands.
+		"""
+		#! retire this after re-factor
+		# you cannot use decorators with Handler
+		is_terminal_command('docker')
+		# step 1: assemble the volume
+		self.spot = Volume(**volume).solve
+		import ipdb;ipdb.set_trace()
+		if self.spot.get('args',None):
+			#! generalize this?
+			docker_args = self.spot['args']%'/home/user/outside'+' '
+		else: docker_args = ''
+		# step 2: locate the container
+		self.container = DockerContainer(name=docker_container).solve
+		# step 3: prepare the content of the execution
+		#! keep the '-i' flag?
+		cmd = 'docker run -u 0 -i %s%s'%(docker_args,self.container)
+		self.do = DockerExecution(**kwargs).solve
+		# case A: one-liner
+		if self.do['kind']=='line':
+			cmd += ' /bin/sh -c %s'%self.do['line']
+		# case B: write a script
+		elif self.do['kind']=='script': pass
+		else: raise Exception('dev')
+		# step 4: execute the docker run command
+		#! announcement for the script is clumsy because of newlines and
+		#!   escaped characters
+		# script execution via stdin to docker
+		if self.do['kind']=='script':
+			script = self.do['script']
+			print('status script:\n'+str(script))
+			print('status command: %s'%cmd)
+			proc = subprocess.Popen(cmd.split(),stdin=subprocess.PIPE)
+			proc.communicate(script.encode())
+		# standard execution
+		else: bash(cmd,scroll=True,v=True)
+	def docker_mimic(self,root,docker_container,line):
+		"""
+		Run a docker container in "mimic" mode where it substitutes for the
+		host operation system and maintains the right paths.
+		"""
+		return self._docker(
+			volume=dict(root=path_resolver(root)))
 	def screen(self,screen,script,**kwargs):
 		"""
 		Run something in a screen.
@@ -207,15 +264,16 @@ class ReplicateCore(Handler):
 		if kwargs: prelim = ScriptPrelim(**kwargs).solve
 		else: prelim = {}
 		# prepare a location
-		if spot and not os.path.isdir(spot): os.mkdir(spot)
-		elif not spot: spot = './'
+		if spot and not os.path.isdir(spot): 
+			os.mkdir(spot)
+			spot = path_resolver(spot)
 		# detect string interpolation
 		#! finish this feature! protect against wonky scripts
 		if 0:
 			formatter = string.Formatter()
 			reqs = formatter.parse(script)
 			import ipdb;ipdb.set_trace()
-		script = script%dict(spot=os.path.abspath(spot))
+		script = script%dict(spot=spot if spot else '')
 		# add staged variables to the script
 		if prelim:
 			staged_flag = 'staged here'
@@ -231,9 +289,12 @@ class ReplicateCore(Handler):
 					variable_injection,script)
 		# prepare the execution script
 		screen_log = os.path.join(os.getcwd(),'screen-%s.log'%screen)
-		detail = dict(screen_name=screen,contents=script,screen_log=screen_log)
+		detail = dict(screen_name=screen,contents=script,screen_log=screen_log,
+			prelim='' if not spot else '\ncd %s'%spot)
 		with tempfile.NamedTemporaryFile(delete=False) as fp:
 			tmp_fn = fp.name
+			# the CLEANUP_FILES are deleted at the end of the screened script
+			detail['post'] = "\nCLEANUP_FILES=%s"%fp.name
 			fp.write((screen_maker%detail).encode())
 			fp.close()
 		print('status executing temporary script: %s'%tmp_fn)
@@ -241,8 +302,13 @@ class ReplicateCore(Handler):
 		if os.path.isfile(tmp_fn): os.remove(tmp_fn)
 		tmp_screen_conf = 'screen-%s.tmp'%screen
 		#! the following caused a race condition
-		# if os.path.isfile(tmp_screen_conf): os.remove(tmp_screen_conf)
-	def direct(self,script,spot,**kwargs):
+		#!   if os.path.isfile(tmp_screen_conf): os.remove(tmp_screen_conf)
+	def direct_raw(self,script): 
+		return self._direct(script=script,spot=None)
+	def direct_spot(self,script,spot): 
+		return self._direct(script=script,spot=spot)
+	def _direct(self,script,**kwargs):
+		#!!! function is hidden because collision with script. fix later
 		"""
 		Run a script directly.
 		"""
@@ -271,10 +337,10 @@ class ReplicateCore(Handler):
 			fp.write(script.encode())
 			fp.close()
 		print('status executing temporary script: %s'%tmp_fn)
-		bash('bash %s'%tmp_fn,v=True)
+		bash('bash %s'%tmp_fn,v=True,cwd=spot)
 
 class Replicate(YAMLObjectInit):
 	"""Wrap a handler with a yaml recipe."""
 	yaml_tag = '!replicate'
 	def __init__(self,**kwargs):
-		self.out = ReplicateCore(**kwargs).solve		
+		self.out = ReplicateCore(**kwargs).solve
