@@ -45,26 +45,5 @@ basic:
         build: .
         image: factory:centos7_user
         volumes:
-          #- "../:/home/rpb/testbed/factory"
+          # - "../:/home/rpb/testbed/factory"
           - "../:/home/user/factory"
-
-email: 
-  persist: true
-  #! use of visit is somewhat clumsy. find another location
-  site: "./visit"
-  rebuild: false
-  dockerfile:
-    sequence: 
-      - centos7
-      - centos7_dev
-      - user_sudo
-  command: docker-compose run --service-ports deploy
-  compose:
-    version: '3'
-    services:
-      deploy:
-        entrypoint: ['/bin/bash','-l']
-        build: .
-        image: factory:centos7_user
-        volumes:
-          - "/home/rpb/testbed/mutt:/home/user/mutt"
