@@ -1,0 +1,4 @@
+config:
+  cli_extensions:
+    docker: lib.replicator.docker
+    screen: lib.replicator.screen
