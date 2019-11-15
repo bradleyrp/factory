@@ -8,6 +8,8 @@ def introspect_function(func,**kwargs):
 	"""
 	Get arguments and kwargs expected by a function.
 	"""
+	# the self object remains in the argument list in old python
+	selfless = lambda x: [i for i in x if i!='self']
 	message = kwargs.pop('message',(
 		'function introspection received a string instead of a function '
 		'indicating that we have gleaned the function without importing it. '
@@ -22,19 +24,20 @@ def introspect_function(func,**kwargs):
 		# python 2 includes self in this list
 		if defaults: 
 			std,var = args[:-len(defaults)],args[-len(defaults):]
-			packed = dict(args=tuple([i for i in std if i!='self']),
+			packed = dict(args=tuple(selfless(std)),
 				kwargs=dict(zip(var,defaults)))
 		else: 
-			packed = dict(kwargs={},
-				args=tuple([i for i in args if i!='self']))
+			packed = dict(kwargs={},args=tuple(selfless(args)))
 		if check_varargs and varargs: packed['*'] = varargs
 		if varkw: packed['**'] = varkw
 		return packed
 	else:
 		#! might need to validate this section for python 3 properly
 		sig = inspect.signature(func) # pylint: disable=no-member
-		packed = {'args':tuple([key for key,val in sig.parameters.items() 
-			if val.default==inspect._empty])}
+		args_collect = tuple([key for key,val in sig.parameters.items() 
+			if val.default==inspect._empty])
+		# decorators add self to the argument list somehow so we filter
+		packed = {'args':selfless(args_collect)}
 		keywords = [(key,val.default) for key,val in sig.parameters.items() 
 			if val.default!=inspect._empty]
 		packed['kwargs'] = dict(keywords)
