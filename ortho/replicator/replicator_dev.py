@@ -15,11 +15,58 @@ from ..handler import Handler
 from ..requires import requires_program,is_terminal_command
 from ..misc import path_resolver
 
+# template for a script that screens itself
+screen_maker = """#!/bin/bash
+
+set -x
+export SCREEN_CONF_TMP=screen-%(screen_name)s.tmp
+export SCREEN_LOG=%(screen_log)s
+#! is this too recursive?
+export BOOTSTRAP_SCRIPT=$(mktemp)
+
+# generate a BASH script that screens itself
+cat <<'EOF_OUT'> $BOOTSTRAP_SCRIPT
+#!/bin/bash
+# run in a screen with specific log file
+# typically: TMPDIR="./" tmp_screen_rc=$(mktemp)
+export tmp_screen_rc=$SCREEN_CONF_TMP
+echo "[STATUS] temporary screenrc at $tmp_screen_rc"
+
+# the bootstrap script writes a conf to set screen logfile
+cat <<EOF> $tmp_screen_rc
+logfile ${SCREEN_LOG:-log-screen}
+EOF
+
+# ensure that the script screens itself
+if [ -z "$STY" ]; then 
+echo "[STATUS] executing in a screen"
+exec screen -c $tmp_screen_rc -Ldm -S %(screen_name)s /bin/bash "$0"
+fi
+set -e
+
+# prelim%(prelim)s
+
+# KERNEL
+%(contents)s
+
+# post%(post)s
+
+# clean up the temporary files inside the screened execution
+trap "{ rm -f $SCREEN_CONF_TMP $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT
+
+# end of the screen
+EOF_OUT
+
+# run the script which screens itself
+bash $BOOTSTRAP_SCRIPT
+"""
+
 class Volume(Handler):
 	"""
 	Handle external volumes for a replicator.
 	Note that this class is used by the Volume class exposed to yaml.
 	"""
+
 	def docker(self,docker):
 		"""Use a docker volume."""
 		volumes = bash('docker volume ls -q',scroll=False,v=True)
@@ -28,36 +75,13 @@ class Volume(Handler):
 			print('status adding docker volume %s'%docker)
 			out = bash('docker volume create %s'%docker,scroll=False,v=True)
 		else: print('status found docker volume %s'%docker)
-		return dict(name=docker,args='-v %s:%%s'%docker)
+		#! hardcoded link to the outside should be configurable
+		args_out = ('-v %s:%%s'%docker)%'/home/user/outside'
+		return dict(name=docker,docker_args=args_out)
+
 	def local(self,root):
-		import ipdb;ipdb.set_trace()
-
-#! abandoned
-class VolumeWrap(YAMLObjectInit):
-	"""The Volume class wraps VolumeCore which handles different uses."""
-	yaml_tag = '!volume'
-	def __init__(self,**kwargs):
-		self.volume = VolumeCore(**kwargs).solve
-
-#! abandoned
-class Executor(YAMLObjectInit):
-	yaml_tag = '!executor'
-	def __init__(self,sequence): 
-		self.sequence = sequence
-		for item in self.sequence:
-			if hasattr(item,'_run'):
-				print('status found _run for %s'%str(item))
-				getattr(item,'_run')()
-
-#! abandoned
-class Replicate(YAMLObjectInit):
-	yaml_tag = '!replicate'
-	def __init__(self,**kwargs):
-		print('status inside the Replicate')
-		self.spot = kwargs.pop('spot',None)
-		self.inside = kwargs.pop('inside',None)
-		if kwargs: raise Exception('unprocessed kwargs: %s'%str(kwargs))
-		import ipdb;ipdb.set_trace()
+		"""Add the current directory to the volume."""
+		return dict(docker_args='-v %s:%s -w %s'%(root,root,root))
 
 class DockerContainer(Handler):
 	_internals = {'name':'real_name','meta':'meta'}
@@ -106,52 +130,6 @@ class DockerExecution(Handler):
 	def script(self,script):
 		"""Scripts pass through to the function that calls docker."""
 		return dict(script=script,kind='script')
-
-# template for a script that screens itself
-screen_maker = """#!/bin/bash
-
-set -x
-export SCREEN_CONF_TMP=screen-%(screen_name)s.tmp
-export SCREEN_LOG=%(screen_log)s
-#! is this too recursive?
-export BOOTSTRAP_SCRIPT=$(mktemp)
-
-# generate a BASH script that screens itself
-cat <<'EOF_OUT'> $BOOTSTRAP_SCRIPT
-#!/bin/bash
-# run in a screen with specific log file
-# typically: TMPDIR="./" tmp_screen_rc=$(mktemp)
-export tmp_screen_rc=$SCREEN_CONF_TMP
-echo "[STATUS] temporary screenrc at $tmp_screen_rc"
-
-# the bootstrap script writes a conf to set screen logfile
-cat <<EOF> $tmp_screen_rc
-logfile ${SCREEN_LOG:-log-screen}
-EOF
-
-# ensure that the script screens itself
-if [ -z "$STY" ]; then 
-echo "[STATUS] executing in a screen"
-exec screen -c $tmp_screen_rc -Ldm -S %(screen_name)s /bin/bash "$0"
-fi
-set -e
-
-# prelim%(prelim)s
-
-# KERNEL
-%(contents)s
-
-# post%(post)s
-
-# clean up the temporary files inside the screened execution
-trap "{ rm -f $SCREEN_CONF_TMP $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT
-
-# end of the screen
-EOF_OUT
-
-# run the script which screens itself
-bash $BOOTSTRAP_SCRIPT
-"""
 
 class ScriptPrelim(Handler):
 	def fileprep(self,files=None,specs=None):
@@ -208,7 +186,8 @@ class ReplicateCore(Handler):
 			proc.communicate(script.encode())
 		# standard execution
 		else: bash(cmd,scroll=True,v=True)
-	def _docker(self,volume={}):
+	
+	def _docker(self,image,volume={},visit=False,**kwargs):
 		"""
 		Run a one-liner command in docker.
 		Not suitable for complex bash commands.
@@ -216,25 +195,33 @@ class ReplicateCore(Handler):
 		#! retire this after re-factor
 		# you cannot use decorators with Handler
 		is_terminal_command('docker')
+
 		# step 1: assemble the volume
 		self.spot = Volume(**volume).solve
-		import ipdb;ipdb.set_trace()
-		if self.spot.get('args',None):
-			#! generalize this?
-			docker_args = self.spot['args']%'/home/user/outside'+' '
-		else: docker_args = ''
+		docker_args = self.spot['docker_args']
+
 		# step 2: locate the container
-		self.container = DockerContainer(name=docker_container).solve
+		self.container = DockerContainer(name=image).solve
+
 		# step 3: prepare the content of the execution
 		#! keep the '-i' flag?
-		cmd = 'docker run -u 0 -i %s%s'%(docker_args,self.container)
+		if docker_args: docker_args += ' '
+		cmd = 'docker run -u 0 -i%s %s%s'%('t' if visit else '',
+			docker_args,self.container)
+		# kwargs contains either line or script for the execution step
 		self.do = DockerExecution(**kwargs).solve
+
 		# case A: one-liner
-		if self.do['kind']=='line':
+		if visit:
+			if not self.do['kind']=='line': 
+				raise Exception('visit requires line')
+			cmd += ' '+self.do['line']
+		elif self.do['kind']=='line':
 			cmd += ' /bin/sh -c %s'%self.do['line']
 		# case B: write a script
 		elif self.do['kind']=='script': pass
 		else: raise Exception('dev')
+
 		# step 4: execute the docker run command
 		#! announcement for the script is clumsy because of newlines and
 		#!   escaped characters
@@ -245,15 +232,22 @@ class ReplicateCore(Handler):
 			print('status command: %s'%cmd)
 			proc = subprocess.Popen(cmd.split(),stdin=subprocess.PIPE)
 			proc.communicate(script.encode())
+		# we require a TTY to enter the container so we use os.system
+		elif visit:
+			# possible security issue
+			os.system(cmd)
 		# standard execution
-		else: bash(cmd,scroll=True,v=True)
-	def docker_mimic(self,root,docker_container,line):
+		else: bash(cmd,scroll=True if not visit else False,v=True)
+
+	def docker_mimic(self,root,image,visit=False,**kwargs):
 		"""
 		Run a docker container in "mimic" mode where it substitutes for the
 		host operation system and maintains the right paths.
 		"""
 		return self._docker(
-			volume=dict(root=path_resolver(root)))
+			volume=dict(root=path_resolver(root)),
+			image=image,visit=visit,**kwargs)
+
 	def screen(self,screen,script,**kwargs):
 		"""
 		Run something in a screen.

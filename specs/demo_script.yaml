@@ -15,3 +15,5 @@ delay:
     echo "wake and exit"
 uname:
   script: uname -a
+bash:
+  script: /bin/bash

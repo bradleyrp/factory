@@ -19,11 +19,6 @@ from ortho import Handler
 from ortho import tracebacker
 from ortho.installers import install_miniconda
 
-# manage the state
-#! how does this work? test it.
-global_debug = True
-state = StateDict(debug=global_debug)
-
 def update_factory_env_cursor(spot):
     """
     Update a cursor which specifies an environment we should always use.
@@ -31,10 +26,6 @@ def update_factory_env_cursor(spot):
     if os.path.islink('.envcursor'): 
         os.unlink('.envcursor')
     os.symlink(spot,'.envcursor')
-
-def cache_closer(self):
-    """Hook before writing the cache."""
-    pass
 
 class Conda(Handler):
     """
@@ -226,6 +217,7 @@ class Interface(Parser):
 
     def repl(self,name,rebuild=False):
         """Connect to ortho.replicator."""
+        #! this will be superceded by `make docker` from lib.replicator
         print('status calling ortho.replicator')
         args = [name]
         if rebuild: args += ['rebuild']

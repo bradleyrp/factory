@@ -51,6 +51,7 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 	Run a bash command.
 	Development note: tee functionality would be useful however you cannot use pipes with subprocess here.
 	Vital note: log is relative to the current location and not the cwd.
+	Note that this cannot produce a TTY so it is not useful for running interactive docker.
 	"""
 	announce = announce or v
 	if announce: 
