@@ -7,18 +7,22 @@ PYENV_CALL=$PYENV/bin/python
 if [[ ! -f $PYENV_CALL ]]; then 
   unset PYENV_CALL
   # search for common python aliases
-  calls=(python3 python2 python)
-  for call in ${calls[@]}; do
-    type $call &> /dev/null
-    has_python=$?
-    if [[ $has_python -eq 0 ]]; then
-      PYENV_CALL=$call
-      break
+  if [[ -z $python ]]; then
+    calls=(python3 python2 python)
+    for call in ${calls[@]}; do
+      type $call &> /dev/null
+      has_python=$?
+      if [[ $has_python -eq 0 ]]; then
+        PYENV_CALL=$call
+        break
+      fi
+    done
+    if [[ -z $PYENV_CALL ]]; then
+      echo "[ERROR] cannot find python"
+      exit 1
     fi
-  done
-  if [[ -z $PYENV_CALL ]]; then
-    echo "[ERROR] cannot find python"
-    exit 1
+  else
+    PYENV_CALL=$python
   fi
 fi
 
