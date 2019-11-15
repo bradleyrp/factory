@@ -14,6 +14,9 @@ dependencies:
   - mdtraj
   - matplotlib
   - au-eoed::gnu-parallel 
+  - h5py
+  # clojure currently failing because jdk is too new on macbook
+  - asmeurer::leiningen
   - pip: 
     # documentation tools
     - sphinx
