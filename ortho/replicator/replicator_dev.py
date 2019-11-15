@@ -67,7 +67,12 @@ class Volume(Handler):
 	Note that this class is used by the Volume class exposed to yaml.
 	"""
 
-	def docker(self,docker):
+	def _get_tmpdir(self):
+		"""Get the temporary directory on the host."""
+		raise Exception('failing on mac')
+		return os.environ.get('TMPDIR')
+
+	def docker(self,docker,tmpdir=True):
 		"""Use a docker volume."""
 		volumes = bash('docker volume ls -q',scroll=False,v=True)
 		avail = volumes['stdout'].split()
@@ -76,12 +81,20 @@ class Volume(Handler):
 			out = bash('docker volume create %s'%docker,scroll=False,v=True)
 		else: print('status found docker volume %s'%docker)
 		#! hardcoded link to the outside should be configurable
-		args_out = ('-v %s:%%s'%docker)%'/home/user/outside'
+		#! consistent is probably not necessary. case-insensitivity is the issue
+		args_out = ('-v %s:%%s:consistent'%docker)%'/home/user/outside'
+		if 0:
+			tmpdir_spot = self._get_tmpdir()
+			if tmpdir and tmpdir_spot: args_out += ' -v %s:/tmp'%tmpdir_spot
 		return dict(name=docker,docker_args=args_out)
 
-	def local(self,root):
+	def local(self,root,tmpdir=True):
 		"""Add the current directory to the volume."""
-		return dict(docker_args='-v %s:%s -w %s'%(root,root,root))
+		args_out = '-v %s:%s:consistent -w %s'%(root,root,root)
+		if 0:
+			tmpdir_spot = self._get_tmpdir()
+			if tmpdir and tmpdir_spot: args_out += ' -v %s:/tmp'%tmpdir_spot
+		return dict(docker_args=args_out)
 
 class DockerContainer(Handler):
 	_internals = {'name':'real_name','meta':'meta'}
