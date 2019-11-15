@@ -94,6 +94,11 @@ class Interface(Parser):
     """
     # cli extensions add functions to the interface automatically
     subcommander = ortho.conf.get('cli_extensions',{})
+    _extrana = """
+    Note that this interface works with fac to accept pipes and pick python:
+        echo "import sys;print(sys.version_info);sys.exit(0)" | \
+            python=python2 make debug
+    """
 
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
