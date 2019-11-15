@@ -322,15 +322,6 @@ class Parser:
         # leave early if we are looking for help otherwise confusing usage notes
         if '-h' in sys.argv: return
         known_args,unknown = self.parser.parse_known_args()
-        # special handling for tail
-        if (func.__annotations__ and len(inspected['args'])>0 and  
-            func.__annotations__.get(inspected['args'][-1])=='tail'):
-            if inspected.get('**'):
-                raise Exception(
-                    'cannot use keyword arguments with tail on %s'%func)
-            self._call_free_function_tail()
-            return 
-        import ipdb;ipdb.set_trace()
         # example call: ./fac function arg0 arg1 --key1 val1 --key2 val2
         unknown_paired = []
         # pair the keys and values before loading them into the parser
@@ -406,8 +397,8 @@ class Parser:
                     mod_target,func_name = re.match(
                         r'^(.+)\.(.*?)$',target).groups()
                     self.specials[name] = importer(mod_target)[func_name]
-                except: 
-                    print('warning cannot import %s'%target)
+                except: raise Exception('cannot import %s from %s'%(
+                    mod_target,func_name))
         collide_special = [i for i in self.specials if i in subcommand_names]
         if any(collide_special):
             raise Exception(
@@ -418,8 +409,7 @@ class Parser:
         for name in self.specials.keys():
             # check if special functions have arbitrary arguments
             func = self._get_function(name)
-            try: inspected = introspect_function(func,check_varargs=True)
-            except Exception as e: continue
+            inspected = introspect_function(func,check_varargs=True)
             # if we find the star then it has variable arguments
             if inspected.get('*'):
                 detail = {}
@@ -427,13 +417,6 @@ class Parser:
                     detail['help'] = func.__doc__
                 sub = self.subparsers.add_parser(name,**detail)
                 self.free_functions.append(name)
-            # a function with a final argument annotated 'tail' is special too
-            elif func.__annotations__ and len(inspected['args'])>0:
-                if func.__annotations__.get(inspected['args'][-1])=='tail':
-                    self.free_functions.append(name)
-                else:
-                    raise Exception(
-                        'the tail annotation must be used on the last argument')
             else: self._function_to_subcommand(name)
         # divert free functions here (note sys.argv[0]=='cli.py')
         if len(sys.argv)>1 and sys.argv[1] in self.free_functions:

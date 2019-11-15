@@ -26,7 +26,6 @@ def docker(recipe,visit=False,*args,**kwargs):
 	Run anything in a docker using `ReplicatorCore`.
 	make docker spot=./here script specs/demo_script.yaml delay
 	"""
-	import ipdb;ipdb.set_trace()
 	#! need better hook-ups
 	if 0:
 		sources = many_files(ortho.conf['replicator_recipes'])
@@ -49,15 +48,6 @@ def docker(recipe,visit=False,*args,**kwargs):
 		line=cmd,visit=visit,
 		#! fix this
 		image='factory:centos7_user')
-
-'''
-def dockrun(recipe,cmd:'tail'):
-	"""Run a command in a docker."""
-	# the annotation 'tail' on the last argument triggers a special function
-	ReplicateCore(root=os.getcwd(),line=cmd,
-		#! fix this
-		image='factory:centos7_user')
-'''
 
 def screen(screen='screen_anon',*args,**kwargs):
 	"""
