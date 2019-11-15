@@ -7,7 +7,8 @@ so that you can execute different commands inside of alternate environments.
 
 import sys,os
 import ortho
-from ortho.replicator.replicator_dev import ReplicateCore
+from ortho.replicator.replicator_dev import ReplicateCore,RecipeRead
+from ortho.replicator.replicator_dev import promise_run
 #! from ortho.replicator.replicator import replicator_read_yaml,many_files
 from ortho import path_resolver
 
@@ -41,16 +42,25 @@ def docker(recipe,*args,**kwargs):
 		ReplicateCore(script=cmd,docker_container=docker_container,
 			docker_volume=docker_volume)
 
+	# STEP A: get the recipe
+	#! intervene here with a basic default recipe if no yaml
+	# a path to a recipe file skips all of the gathering
+	if os.path.isfile(recipe):
+		# test: make docker specs/recipes/basics_redev.yaml
+		recipe = RecipeRead(path=recipe).solve
+	else: raise Exception('dev')
+
+	# STEP B: translate recipe into call to ReplicateCore
 	# empty arguments triggers a visit to the container
-	if not args: 
-		cmd = '/bin/bash'
-		visit = True
-	else: 
-		cmd = feedback_args_to_command(*args,**kwargs)
-	ReplicateCore(root=os.getcwd(),
-		line=cmd,visit=visit,
-		#! fix this
-		image='factory:centos7_user')
+	if not args: cmd,visit = '/bin/bash',True
+	else: cmd = feedback_args_to_command(*args,**kwargs)
+	image = recipe['image_name']
+	# the incoming site can have a hook
+	local_root = promise_run(recipe['site'])
+	# +++ assume we want the Volume.local method to mount this volume
+	# we connect the spot from the recipe to the root for container volume
+	volume = dict(root=local_root)
+	ReplicateCore(line=cmd,visit=visit,volume=volume,image=image)
 
 def docker_shell(recipe,*args):
 	cmd = ' '.join(args)

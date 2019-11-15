@@ -1,0 +1,8 @@
+spot: !!python/object/apply:lib.macos.MacosImager
+  kwds:
+    name: root
+    mount: ./nix
+    path: ./nix.dmg.sparseimage
+    size: 10g
+    sparse: true
+    fs: hfsx

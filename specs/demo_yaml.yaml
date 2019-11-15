@@ -18,6 +18,8 @@ doc: |
   This is not possible with yaml which is executed recursively.
 
 this: !!python/object/apply:lib.generic.example_yaml_function
+  # this works for classes and functions
+  # note that class __init__ must return None
   kwds: 
     a: 'b'
   args: [1, 2, 3]

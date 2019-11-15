@@ -157,7 +157,7 @@ class Interface(Parser):
                 for route,val in ortho.catalog(spec)) 
             # note that we could add some kind of protection here
             if tagged:
-                print('status found a spec with YAML tags')
+                print('status found a spec with YAML tags at %s'%what)
                 spec = yaml.load(text,Loader=yaml.Loader)
                 if debug: 
                     #! cleaner option is needed here

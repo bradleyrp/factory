@@ -1,0 +1,36 @@
+image_name: &image_name factory:centos7_user
+command: docker-compose run --service-ports deploy
+site: !spots root
+compose:
+  version: '3'
+  services:
+    deploy:
+      entrypoint: ['/bin/bash','-l']
+      build: .
+      image: *image_name
+      volumes: []
+dockerfile:
+  raw: |
+    # section: centos7
+    FROM centos:centos7
+    # section: centos7_dev
+    RUN yum update -y
+    RUN yum groupinstall -y 'Development Tools'
+    RUN yum install -y wget
+    RUN yum install -y which
+    RUN yum install -y vim
+    RUN yum install -y git
+    RUN yum install -y make
+    RUN yum install -y screen
+    RUN yum install -y bzip2
+    RUN yum install -y zlib-devel
+    RUN mkdir -p /opt
+    WORKDIR /opt
+    # section: make_user
+    RUN getent group 100 > /dev/null 2>&1 || (groupmod -g 100 users)
+    RUN useradd -m -u 1000 -g 100 user
+    RUN echo 'user:secret' | chpasswd
+    RUN yum install -y sudo
+    RUN usermod -aG wheel user
+    USER user
+    WORKDIR /home/user
