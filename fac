@@ -24,6 +24,9 @@ fi
 
 # run within the full anaconda environment
 if [[ "$1" == "envrun" ]]; then
+   if [[ ! -f $PYENVCALL ]]; then 
+      echo "[ERROR] no conda environment" && exit 1;
+   fi
    # hardcoded path to miniconda
    source conda/etc/profile.d/conda.sh
    conda activate $(readlink .envcursor)
