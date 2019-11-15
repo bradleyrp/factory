@@ -118,17 +118,20 @@ def hook_watch(*args_out,**kwargs):
 			for arg in args_out:
 				# identify arguments that are both in the hook argument list
 				#   and also are arguments accepted by the function
-				if arg in kwargs and (arg in introspect['args'] or arg in introspect['kwargs']):
+				if arg in kwargs and (arg in introspect['args'] 
+					or arg in introspect['kwargs']):
 					# get the "real" answer to the hook query
 					# note that we strip the @-syntax
 					value = kwargs[arg]
-					result = read_config(hook=value,strict=strict).get(value,value)
+					result = read_config(hook=value,
+						strict=strict).get(value,value)
 					kwargs[arg] = result
 			# run the function and return
 			finding = function(self,**kwargs)
 			return finding
-		# we attach the original introspection for the Handler, which needs this
-		#   to decide how to route the arguments from the constructor to the method
+		# we attach the original introspection for the Handler, which needs
+		#   this to decide how to route the arguments from the constructor
+		#   to the method
 		decorator._introspected = introspect
 		return decorator
 	return wrapper
@@ -218,8 +221,8 @@ class ReplicatorGuide(Handler):
 			for service in compose['services']:
 				if 'container_name' in compose['services']:
 					raise Exception(('received cname from the command line but '
-						'the service "%s" already has a container named %s and we '
-						'refuse to override this')%(service,
+						'the service "%s" already has a container named %s '
+						'and we refuse to override this')%(service,
 						compose['services']['container_name']))
 				else: compose['services'][service]['container_name'] = cname
 		compose_fn = os.path.join(spot.path,'docker-compose.yml')
@@ -299,7 +302,9 @@ class ReplicatorGuide(Handler):
 		else: raise Exception('error in resolving "via" path')
 		fname = self._classify(*self.meta['complete'][first].keys())
 		if fname=='via': 
-			raise Exception('eldest parent of this "via" graph needs a parent: %s'%str(paths_this))
+			raise Exception(
+				'eldest parent of this "via" graph needs a parent: %s'%str(
+					paths_this))
 		outgoing = copy.deepcopy(self.meta['complete'][first])
 		for stage in paths_this[1:]:
 			outgoing.update(**copy.deepcopy(self.meta['complete'][stage].get('overrides',{})))
@@ -339,4 +344,5 @@ def get_jupyter_token(container):
 	matched = re.findall(r':(\d+)/\?token=(.*?)\s',result['stdout'])
 	if len(matched)==1: raise Exception('cannot locate the token')
 	port,token = int(matched[-1][0]),matched[-1][1]
-	print('status notebook is available at http://localhost:%d/?token=%s'%(port,token))
+	print('status notebook is available at http://localhost:%d/?token=%s'%(
+		port,token))
