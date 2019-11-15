@@ -1,5 +1,6 @@
 # This is the standard ("std") environment we install in the factory.
 # note that reqs_std_md_extra.yaml should inherit from here
+# everything here should be osx/linux compatible
 name: dev
 dependencies:
   - pyyaml
@@ -15,8 +16,7 @@ dependencies:
   - matplotlib
   - au-eoed::gnu-parallel 
   - h5py
-  # clojure currently failing because jdk is too new on macbook
-  - asmeurer::leiningen
+  - dan_blanchard::leiningen
   - git
   # api
   - conda-forge::nodejs
