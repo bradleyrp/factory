@@ -398,7 +398,7 @@ class Parser:
                         r'^(.+)\.(.*?)$',target).groups()
                     self.specials[name] = importer(mod_target)[func_name]
                 except: raise Exception('cannot import %s from %s'%(
-                    mod_target,func_name))
+                    func_name,mod_target))
         collide_special = [i for i in self.specials if i in subcommand_names]
         if any(collide_special):
             raise Exception(
