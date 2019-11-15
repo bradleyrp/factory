@@ -17,14 +17,18 @@ def introspect_function(func,**kwargs):
 	if kwargs: raise Exception('kwargs: %s'%kwargs)
 	# getargspec will be deprecated by Python 3.6
 	if sys.version_info<(3,3): 
-		if check_varargs: raise Exception(
-			'variable argument checking not implemented in old python')
 		if isinstance(func,str_types): raise Exception(messsage)
 		args,varargs,varkw,defaults = inspect.getargspec(func)
+		# python 2 includes self in this list
 		if defaults: 
 			std,var = args[:-len(defaults)],args[-len(defaults):]
-			packed = dict(args=tuple(std),kwargs=dict(zip(var,defaults)))
-		else: packed = dict(args=tuple(args),kwargs={})
+			packed = dict(args=tuple([i for i in std if i!='self']),
+				kwargs=dict(zip(var,defaults)))
+		else: 
+			packed = dict(kwargs={},
+				args=tuple([i for i in args if i!='self']))
+		if check_varargs and varargs: packed['*'] = varargs
+		if varkw: packed['**'] = varkw
 		return packed
 	else:
 		#! might need to validate this section for python 3 properly
@@ -37,7 +41,10 @@ def introspect_function(func,**kwargs):
 		#! probably only one double star is allowed anyway so list is confusing
 		double_star = [i for i in sig.parameters 
 			if str(sig.parameters[i]).startswith('**')]
-		if double_star: packed['**'] = double_star
+		if len(double_star)>1:
+			raise Exception('unexpected number of double stars: %s'%
+				str(double_star))
+		if double_star: packed['**'] = double_star[0]
 		if check_varargs:
 			varargs = inspect.getfullargspec(func).varargs
 			if varargs: packed['*'] = varargs
@@ -128,17 +135,19 @@ class Handler(object):
 		for key in methods:
 			if hasattr(methods[key],'_introspected'): 
 				expected[key] = methods[key]._introspected
-		#! this is not useful in python 3 because the self argument is 
-		#!   presumably ignored by the introspection
-		if sys.version_info<(3,0):
-			for name,expect in expected.items():
-				if 'self' not in expect['args']:
-					print('debug expect=%s'%expect)
-					raise Exception('function "%s" lacks the self argument'%
-						name)
+		#! fixed this in instrospect above for consistency
+		if 0:
+			#! this is not useful in python 3 because the self argument is 
+			#!   presumably ignored by the introspection
+			if sys.version_info<(3,0):
+				for name,expect in expected.items():
+					if 'self' not in expect['args']:
+						print('debug expect=%s'%expect)
+						raise Exception('function "%s" lacks the self argument'%
+							name)
 		# convert to a typical taxonomy structure
 		self._taxonomy = dict([(name,{
-			'base':set(expect['args'])-set(['self']),
+			'base':set(expect['args']),
 			'opts':set(expect['kwargs'].keys())
 			}) for name,expect in expected.items()
 			if not name.startswith('_')])
@@ -148,9 +157,8 @@ class Handler(object):
 		to accept any arbitrary keyword arguments, as is the 
 		"""
 		for key in self._taxonomy:
-			if ('kwargs' in self._taxonomy[key]['base'] 
-				and 'kwargs' in expected[key].get('**',[])):
-				self._taxonomy[key]['base'].remove('kwargs')
+			double_stars = expected[key].get('**',None)
+			if double_stars: 
 				self._taxonomy[key]['kwargs'] = True
 		# check for a single default handler that only accespts **kwargs
 		defaults = [i for i,j in self._taxonomy.items() 
