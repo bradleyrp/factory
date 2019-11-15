@@ -91,12 +91,20 @@ class MakeUse(Handler):
             ortho.delveset(ortho.conf,*route,value=val)
         ortho.write_config(ortho.conf)
 
+def spot_cli(cmd,**kwargs):
+    """
+    Manage "spots" in the config. A spot is a place on disk, possibly an image.
+    """
+    #! test with make spot new name=local/root
+    import ipdb;ipdb.set_trace()
+
 class Interface(Parser):
     """
     A single call to this interface.
     """
     # cli extensions add functions to the interface automatically
     subcommander = ortho.conf.get('cli_extensions',{})
+    subcommander['spot'] = 'cli.spot_cli'
     _extrana = """
     Note that this interface works with fac to accept pipes and pick python:
         echo "import sys;print(sys.version_info);sys.exit(0)" | \
@@ -250,6 +258,15 @@ class Interface(Parser):
         # compose the RunScript in the FileNameSubSelector pattern
         class This(FileNameSubSelector): Target = RunScript
         This(file=file,name=name,spot=spot)
+
+    def venv(self,spot,what):
+        """
+        Manage a virtual environment.
+        """
+        spot_detail = ortho.conf.get('spots',{}).get(spot,None)
+        if not spot_detail:
+            raise Exception('spot %s is not registered'%spot)
+        import ipdb;ipdb.set_trace()
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface
