@@ -8,7 +8,7 @@ so that you can execute different commands inside of alternate environments.
 import sys,os
 import ortho
 from ortho.replicator.replicator_dev import ReplicateCore
-from ortho.replicator.replicator import replicator_read_yaml,many_files
+#! from ortho.replicator.replicator import replicator_read_yaml,many_files
 from ortho import path_resolver
 
 def feedback_args_to_command(*args,**kwargs):
@@ -21,11 +21,12 @@ def feedback_args_to_command(*args,**kwargs):
 	if kwargs: cmd += ' '+' '.join(['%s=%s'%(i,j) for i,j in kwargs.items()])
 	return cmd
 
-def docker(recipe,visit=False,*args,**kwargs):
+def docker(recipe,*args,**kwargs):
 	"""
 	Run anything in a docker using `ReplicatorCore`.
 	make docker spot=./here script specs/demo_script.yaml delay
 	"""
+	visit = kwargs.pop('visit',False)
 	#! need better hook-ups
 	if 0:
 		sources = many_files(ortho.conf['replicator_recipes'])

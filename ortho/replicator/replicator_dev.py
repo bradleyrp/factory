@@ -6,11 +6,11 @@ Rebuild a replicator feature to replace ortho.replicator, specifically `repl`.
 """
 
 import os,re,tempfile,subprocess,string
-import yaml
+#! import yaml removed for python 2 compatibility
 #! refer to ortho by name for top-level imports simplified by init?
 from ..bash import bash
 from ..dictionary import DotDict
-from ..yaml_mods import YAMLObjectInit
+#! removing this for compatibility: from ..yaml_mods import YAMLObjectInit
 from ..handler import Handler
 from ..requires import requires_program,is_terminal_command
 from ..misc import path_resolver
@@ -126,7 +126,7 @@ class DockerExecution(Handler):
 					hashbang_path)
 		# fix quotes
 		contents_safe = re.sub('"','\\"',contents.strip('\n'))
-		return dict(line='"%s"'%contents_safe,kind='line')
+		return dict(line='%s'%contents_safe,kind='line')
 	def script(self,script):
 		"""Scripts pass through to the function that calls docker."""
 		return dict(script=script,kind='script')
@@ -217,7 +217,7 @@ class ReplicateCore(Handler):
 				raise Exception('visit requires line')
 			cmd += ' '+self.do['line']
 		elif self.do['kind']=='line':
-			cmd += ' /bin/sh -c %s'%self.do['line']
+			cmd += ' /bin/sh -c "%s"'%self.do['line']
 		# case B: write a script
 		elif self.do['kind']=='script': pass
 		else: raise Exception('dev')
@@ -235,6 +235,7 @@ class ReplicateCore(Handler):
 		# we require a TTY to enter the container so we use os.system
 		elif visit:
 			# possible security issue
+			print('status running docker: %s'%cmd)
 			os.system(cmd)
 		# standard execution
 		else: bash(cmd,scroll=True if not visit else False,v=True)
@@ -333,8 +334,10 @@ class ReplicateCore(Handler):
 		print('status executing temporary script: %s'%tmp_fn)
 		bash('bash %s'%tmp_fn,v=True,cwd=spot)
 
+''' python 2 compatibility
 class Replicate(YAMLObjectInit):
 	"""Wrap a handler with a yaml recipe."""
 	yaml_tag = '!replicate'
 	def __init__(self,**kwargs):
 		self.out = ReplicateCore(**kwargs).solve
+'''
