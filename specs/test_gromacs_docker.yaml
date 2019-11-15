@@ -2,12 +2,14 @@ _: !!python/module:ortho.replicator.replicator_dev
 #! no multiple recipe feature yet
 
 t01: !replicate
-  docker_container: factory:cc00
+  docker_container: factory:centos7_user
   docker_volume: t01-factory-tests-a01
   #! had to kickstart this with: docker run -it -v t01-factory-tests:/home/user/outside factory:cc00 bash ; cd ~/outside ; sudo chown user:users . -R
   script: |
     #!/bin/bash
     set -e
+    uname -a
+    exit
     #! make the root programmatic
     ROOT=/home/user/outside
     cd $ROOT

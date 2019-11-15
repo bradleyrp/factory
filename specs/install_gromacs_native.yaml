@@ -2,22 +2,38 @@ _: !!python/module:ortho.replicator.replicator_dev
 _: !replicate
   screen: install-gromacs
   spot: local
+  specs:
+    spack_env_spec: 
+      spack:
+        concretization: separately
+        mirrors: {}
+        repos: []
+        upstreams: {}
+        modules:
+          enable: []
+        definitions: []
+        packages: {}
+        config: 
+          checksum: false
+        specs: ['gromacs@2019.3%gcc@6.4.0']
+        view: false
   script: |
     #!/bin/bash
     set -e
+    # staged here
     export here=$PWD
     export ROOT=%(spot)s
     cd $ROOT
     if [ ! -d spack ]; then git clone http://github.com/spack/spack; fi
-    mkdir -p env
-    cd env
+    mkdir -p env_gromacs
+    cd env_gromacs
     echo -e '#!/bin/bash\n'"source $ROOT/spack/share/spack/setup-env.sh" > go.sh
     source go.sh
-    echo "spack: {concretization: separately, mirrors: {}, repos: [], upstreams: {}, modules: {enable: []}, definitions: [], packages: {}, config: {checksum: false}, specs: ['gromacs@2019.3'], view: false}" > spack.yaml
+    cp $spack_env_spec spack.yaml
     spack concretize -f
     # bootstrap for environment-modules
     time spack bootstrap
-    time spack install --no-checksum
+    #! time spack install --no-checksum
     # return to the factory to register this, and the conda environment
     cd $here
     # hardcoding the environment sourcing
@@ -26,5 +42,5 @@ _: !replicate
     echo -e "source $(spack location -i gromacs@2019.3)/bin/GMXRC.bash" >> $ROOT/env_gromacs_std.sh
     echo -e "source $PWD/conda/bin/activate conda/envs/std" >> $ROOT/env_gromacs_std.sh
     # cleanup
-    sleep 3
+    sleep 2
     rm -f screen-install-gromacs.*

@@ -335,3 +335,7 @@ def compare_dicts(a,b):
 	"""Compare dictionaries with unicode strings."""
 	#! used when you need strings to come out
 	return lowest_common_dict_denominator(a)==lowest_common_dict_denominator(b)
+
+def path_resolver(path):
+	"""Resolve paths allowing for home and absolute paths."""
+	return os.path.realpath(os.path.expanduser(os.path.abspath(path)))

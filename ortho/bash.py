@@ -51,6 +51,7 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 	Run a bash command.
 	Development note: tee functionality would be useful however you cannot use pipes with subprocess here.
 	Vital note: log is relative to the current location and not the cwd.
+	Note that this cannot produce a TTY so it is not useful for running interactive docker.
 	"""
 	announce = announce or v
 	if announce: 
@@ -215,12 +216,10 @@ def bash_basic(cmd,cwd,log=None):
 		bash(command=cmd_tee,cwd=cwd)
 	else: os.system('cd %s && %s'%(cwd,cmd))
 
-#! via community-collections
-def shell_script(script, subshell=None, bin='bash', strict=True):
+def shell_script(script, subshell=None, bin='bash', log=None):
     """Run an anonymous bash script."""
-    # strict is not connected
-    if not subshell:
-        subshell = lambda x: x
+    # this function originally published with community-collections
+    if not subshell: subshell = lambda x: x
     out = script.strip()
     print('status executing the following script')
     print('\n'.join(['| '+i for i in out.splitlines()]))
@@ -228,8 +227,12 @@ def shell_script(script, subshell=None, bin='bash', strict=True):
         fp.write(out.encode())
         fp.close()
     try:
-        bash(subshell('%s %s' % (bin, fp.name)))
+        # log is safe for installing Miniconda on python 2 else encoding error
+        if log: kwargs = dict(log=log,scroll=False)
+        else: kwargs = {}
+        bash(subshell('%s %s' % (bin, fp.name)),**kwargs)
     except Exception as e:
+        if log: print('status see log for error: %s'%log)
         tracebacker(e)
         return False
     else:

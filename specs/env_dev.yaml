@@ -17,6 +17,11 @@ dependencies:
   - h5py
   # clojure currently failing because jdk is too new on macbook
   - asmeurer::leiningen
+  - git
+  # api
+  - conda-forge::nodejs
+  - flask
+  - pipenv
   - pip: 
     # documentation tools
     - sphinx
@@ -27,3 +32,5 @@ dependencies:
     # math
     - numpy
     - scipy
+    # api
+    - connexion[swagger-ui]

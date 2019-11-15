@@ -1,0 +1,3 @@
+config:
+  cli_extensions:
+    spack: lib.spack.spack_tree

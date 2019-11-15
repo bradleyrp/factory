@@ -68,8 +68,9 @@ def config_hook_get(hook,default):
 	conf = read_config(hook=hook,strict=False)
 	return conf.get(hook,default)
 	
-def write_config(config,source=None):
+def write_config(config=None,source=None):
 	"""Write the configuration."""
+	if not config: config = conf
 	global config_fn
 	check_ready()
 	with open(source if source else config_fn,'w') as fp:

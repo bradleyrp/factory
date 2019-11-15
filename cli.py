@@ -16,12 +16,8 @@ from ortho import Parser,StateDict
 from ortho import requires_python,requires_python_check
 from ortho import conf,treeview
 from ortho import Handler
+from ortho import tracebacker
 from ortho.installers import install_miniconda
-
-# manage the state
-#! how does this work? test it.
-global_debug = True
-state = StateDict(debug=global_debug)
 
 def update_factory_env_cursor(spot):
     """
@@ -30,10 +26,6 @@ def update_factory_env_cursor(spot):
     if os.path.islink('.envcursor'): 
         os.unlink('.envcursor')
     os.symlink(spot,'.envcursor')
-
-def cache_closer(self):
-    """Hook before writing the cache."""
-    pass
 
 class Conda(Handler):
     """
@@ -83,16 +75,30 @@ class Action(Handler):
         #! highly dangerous. unprotected execution!
         #!   consider using the replicator instead?
         exec(script)
+    def command(self,command,**kwargs):
+        import ipdb;ipdb.set_trace()
+
+class MakeUse(Handler):
+    def update_config(self,config):
+        """Alter the local config."""
+        # unroll the config so we merge without overwrites
+        #   otherwise repeated `make use` would override not accumulate changes
+        unrolled = ortho.catalog(config)
+        for route,val in unrolled:
+            ortho.delveset(ortho.conf,*route,value=val)
+        ortho.write_config(ortho.conf)
 
 class Interface(Parser):
     """
     A single call to this interface.
     """
-    # we are not using the Cacher interface at this point, only Parser
+    # cli extensions add functions to the interface automatically
+    subcommander = ortho.conf.get('cli_extensions',{})
 
     def _try_except(self,exception): 
         # include this function to throw legitimate errors
-        raise exception
+        tracebacker(exception)
+        #! previously: `raise exception` but this caused repeats
 
     def _get_settings(self):
         import yaml
@@ -107,6 +113,7 @@ class Interface(Parser):
 
     def conda(self,file):
         """Update or install a conda environment."""
+        #? consider adding this to `make do` via yaml tag
         Conda(file=file).solve
 
     def update_conda(self):
@@ -149,12 +156,14 @@ class Interface(Parser):
                 spec = yaml.load(text,Loader=yaml.Loader)
                 if debug: 
                     #! cleaner option is needed here
+                    #! only works with ./fac --debug
                     import ipdb;ipdb.set_trace()
                     #! fix this. rescue self.debug()
                 print('status finished with YAML spec')
             # standard execution
             else: 
                 spec = yaml.load(text,Loader=yaml.Loader)
+                #! previously tried to add **kwargs from do to spec['kwargs']
                 Action(**spec).solve
         else: raise Exception('unclear what: %s'%what)
 
@@ -205,6 +214,34 @@ class Interface(Parser):
         """Create a simulation from a remote automacs."""
         #! remote automacs location is hardcoded now
         bash('make -C ../automacs tether %s'%os.path.abspath(path))
+
+    def repl(self,name,rebuild=False):
+        """Connect to ortho.replicator."""
+        #! this will be superceded by `make docker` from lib.replicator
+        print('status calling ortho.replicator')
+        args = [name]
+        if rebuild: args += ['rebuild']
+        ortho.replicator.repl(*args)
+
+    def use(self,what):
+        """Update the config with a prepared set of changes."""
+        requires_python_check('yaml')
+        import yaml
+        if os.path.isfile(what):
+            with open(what) as fp: text = fp.read()
+            changes = yaml.load(text,Loader=yaml.SafeLoader)
+            MakeUse(**changes).solve
+        else: raise Exception('unclear what: %s'%what)
+
+    def script(self,file,name,spot=None):
+        """
+        Run a script with the file/name pattern.
+        """
+        from lib.generic import FileNameSubSelector
+        from lib.generic import RunScript
+        # compose the RunScript in the FileNameSubSelector pattern
+        class This(FileNameSubSelector): Target = RunScript
+        This(file=file,name=name,spot=spot)
 
 if __name__ == '__main__':
     # the ./fac script calls cli.py to make the interface

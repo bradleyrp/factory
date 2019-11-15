@@ -1,8 +1,6 @@
-_: !!python/module:lib.spack
-#! move the sync somewhere else
+_: !!python/module:lib.generic
 automacs: !ortho_sync
   spack:
     spot: "./automacs"
     address: https://github.com/bradleyrp/automacs
     branch: ortho_clean
-

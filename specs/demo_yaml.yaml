@@ -1,0 +1,29 @@
+
+doc: |
+  This yaml file demonstrates the use of yaml tags.
+  You can either call a function or create a class.
+  Note that apply serializer has specific keys.
+  See https://pyyaml.org/wiki/PyYAMLDocumentation for details.
+  To use example_yaml_class you must import the module in parent scope.
+  The class instance and function returns are ignored by `cli.Interface.do`.
+  This means that you must perform the action on class construction.
+  And this means that the function return value is not useful.
+  See lib/generic.py for the code that this file runs.
+  The key feature for this is an inversion whereby side-effects are the point.
+  The YAML file itself is only a means to following the tags.
+  Note that this file can be tested with `make do specs/demo_yaml.yaml`.
+  Everything in the file is executed.
+  See `make spack_tree specs/spack_tree.yaml <name>` for an alternative.
+  The alternative is to select part of the file to run.
+  This is not possible with yaml which is executed recursively.
+
+this: !!python/object/apply:lib.generic.example_yaml_function
+  kwds: 
+    a: 'b'
+  args: [1, 2, 3]
+  # keys not outlined in the docs are ignored
+  key: ignored 
+
+require: !!python/module:lib.generic 
+a: !example_yaml_class 
+  argument: value
