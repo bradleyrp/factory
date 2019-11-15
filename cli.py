@@ -39,7 +39,9 @@ class Conda(Handler):
         spot = os.path.realpath(ortho.conf.get('miniconda_root','./conda'))
         # +++ assume if spot exists and is directory then conda is installed
         if not os.path.isdir(spot):
-            return install_miniconda(spot)
+            install_miniconda(spot)
+        return spot
+
     def make(self,file=None):
         """
         Make a conda environment.
@@ -47,9 +49,10 @@ class Conda(Handler):
         if not os.path.isfile(file):
             raise Exception('cannot find %s'%file)
         print('status checking for miniconda')
-        self._install_check()
+        install_dn = self._install_check()
         print('status updating environment from %s'%file)
-        bash('conda/bin/conda env update --file %s'%file,announce=True)
+        bash('%s env update --file %s'%(os.path.join(install_dn,'bin/conda'),
+            file),announce=True)
         # get the prefix for the file to update the cursor
         with open(file) as fp: reqs = fp.read()
         # get the name with a regex
@@ -57,7 +60,7 @@ class Conda(Handler):
         if len(name)!=1: raise Exception('cannot identify a name in %s'%file)
         else: name = name[0]
         # +++ assume name is the install location in conda/envs
-        env_spot = os.path.join(os.getcwd(),'conda','envs',name)
+        env_spot = os.path.join(install_dn,'envs',name)
         update_factory_env_cursor(env_spot)
 
 class Action(Handler):

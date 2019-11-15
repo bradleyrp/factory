@@ -7,8 +7,8 @@ so that you can execute different commands inside of alternate environments.
 
 import sys,os
 import ortho
-from ortho.replicator.replicator_dev import ReplicateCore,RecipeRead
-from ortho.replicator.replicator_dev import promise_run
+from ortho.replicator.replicator_dev import ReplicateCore
+from ortho.replicator.replicator_dev import RecipeRead
 #! from ortho.replicator.replicator import replicator_read_yaml,many_files
 from ortho import path_resolver
 
@@ -30,20 +30,9 @@ def docker(recipe,*args,**kwargs):
 	make docker spot=./here script specs/demo_script.yaml delay
 	"""
 	visit = kwargs.pop('visit',False)
-	#! need better hook-ups
-	if 0:
-		sources = many_files(ortho.conf['replicator_recipes'])
-		this_test = replicator_read_yaml(name=recipe,sources=sources)
-		#! major hack we need to connect this somehow or systematize it
-		#! or just point to test_gromacs_docker.yaml instead?
-		docker_container = this_test['meta']['complete'][recipe][
-			'compose']['services']['deploy']['image']
-		docker_volume = 't01-factory-tests-a01'
-		ReplicateCore(script=cmd,docker_container=docker_container,
-			docker_volume=docker_volume)
 
 	# STEP A: get the recipe
-	#! intervene here with a basic default recipe if no yaml
+	#! intervene here with a basic default recipe if no yaml?
 	# a path to a recipe file skips all of the gathering
 	if os.path.isfile(recipe):
 		# test: make docker specs/recipes/basics_redev.yaml
@@ -55,14 +44,10 @@ def docker(recipe,*args,**kwargs):
 	if not args: cmd,visit = '/bin/bash',True
 	else: cmd = feedback_args_to_command(*args,**kwargs)
 	image = recipe['image_name']
-	# the incoming site can have a hook
-	local_root = promise_run(recipe['site'])
-	# +++ assume we want the Volume.local method to mount this volume
-	# we connect the spot from the recipe to the root for container volume
-	volume = dict(root=local_root)
-	ReplicateCore(line=cmd,visit=visit,volume=volume,image=image)
+	ReplicateCore(line=cmd,visit=visit,volume=recipe['site'],image=image)
 
 def docker_shell(recipe,*args):
+	raise Exception('dev')
 	cmd = ' '.join(args)
 	ReplicateCore(root=os.getcwd(),
 		line=cmd,visit=False,

@@ -15,20 +15,6 @@ from ..requires import requires_python_check
 from ..misc import path_resolver
 from .templates import screen_maker
 
-class HookPromise:
-	"""Run a hook later."""
-	def __init__(self,hook,**kwargs):
-		#! check for handler type and return solve?
-		self.kwargs = kwargs
-		self.hook = hook
-	def run(self):
-		return self.hook(**self.kwargs)
-
-def promise_run(this):
-	if this.__class__.__name__=='HookPromise':
-		return this.run()
-	else: return this
-
 def mount_macos(dmg,mount):
 	"""
 	Mount an image in macos.
@@ -39,18 +25,27 @@ def mount_macos(dmg,mount):
 	return mount
 
 class SpotPath(Handler):
+	"""
+	Handle a path for docker.
+	"""
 	def macos_mount(self,dmg,mount):
 		"""
 		Mount a dmg file.
 		This interpreter takes a spot from the config created 
 		by lib.macos.MacosImager and passes along a hook for mounting.
 		"""
-		return HookPromise(hook=mount_macos,dmg=dmg,mount=mount)
+		mount_macos(dmg,mount)
+		return dict(fs='dmg',path=mount)
+	def local(local): 
+		"""
+		Default local path to a spot.
+		"""
+		return dict(path=local)
 
 def constructor_site_hook(loader,node):
 	"""
 	Use this as a constructor for the `!spots` yaml tag to get an alternate
-	location for running something.
+	location for running something. Works with SpotPath and sends to Volume.
 	"""
 	name = loader.construct_scalar(node)
 	# process the site
@@ -59,20 +54,16 @@ def constructor_site_hook(loader,node):
 	if name in spots:
 		return SpotPath(**spots[name]).solve
 	# the root keyword points to the local directory
-	elif name=='root': return './'
+	elif name=='root': return dict(local='./')
 	# pass through the name for a literal path
-	else: return name
+	else: return dict(local=name)
 
 class Volume(Handler):
 	"""
 	Handle external volumes for a replicator.
 	Note that this class is used by the Volume class exposed to yaml.
-	"""
-	"""
-	See docker volume "consistent" option which may be important for low-level
-	file operations and performance: 
+	For extra volume tuning see 'consistent' at: 
 		https://docs.docker.com/docker-for-mac/osxfs-caching/
-	Note that the cached/consistent/delegated flags can be used in mounts.
 	"""
 	def _check_darwin(self):
 		if sys.platform=='darwin':
@@ -93,10 +84,25 @@ class Volume(Handler):
 		args_out = ('-v %s:%%s'%docker)%'/home/user/outside'
 		return dict(name=docker,docker_args=args_out)
 
-	def local(self,root):
+	def _local(self,path):
+		path = path_resolver(path)
+		args_out = '-v %s:%s -w %s'%(path,path,path)
+		return dict(docker_args=args_out)
+
+	def local(self,path):
 		"""Add the current directory to the volume."""
 		self._check_darwin()
-		args_out = '-v %s:%s -w %s'%(root,root,root)
+		path = path_resolver(path)
+		args_out = '-v %s:%s -w %s'%(path,path,path)
+		return dict(docker_args=args_out)
+
+	def local_fs(self,path,fs):
+		# in this use case we mount an extra path as well as the pwd
+		#! this is designed for macos mounts with a non-root mount
+		if fs!='dmg': self._check_darwin()
+		path = path_resolver(path)
+		pwd = path_resolver(os.getcwd())
+		args_out = '-v %s:%s -v %s:%s -w %s'%(path,path,pwd,pwd,pwd)
 		return dict(docker_args=args_out)
 
 class DockerContainer(Handler):
@@ -178,45 +184,7 @@ class ReplicateCore(Handler):
 	"""
 	DEV: replacement for the replicator functions
 	"""
-	def docker_container_volume(self,
-		docker_container,docker_volume,**kwargs):
-		"""
-		Run a one-liner command in docker.
-		Not suitable for complex bash commands.
-		"""
-		#!!! retire this after re-factor below
-		# you cannot use decorators with Handler
-		is_terminal_command('docker')
-		# step 1: assemble the volume
-		self.spot = Volume(docker=docker_volume).solve
-		if self.spot.get('args',None):
-			docker_args = self.spot['args']%'/home/user/outside'+' '
-		else: docker_args = ''
-		# step 2: locate the container
-		self.container = DockerContainer(name=docker_container).solve
-		# step 3: prepare the content of the execution
-		#! keep the '-i' flag?
-		cmd = 'docker run -u 0 -i %s%s'%(docker_args,self.container)
-		self.do = DockerExecution(**kwargs).solve
-		# case A: one-liner
-		if self.do['kind']=='line':
-			cmd += ' /bin/sh -c %s'%self.do['line']
-		# case B: write a script
-		elif self.do['kind']=='script': pass
-		else: raise Exception('dev')
-		# step 4: execute the docker run command
-		#! announcement for the script is clumsy because of newlines and
-		#!   escaped characters
-		# script execution via stdin to docker
-		if self.do['kind']=='script':
-			script = self.do['script']
-			print('status script:\n'+str(script))
-			print('status command: %s'%cmd)
-			proc = subprocess.Popen(cmd.split(),stdin=subprocess.PIPE)
-			proc.communicate(script.encode())
-		# standard execution
-		else: bash(cmd,scroll=True,v=True)
-	
+
 	def _docker(self,image,volume={},visit=False,**kwargs):
 		"""
 		Run a one-liner command in docker.

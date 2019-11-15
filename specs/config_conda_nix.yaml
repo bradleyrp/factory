@@ -1,0 +1,2 @@
+config:
+  miniconda_root: ./nix/conda
