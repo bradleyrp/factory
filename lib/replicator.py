@@ -16,7 +16,9 @@ def feedback_args_to_command(*args,**kwargs):
 	Convert arguments back into a command which is composed with a replicator.
 	"""
 	here = os.getcwd()
-	cmd = "make -C %s "%here+' '.join(args)
+	#cmd = "make -C %s "%here+' '.join(args)
+	#! fac has no path variable
+	cmd = "cd %s "%here + "&& ./fac "+' '.join(args)
 	# note that we use the make syntax here rather than ./fac
 	if kwargs: cmd += ' '+' '.join(['%s=%s'%(i,j) for i,j in kwargs.items()])
 	return cmd
@@ -47,6 +49,13 @@ def docker(recipe,*args,**kwargs):
 		cmd = feedback_args_to_command(*args,**kwargs)
 	ReplicateCore(root=os.getcwd(),
 		line=cmd,visit=visit,
+		#! fix this
+		image='factory:centos7_user')
+
+def docker_shell(recipe,*args):
+	cmd = ' '.join(args)
+	ReplicateCore(root=os.getcwd(),
+		line=cmd,visit=False,
 		#! fix this
 		image='factory:centos7_user')
 
