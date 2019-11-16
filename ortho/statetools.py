@@ -210,14 +210,9 @@ class Parser:
 		Parser is a singleton. Note that you still cannot use --key val with
 		make but otherwise the make and direct syntax are identical.
 		"""
-		self.interface_script = sys.argv[0]
-		self._via_makeface = False
 		regex_alt = '^(?:--)?(.+)=(.+)$'
 		revised = []
-		for ii,item in enumerate(sys.argv):
-			if ii==1: 
-				self._via_makeface = item=='_via_makeface'
-				continue
+		for item in sys.argv:
 			match = re.match(regex_alt,item)
 			if match:
 				revised.append('--%s'%match.group(1))
@@ -281,10 +276,10 @@ class Parser:
 					(arg,int(val)))
 			else:
 				# development error if you use an invalid type in a parser
-				raise Exception((
-					'cannot automatically make a parser '
-					'from argument to "%s": "%s" (default "%s")')%(
-					name,arg,str(val)))
+				raise Exception(
+					('cannot automatically make a parser '
+					 'from argument to "%s": "%s" (default "%s")')%(
+					 name,arg,str(val)))
 		# set the function
 		sub.set_defaults(func=func)
 
@@ -346,7 +341,11 @@ class Parser:
 		# keyword booleans
 		for ind_bool in inds_kwargs_bool:
 			arg = unknown[ind_bool[0]]
-			# only allow true for booleans without the --no-key method yet
+			#! see sub.print_help() for why these fail
+			if 0:
+				sub.add_argument('--%s'%arg,action='store_true')
+				sub.add_argument('--no-%s'%arg,action='store_false')
+			#! no ability to do the --no-X thing yet
 			sub.add_argument(arg,action='store_true')
 		# set the function name
 		sub.set_defaults(func=func)
@@ -411,8 +410,6 @@ class Parser:
 				sub = self.subparsers.add_parser(name,**detail)
 				self.free_functions.append(name)
 			else: self._function_to_subcommand(name)
-		#! this would be the position to interpret a 'key' flag as key=True
-		#!   for example, to implement: `make nuke sure`
 		# divert free functions here (note sys.argv[0]=='cli.py')
 		if len(sys.argv)>1 and sys.argv[1] in self.free_functions:
 			self._call_free_function()

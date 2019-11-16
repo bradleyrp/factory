@@ -12,7 +12,7 @@ CMD_TAIL=$(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS))
 # first arguments are routed to ./fac
 $(word 1,$(RUN_ARGS)):
 	echo "[STATUS] make will run: ./fac $@ $(CMD_TAIL) $(MAKEFLAGS_OUT)"
-	./fac _via_makeface $@ $(CMD_TAIL) ${MAKEFLAGS_OUT}
+	./fac $@ $(CMD_TAIL) ${MAKEFLAGS_OUT}
 # tailing arguments are not valid targets
 $(wordlist 2,$(words $(RUN_ARGS)),$(RUN_ARGS)):
 # always execute
