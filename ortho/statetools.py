@@ -173,9 +173,7 @@ class Cacher(object):
                 else:
                     # raise Exception('invalid policy %s' % policy)
                     raise Exception('invalid policy')
-
         return CachedClass
-
 
 def logger(cache):
     """Decorator for updating the cache when a function runs."""
@@ -198,7 +196,6 @@ def logger(cache):
             return result
         return logger
     return intermediate
-
 
 class Parser:
     """
@@ -306,64 +303,68 @@ class Parser:
         This function recovers the ortho.cli functionality.
         """
         print("status calling a function with arbitrary arguments")
-        #! could we allow functions to mark themselves for this feature?
-        #!   with a decorator or possibly automatically detect it?
         call_script,name,tail = sys.argv[0],sys.argv[1],sys.argv[2:]
-        if call_script!='cli.py': raise Exception('arrived here from unknown')
+        #!!! disabled during testing:
+        #!!!   if call_script!='cli.py': 
+        #!!!    raise Exception('arrived here from unknown')
         func = self._get_function(name)
         # we inspect the function again but we could have saved it earlier
         inspected = introspect_function(func,check_varargs=True)
-        # add this free function to the subparsers to prevent a known_args error
-        detail = {}
         if hasattr(func,'__doc__') and '-h' in sys.argv:
             print('status instructions follow:\n')
             print('\n'.join(['  %s'%i for i in func.__doc__.splitlines()]))
         sub = self.subparsers.add_parser(name)
-        # leave early if we are looking for help otherwise confusing usage notes
-        if '-h' in sys.argv: return
+        #! sub.add_argument('subcommand')
+        # leave early if we are looking for help to prevent confusing notes
+        #!!! if '-h' in sys.argv: return
+        # build the parser from the args: this trick allows arbitrary args
         known_args,unknown = self.parser.parse_known_args()
-        # example call: ./fac function arg0 arg1 --key1 val1 --key2 val2
-        unknown_paired = []
-        # pair the keys and values before loading them into the parser
-        for ii in range(len(unknown)):
-            item = unknown[ii]
-            if item.startswith(("-","--")) and ii==len(unknown)-1:
-                import ipdb;ipdb.set_trace()
-                raise Exception('keyword at the end: %s'%str(unknown))
-            elif ii>0 and unknown[ii-1].startswith(("-","--")): 
-                if item.startswith(("-","--")):
-                    raise Exception('repeated keywords with no values: %s'%
-                        str(unknown))
-                unknown_paired.append((unknown[ii-1],item))
-            elif item.startswith(("-","--")): pass
-            else: unknown_paired.append((item,None))
-        # if the function expects variable arguments we collapse all arguments
-        if inspected.get('*') and any([j==None for i,j in unknown_paired]):
+        obs_known_args = vars(known_args)
+        if obs_known_args: 
+            # known_args are not added to parser so we catch them here
+            raise Exception('preemptively got some args: %s'%obs_known_args)
+        # step 1: identify keyword arguments with values from the list
+        inds_kwargs_val = [(ii,ii+1) for ii,i in enumerate(unknown) 
+            if i.startswith(('-','--')) 
+            and ii<len(unknown)-1 
+            and not unknown[ii+1].startswith(('-','--'))]
+        # step 2: identify lone kwargs which must be booleans
+        inds_kwargs_bool = [(ii,) for ii,i in enumerate(unknown) 
+            if i.startswith(('-','--')) 
+            and ii==len(unknown)-1 or (ii<len(unknown)-1 
+            and unknown[ii+1].startswith(('-','--')))]
+        # step 3: the remainder are arguments
+        inds_args = [i for i in range(len(unknown)) if i not in [m 
+            for n in inds_kwargs_bool+inds_kwargs_val for m in n]]
+        # if we have star arguments in the signature then args go there
+        if inspected.get('*'):
             sub.add_argument('args',nargs='*')
-            has_varargs = True
-            star_args = [i for i,j in unknown_paired if j==None]
-        else: 
-            has_varargs = False
-            star_args = None
-        anum = 1
-        for key,val in unknown_paired:
-            # arguments are handled here
-            if val==None and not has_varargs:
-                # assume args are at the beginning of the list
-                sub.add_argument(inspected['args'][anum-1])
-                anum += 1
-            # otherwise kwargs handled here
-            else:
-                sub.add_argument(key,default=val)
+        else:
+            raise Exception('dev: named arguments')
+        # keyword arguments
+        for ind_name,ind_val in inds_kwargs_val:
+            sub.add_argument(unknown[ind_name],default=unknown[ind_val])
+        # keyword booleans
+        for ind_bool in inds_kwargs_bool:
+            arg = unknown[ind_bool[0]]
+            # see sub.print_help() for why these fail
+            if 0:
+                sub.add_argument('--%s'%arg,action='store_true')
+                sub.add_argument('--no-%s'%arg,action='store_false')
+            #! no ability to do the --no-X thing yet
+            sub.add_argument(arg,action='store_true')
+        # set the function name
+        sub.set_defaults(func=func)
+        # check unknown
+        known,unknown = sub.parse_known_args()
+        print(sub.print_help()) #!!!!!
+        if unknown: raise Exception(
+            'failure to process arguments: %s'%str(unknown))
         # connect the function to the parser
         sub.set_defaults(func=func)
         # now that we have prepared the parser we add the function and call
         args = self.parser.parse_args()
-        # star arguments have to be passed separately
-        if star_args: 
-            args.__dict__.pop('args')
-            self._call(args,star_args=star_args)
-        else: self._call(args)
+        self._call_free(incoming=args)
 
     def __init__(self, parser_order=None):
         subcommand_names = [
@@ -374,7 +375,7 @@ class Parser:
             and not func in self.protected_functions]
         # preprocess the arguments
         self._preproc()
-        # under development: need a custom ordering!
+        #! need a custom ordering here
         if self.parser_order:
             subcommand_names = (
                 [i for i in subcommand_names if i in parser_order] +
@@ -425,7 +426,7 @@ class Parser:
         # print help if no function
         if not hasattr(args,'func'):
             self.parser.print_help()
-        # separate cacher before execute
+        # separate Cacher methods before execute
         else:
             # we protect the main execution loop with a handler here
             try: self._call(args)
@@ -438,12 +439,20 @@ class Parser:
                     self._try_else()
         return
 
-    def _call(self,args,star_args=None):
+    def _call(self,args):
         """Main execution loop for a subcommand with handler and else"""
         func = args.func
         delattr(args,'func')
-        if star_args: func(*star_args,**vars(args))
-        else: func(**vars(args))
+        func(**vars(args))
+
+    def _call_free(self,incoming):
+        """Custom caller for arbitrary functions."""
+        args = vars(incoming)
+        func = args['func']
+        kwargs = dict([(i,j) for i,j in args.items()
+            if i not in ('func','args')])
+        args = args.get('args',())
+        func(*args,**kwargs)
 
     def debug(self):
         """
