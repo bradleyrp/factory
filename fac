@@ -41,5 +41,5 @@ elif [[ "$1" == "run" ]]; then
    ${@:2}
 # standard interface does not have the full environment
 else 
-  $PYENV_CALL -B cli.py $@
+  $PYENV_CALL -B ${CLI:-cli.py} $@
 fi
