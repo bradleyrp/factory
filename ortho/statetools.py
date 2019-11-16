@@ -276,10 +276,10 @@ class Parser:
 					(arg,int(val)))
 			else:
 				# development error if you use an invalid type in a parser
-				raise Exception(
-					('cannot automatically make a parser '
-					 'from argument to "%s": "%s" (default "%s")')%(
-					 name,arg,str(val)))
+				raise Exception((
+					'cannot automatically make a parser '
+					'from argument to "%s": "%s" (default "%s")')%(
+					name,arg,str(val)))
 		# set the function
 		sub.set_defaults(func=func)
 
