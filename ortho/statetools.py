@@ -457,6 +457,8 @@ class Parser:
 		"""
 		Use an interactive mode to debug the program.
 		"""
+        #! note that this function can receive a pipe 
+        #!   for example: echo "print(1)" | make debug
 		import code
 		sys.ps1 = "[cc] >>> "
 		vars = globals()
