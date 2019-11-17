@@ -301,13 +301,8 @@ class Interface(Parser):
             install_miniconda(spot)
         # always update to install a sub-environment
         print('status updating environment from %s'%file)
-        os.system('source %s && %s env update --file %s'%(
-            os.path.join(spot,'bin','activate'),
-            os.path.join(spot,'bin','conda'),file))
-        if 0:
-            bash('source %s && %s env update --file %s'%(
-                os.path.join(spot,'bin','activate'),
-                os.path.join(spot,'bin','conda'),file),announce=True)
+        bash('%s env update --file %s'%(
+            os.path.join(spot,'bin/conda'),file),announce=True)
         # get the prefix for the file to update the cursor
         with open(file) as fp: reqs = fp.read()
         # get the name with a regex
