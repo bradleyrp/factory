@@ -1,0 +1,6 @@
+name: min
+dependencies:
+  - pyyaml
+  - pip
+  - pip:
+    - ruamel.yaml
