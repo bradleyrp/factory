@@ -8,7 +8,7 @@ Note that this CLI interface uses the script-connect makefile (not the
 ortho-connect makefile) and the Parser. This is the preferred CLI method.
 """
 
-import os,re,shutil,json
+import os,sys,re,shutil,json
 
 import ortho
 from ortho import bash
@@ -18,8 +18,38 @@ from ortho import conf,treeview
 from ortho import Handler
 from ortho import tracebacker
 from ortho.installers import install_miniconda
+from ortho.statetools import StateDict,Cacher
+from ortho.replicator.replicator_dev import ReplicateCore
+from json import JSONEncoder
 
-def update_factory_env_cursor(spot):
+class FactoryConfig(StateDict):
+    """
+    Manage the factory configuration as a cache.
+    """
+    def __init__(self):
+        self._debug = False
+        self['envs'] = {}
+        self['spots'] = {}
+    def add_env(self,spot,kind,file=None,**kwargs):
+        """Register an evironment spot."""
+        self['envs'][spot] = dict(kind=kind,file=file,**kwargs)
+
+# state holds config
+state = FactoryConfig()
+
+def get_uname():
+    """
+    Check the platform and architecture of the system. Useful for docker.
+    """
+    this = os.uname()
+    if sys.version_info<(3,0):
+        this = dict([(k,this[kk]) for kk,k in 
+            [(0,'sysname'),(1,'nodename'),(2,'release'),(4,'machine')]])
+        return this
+    else: return dict(sysname=this.sysname,release=this.release,
+        machine=this.machine,nodename=this.nodename)
+
+def set_env_cursor(spot):
     """
     Update a cursor which specifies an environment we should always use.
     """
@@ -27,63 +57,28 @@ def update_factory_env_cursor(spot):
         os.unlink('.envcursor')
     os.symlink(spot,'.envcursor')
 
-class Conda(Handler):
-    """
-    Manage conda environment installation
-    """
-    def _install_check(self):
-        """
-        Install miniconda if absent. No automatic removal on failure.
-        """
-        #! dev: automatically register this preliminary function with Handler?
-        spot = os.path.realpath(ortho.conf.get('miniconda_root','./conda'))
-        # +++ assume if spot exists and is directory then conda is installed
-        if not os.path.isdir(spot):
-            install_miniconda(spot)
-        return spot
-
-    def make(self,file=None):
-        """
-        Make a conda environment.
-        """
-        if not os.path.isfile(file):
-            raise Exception('cannot find %s'%file)
-        print('status checking for miniconda')
-        install_dn = self._install_check()
-        print('status updating environment from %s'%file)
-        bash('%s env update --file %s'%(os.path.join(install_dn,'bin/conda'),
-            file),announce=True)
-        # get the prefix for the file to update the cursor
-        with open(file) as fp: reqs = fp.read()
-        # get the name with a regex
-        name = re.findall(r'name:\s+(.*?)(?:\s|\n|\Z)',reqs)
-        if len(name)!=1: raise Exception('cannot identify a name in %s'%file)
-        else: name = name[0]
-        # +++ assume name is the install location in conda/envs
-        env_spot = os.path.join(install_dn,'envs',name)
-        update_factory_env_cursor(env_spot)
-
 class Action(Handler):
     """Generic state-based code."""
-    requires_python('ipdb')
+    #! removed this requirement: requires_python('ipdb')
     def basic(self,lib,path,function,spec={}):
-        #! note that the replicator has a method for this
         path = os.path.abspath(os.path.expanduser(path))
         if not os.path.isdir(path):
             os.mkdir(path)
         this = ortho.importer(lib)
         spec['spot'] = path
         this[function](**spec) 
-    def script(self,script):
-        #! highly dangerous. unprotected execution!
-        #!   consider using the replicator instead?
+    def python(self,script):
+        """Run a python script from a yaml file."""
+        #! unprotected execution
         exec(script)
-    def command(self,command,**kwargs):
-        import ipdb;ipdb.set_trace()
+    def bash(self,bash):
+        """Run a bash script from a yaml file."""
+        ReplicateCore(script=bash)
 
 class MakeUse(Handler):
     def update_config(self,config):
         """Alter the local config."""
+        #! uses ortho.conf and not the state for now
         # unroll the config so we merge without overwrites
         #   otherwise repeated `make use` would override not accumulate changes
         unrolled = ortho.catalog(config)
@@ -91,21 +86,26 @@ class MakeUse(Handler):
             ortho.delveset(ortho.conf,*route,value=val)
         ortho.write_config(ortho.conf)
 
-def spot_cli(cmd,**kwargs):
-    """
-    Manage "spots" in the config. A spot is a place on disk, possibly an image.
-    """
-    #! test with make spot new name=local/root
-    import ipdb;ipdb.set_trace()
+def cache_closer(self):
+    """Hook before writing the cache."""
+    # is this the correct way to pass a hook function into a class method?
+    # remove the settings from the cache before saving
+    #   since they should be written back to the settings if they are important
+    for key in ['settings','settings_raw']:
+        if key in self.cache:
+            del self.cache[key]
 
+@Cacher(
+    cache_fn='cache.json',
+    closer=cache_closer,
+    cache=state,)
 class Interface(Parser):
     """
     A single call to this interface.
     """
     # cli extensions add functions to the interface automatically
     subcommander = ortho.conf.get('cli_extensions',{})
-    subcommander['spot'] = 'cli.spot_cli'
-    _extrana = """
+    """
     Note that this interface works with fac to accept pipes and pick python:
         echo "import sys;print(sys.version_info);sys.exit(0)" | \
             python=python2 make debug
@@ -155,8 +155,7 @@ class Interface(Parser):
         This is the PRIMARY INTERFACE to most features.
         """
         #! we cannot use the requires_python decorator with Parser
-        requires_python_check('ipdb','yaml')
-        #!!! requires the EcoSystem. import it here
+        requires_python_check('yaml')
         import yaml
         if os.path.isfile(what):
             with open(what) as fp: text = fp.read()
@@ -191,8 +190,9 @@ class Interface(Parser):
 
     def nuke(self,sure=False):
         """Reset everything. Useful for testing."""
+        self.cache['languish'] = True
         from ortho import confirm
-        dns = ['apps','spack','conda']
+        dns = ['apps','spack','conda','local','config.json','cache.json']
         links = ['.envcursor']
         if sure or confirm('okay to nuke everything?'):
             for dn in dns:
@@ -259,15 +259,88 @@ class Interface(Parser):
         class This(FileNameSubSelector): Target = RunScript
         This(file=file,name=name,spot=spot)
 
-    def venv(self,spot,what):
+    def venv(self,cmd,file=None,spot='local/venv'):
         """
         Manage a virtual environment.
+        usage: python=python2 make venv create 
         """
-        spot_detail = ortho.conf.get('spots',{}).get(spot,None)
-        if not spot_detail:
-            raise Exception('spot %s is not registered'%spot)
-        import ipdb;ipdb.set_trace()
+        if file and not os.path.isfile(file):
+            raise Exception('cannot find %s'%file)
+        #! spot should be hookable
+        #! use subparsers?
+        if cmd=='create':
+            # +++ assume if it exists it was installed correctly
+            if os.path.isdir(spot):
+                raise Exception('already exists: %s'%spot)
+            bash('python -m venv %s'%spot)
+            if not file:
+                # default venv packages
+                packages = ['pyyaml']
+                for pack in packages:
+                    bash('source %s/bin/activate && pip install %s'%(
+                        spot,pack))
+            else: bash('source %s/bin/activate && '
+                'pip install -r %s'%(spot,file))
+            #!! set_env_cursor(os.path.join(spot))
+        else: raise Exception('unclear command: %s'%cmd)
+        # register this environment
+        self.cache.add_env(spot=spot,kind='venv',file=file,uname=get_uname())
+
+    def conda(self,file,spot='local/conda',use=True):
+        """
+        Build a conda environment.
+        """
+        if not os.path.isfile(file):
+            raise Exception('cannot find %s'%file)
+        print('status checking for miniconda')
+        spot_rel = spot
+        # +++ assume if spot exists and is directory then conda is installed
+        spot = ortho.path_resolver(spot)
+        # install if missing
+        if not os.path.isdir(spot):
+            install_miniconda(spot)
+        # always update to install a sub-environment
+        print('status updating environment from %s'%file)
+        os.system('source %s && %s env update --file %s'%(
+            os.path.join(spot,'bin','activate'),
+            os.path.join(spot,'bin','conda'),file))
+        if 0:
+            bash('source %s && %s env update --file %s'%(
+                os.path.join(spot,'bin','activate'),
+                os.path.join(spot,'bin','conda'),file),announce=True)
+        # get the prefix for the file to update the cursor
+        with open(file) as fp: reqs = fp.read()
+        # get the name with a regex
+        name = re.findall(r'name:\s+(.*?)(?:\s|\n|\Z)',reqs)
+        if len(name)!=1: raise Exception('cannot identify a name in %s'%file)
+        else: name = name[0]
+        # +++ assume name is the install location in conda/envs
+        env_spot = os.path.join(spot,'envs',name)
+        env_spot_rel = os.path.join(spot_rel,'envs',name)
+        #!! disabled for now if use: set_env_cursor(env_spot)
+        # register this environment
+        print('status activate this environment with: '
+            './fac activate %s'%env_spot_rel)
+        self.cache.add_env(spot=env_spot_rel,kind='conda',
+            file=file,uname=get_uname())
+
+    def activate(self,spot):
+        """
+        Activate an environment.
+        """
+        envs = self.cache['envs']
+        if spot not in envs:
+            raise Exception('available envs: %s'%str(list(envs.keys())))
+        env = envs[spot]
+        uname = get_uname()
+        for key in ['sysname','release','machine','nodename']:     
+            if env['uname'][key]!=uname[key]:
+                #! test this later
+                raise Exception('refusing to activate because of a mismatch. '
+                    'the environment has %s=%s but uname indicates %s=%s'%
+                    (key,env['uname'][key],key,uname[key]))
+        set_env_cursor(spot)
 
 if __name__ == '__main__':
-    # the ./fac script calls cli.py to make the interface
+    # the ./fac script calls this interface
     Interface()
