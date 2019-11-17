@@ -8,7 +8,7 @@ Note that this CLI interface uses the script-connect makefile (not the
 ortho-connect makefile) and the Parser. This is the preferred CLI method.
 """
 
-import os,sys,re,shutil,json
+import os,sys,re,shutil,json,glob
 
 import ortho
 from ortho import bash
@@ -96,7 +96,7 @@ def cache_closer(self):
             del self.cache[key]
 
 @Cacher(
-    cache_fn='cache.json',
+    cache_fn='config.json',
     closer=cache_closer,
     cache=state,)
 class Interface(Parser):
@@ -190,7 +190,6 @@ class Interface(Parser):
 
     def nuke(self,sure=False):
         """Reset everything. Useful for testing."""
-        self.cache['languish'] = True
         from ortho import confirm
         dns = ['apps','spack','conda','local','config.json','cache.json']
         links = ['.envcursor']
@@ -203,11 +202,17 @@ class Interface(Parser):
                 if os.path.islink(link):
                     print('unsetting %s'%link)
                     os.unlink(link)
+        # we must clear the cache or else it waits in memory and is written
+        #   out again with the same contents as before the nuke. this is 
+        #   actually a healthy feature for the cache but defies the nuke idea
+        self.cache = {}
 
     def envs(self):
         """
         Useful help for activating environments. Called by env.sh.
         """
+        #! DEPRECATED
+        raise Exception('deprecated')
         try_this = 'try ./fac conda <requirements>'
         if not os.path.isfile('conda/bin/activate'):
             raise Exception('conda is not installed. '+try_this)
@@ -262,8 +267,8 @@ class Interface(Parser):
     def venv(self,cmd,file=None,spot='local/venv'):
         """
         Manage a virtual environment.
-        usage: python=python2 make venv create 
         """
+        # usage: python=python2 make venv create 
         if file and not os.path.isfile(file):
             raise Exception('cannot find %s'%file)
         #! spot should be hookable
@@ -335,6 +340,44 @@ class Interface(Parser):
                     'the environment has %s=%s but uname indicates %s=%s'%
                     (key,env['uname'][key],key,uname[key]))
         set_env_cursor(spot)
+
+    def check_config(self):
+        """Check the config against an incoming pipe."""
+        print('status waiting for a pipe')
+        incoming = sys.stdin.read()
+        match = False
+        try: 
+            expected = eval(incoming)
+            match = expected==self.cache
+        except Exception as e: 
+            ortho.tracebacker(e)
+        if not match:
+            print('status expected config: %s'%str(incoming))
+            print('status current config: %s'%str(self.cache))
+        print('status result: %s'%('PASS' if match else 'FAIL'))
+        if not match: raise Exception('mismatched config')
+
+    def bootstrap(self,name=None,suffix=None):
+        """Bootstrap a configuration."""
+        """ CURRENT Tests
+        make bootstrap name=venv suffix=macos
+        make bootstrap name=conda suffix=macos #! conda is immovable
+        """
+        sources = glob.glob('lib/tests/test_bootstrap_*.sh')
+        regex = 'lib/tests/test_bootstrap_(.+).sh'
+        sources = [re.match(regex,i).group(1) for i in sources]
+        if not name:
+            print('usage make bootstrap name=<name> (suffix=<suffix>)')
+            print('usage the suffix is appended to the environment path')
+            print('status available bootstrap names: %s'%str(sources))
+            return
+        # note that this simply calls some bash scripts that serve as tests
+        print('status bootstrap %s%s'%(
+            name,' with suffix %s'%suffix if suffix else ''))
+        cmd = 'bash lib/tests/test_bootstrap_%s.sh'%name
+        if suffix: cmd += ' %s'%suffix
+        #! add protection agaist `./fac nuke --sure`
+        ortho.bash(cmd,scroll=True,announce=True)
 
 if __name__ == '__main__':
     # the ./fac script calls this interface
