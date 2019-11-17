@@ -104,6 +104,7 @@ class Cacher(object):
 					self.cache_copy = copy.deepcopy(self.cache)
 				self.errorclear()
 				# initialize the parent class
+				print('status done reading cache')
 				super(cls,self).__init__()
 
 			def _try_except(self, exception=None):
@@ -424,8 +425,9 @@ class Parser:
 			# we protect the main execution loop with a handler here
 			try: self._call(args)
 			except Exception as e:
-				# added tracebacker because 
-				tracebacker(e)
+				#! sometimes traceback is missing, but after adding this
+				#!   we sometimes get a double error
+				#! removed: tracebacker(e)
 				# traceback is necessary here or raise is not useful
 				if hasattr(self,'_try_except'): 
 					self._try_except(exception=e)
@@ -489,17 +491,16 @@ class StateDict(dict):
 	Special dictionary for watching what happens to the state.
 	Prototype only.
 	"""
-	def __init__(self, debug=False, *args, **kwargs):
+	def __init__(self,debug=False,*args,**kwargs):
 		self._debug = debug
 		super(StateDict,self).__init__(*args,**kwargs)
+		import ipdb;ipdb.set_trace()
 
 	def _get_line(self):
 		"""Get the line that brought you here."""
 		# does not work on python 2
-		if sys.version_info < (3, 0):
-			return
-		try:
-			raise Exception('introspection-exception')
+		if sys.version_info<(3,0): return
+		try: raise Exception('introspection-exception')
 		except:
 			stack = traceback.extract_stack()
 			# the choice of 3 is probably static
@@ -507,33 +508,35 @@ class StateDict(dict):
 			#   in it, this might be earlier in the broken line
 			#   because the stack line does not read to the true abstract
 			#   beginning of the line
-			where = stack[-3]
-			print('debug we are in %s lineno %d line: `%s`' % (
-				where.filename, where.lineno, where.line))
+			#! disabled because uninformative
+			if 0:
+				where = stack[-3]
+				print('debug we are in %s lineno %d line: `%s`'%(
+					where.filename, where.lineno, where.line))
 		return
 
-	def _say(self, x): return say(x, 'red_black')
+	def _say(self,x): return say(x,'mag_gray')
 
-	def get(self, x, d=None):
+	def get(self,x,d=None):
 		if self._debug:
-			print('debug state get "%s"' % self._say(x))
+			print('debug state get "%s"'%self._say(x))
 			self._get_line()
-		return super(StateDict, self).get(x, d)
+		return super(StateDict, self).get(x,d)
 
-	def __getitem__(self, x):
+	def __getitem__(self,x):
 		if self._debug:
-			print('debug state get "%s"' % self._say(x))
+			print('debug state get "%s"'%self._say(x))
 			self._get_line()
-		return super(StateDict, self).__getitem__(x)
+		return super(StateDict,self).__getitem__(x)
 
-	def set(self, x, y):
+	def set(self,x,y):
 		if self._debug:
-			print('debug state set "%s" "%s"' % (self._say(x), self._say(y)))
+			print('debug state set "%s" "%s"'%(self._say(x),self._say(y)))
 			self._get_line()
-		return super(StateDict, self).set(x, y)
+		return super(StateDict,self).set(x,y)
 
-	def __setitem__(self, x, y):
+	def __setitem__(self,x,y):
 		if self._debug:
-			print('debug state set "%s" "%s"' % (self._say(x), self._say(y)))
+			print('debug state set "%s" "%s"'%(self._say(x),self._say(y)))
 			self._get_line()
-		return super(StateDict, self).__setitem__(x, y)
+		return super(StateDict, self).__setitem__(x,y)
