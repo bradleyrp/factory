@@ -207,29 +207,27 @@ class Interface(Parser):
         #   actually a healthy feature for the cache but defies the nuke idea
         self.cache = {}
 
-    def envs(self):
-        """
-        Useful help for activating environments. Called by env.sh.
-        """
-        #! DEPRECATED
-        raise Exception('deprecated')
-        try_this = 'try ./fac conda <requirements>'
-        if not os.path.isfile('conda/bin/activate'):
-            raise Exception('conda is not installed. '+try_this)
-        toc = bash('conda/bin/conda-env list --json',scroll=False)
-        them = json.loads(toc['stdout']).get('envs',[])
-        base_dn = os.path.join(os.getcwd(),'conda','envs')
-        them = [os.path.relpath(i,base_dn) for i in them]
-        if not them:
-            raise Exception('cannot find environments. '+try_this)
-        print('status available environments:')
-        for t in them: 
-            if t.startswith('..'): continue
-            print('status  %s'%t)
-        print('status activate an environment with: '
-            'source env.sh <name>')
-        print('status or use: source conda/bin/activate conda/envs/<name>')
-        print('status deactivate with: conda deactivate')
+    def envs(self,name=None):
+        """List environments. Used by `env.sh` to source them."""
+        toc = {}
+        for env,detail in self.cache.get('envs',{}).items():
+            shortname = os.path.basename(env)
+            if shortname in toc: raise Exception('collision: %s'%shortname)
+            toc[shortname] = dict(kind=detail['kind'],spot=env)
+        if not name:
+            print('status available environments: %s'%list(toc.keys()))
+            return
+        else:
+            if name not in toc: 
+                raise Exception('cannot find %s'%name)
+        if toc[name]['kind']=='venv':
+            print('source %s/bin/activate'%toc[name]['spot'])
+        elif toc[name]['kind']=='conda':
+            print('source %s/bin/activate %s'%(
+                os.path.relpath(os.path.join(toc[name]['spot'],'..','..')),
+                os.path.join(toc[name]['spot'])))
+        else: 
+            raise Exception('unclear kind: %s'%toc[name]['kind'])
 
     def sim(self,path):
         """Create a simulation from a remote automacs."""
