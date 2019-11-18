@@ -9,7 +9,5 @@ else
 	cmd=$(make envs name=$1 | perl -ne 'print if s/source (.+)$/$1/')
 	# source the correct environment
 	#! possibly dangerous?
-	#echo $cmd
-	#source $cmd
-	source local/conda/bin/activate local/conda/envs/ev01
+	source $cmd
 fi
