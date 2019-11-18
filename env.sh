@@ -1,5 +1,4 @@
 #!/bin/bash
-set -e
 if [ -z "$1" ]; then 
 	make envs
 	echo "[USAGE] see the list above for environments:"
@@ -10,5 +9,7 @@ else
 	cmd=$(make envs name=$1 | perl -ne 'print if s/source (.+)$/$1/')
 	# source the correct environment
 	#! possibly dangerous?
-	source $cmd
+	#echo $cmd
+	#source $cmd
+	source local/conda/bin/activate local/conda/envs/ev01
 fi
