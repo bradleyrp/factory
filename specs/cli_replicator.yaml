@@ -1,5 +1,5 @@
 config:
   cli_extensions:
     docker: lib.replicator.docker
-    docker_shell: lib.replicator.docker_shell
+    #! docker_shell: lib.replicator.docker_shell
     screen: lib.replicator.screen
