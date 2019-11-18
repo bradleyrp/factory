@@ -18,7 +18,7 @@ from ortho import conf,treeview
 from ortho import Handler
 from ortho import tracebacker
 from ortho.installers import install_miniconda
-from ortho.statetools import StateDict,Cacher
+from ortho.statetools import StateDict,Cacher,Convey
 from ortho.replicator.replicator_dev import ReplicateCore
 from json import JSONEncoder
 
@@ -78,13 +78,14 @@ class Action(Handler):
 class MakeUse(Handler):
     def update_config(self,config):
         """Alter the local config."""
-        #! uses ortho.conf and not the state for now
         # unroll the config so we merge without overwrites
         #   otherwise repeated `make use` would override not accumulate changes
+        # previously used ortho.conf directly but now we use self.cache
+        this_conf = self.state
         unrolled = ortho.catalog(config)
         for route,val in unrolled:
-            ortho.delveset(ortho.conf,*route,value=val)
-        ortho.write_config(ortho.conf)
+            ortho.delveset(this_conf,*route,value=val)
+        ortho.write_config(this_conf)
 
 def cache_closer(self):
     """Hook before writing the cache."""
@@ -105,6 +106,7 @@ class Interface(Parser):
     """
     # cli extensions add functions to the interface automatically
     subcommander = ortho.conf.get('cli_extensions',{})
+    name = "Factory Interface".upper()
     """
     Note that this interface works with fac to accept pipes and pick python:
         echo "import sys;print(sys.version_info);sys.exit(0)" | \
@@ -183,6 +185,8 @@ class Interface(Parser):
         else: raise Exception('unclear what: %s'%what)
 
     def build_docs(self,source='',build=''):
+        """Build the documentation. 
+        Usage: `make build_docs source=docs/source build=docs/build`"""
         kwargs = {}
         if source: kwargs['source'] = source
         if build: kwargs['build'] = build
@@ -249,7 +253,7 @@ class Interface(Parser):
         if os.path.isfile(what):
             with open(what) as fp: text = fp.read()
             changes = yaml.load(text,Loader=yaml.SafeLoader)
-            MakeUse(**changes).solve
+            Convey(state=self.cache)(MakeUse)(**changes).solve
         else: raise Exception('unclear what: %s'%what)
 
     def script(self,file,name,spot=None):
