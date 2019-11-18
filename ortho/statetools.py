@@ -375,7 +375,8 @@ class Parser:
 				[i for i in subcommand_names if i in parser_order] +
 				[i for i in subcommand_names if i not in parser_order])
 		self.parser = argparse.ArgumentParser(
-			description='Community Collections Manager.')
+			description='Ortho Interface.' 
+			if not hasattr(self,'name') else getattr(self,'name'))
 		self.subparsers = self.parser.add_subparsers(
 			title='subcommands',
 			description='Valid subcommands:',
