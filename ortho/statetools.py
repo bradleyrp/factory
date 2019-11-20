@@ -345,6 +345,10 @@ class Parser:
 		# explicit number of arguments if necessary
 		elif inds_args:
 			sub.add_argument('args',nargs=len(inds_args))
+		#! note that the following signature and call fail:
+		#!   def screen(screen='anon',*args,**kwargs)
+		#!   ./fac screen screen=spack spack specs/spack_tree.yaml
+		#!   however removing the kwargs screen='anon' works
 		# args are still unknown to sub.parse_known_args() here
 		# connect the function to the parser
 		sub.set_defaults(func=func)
