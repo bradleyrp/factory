@@ -3,7 +3,7 @@
 # template for a script that screens itself
 screen_maker = """#!/bin/bash
 
-set -x
+# note that set -x is too verbose
 export SCREEN_CONF_TMP=screen-%(screen_name)s.tmp
 export SCREEN_LOG=%(screen_log)s
 #! is this too recursive?
@@ -29,15 +29,21 @@ exec screen -c $tmp_screen_rc -Ldm -S %(screen_name)s /bin/bash "$0"
 fi
 set -e
 
+# clean up the temporary files inside the screened execution
+# this must happen before lines with possible errors
+# the $tmp_screen_rc serves as a signal that the screen is running
+trap "{ rm -f $SCREEN_CONF_TMP $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT ERR
+
+echo "[STATUS] running the following script:"
+sed -e 's/^/| /' $BOOTSTRAP_SCRIPT
+echo "[STATUS] end of script"
+
 # prelim%(prelim)s
 
 # KERNEL
 %(contents)s
 
 # post%(post)s
-
-# clean up the temporary files inside the screened execution
-trap "{ rm -f $SCREEN_CONF_TMP $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT
 
 # end of the screen
 EOF_OUT
