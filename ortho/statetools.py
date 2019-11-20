@@ -29,13 +29,13 @@ from .dev import tracebacker
 
 class Singleton(type):
 	# via https://stackoverflow.com/a/42239713
-	#! use with `__metaclass__ = Singleton` however this fails
-	def __init__(cls, name, bases, dict):
-		super(Singleton, cls).__init__(name, bases, dict)
+	#!!! use with `__metaclass__ = Singleton` however this fails
+	def __init__(cls,name,bases,dict):
+		super(Singleton, cls).__init__(name,bases,dict)
 		cls._instance = None
-	def __call__(cls, *args, **kw):
+	def __call__(cls,*args,**kw):
 		if cls._instance is None:
-			cls._instance = super(Singleton, cls).__call__(*args, **kw)
+			cls._instance = super(Singleton,cls).__call__(*args,**kw)
 		return cls._instance
 
 class Cacher(object):
@@ -71,7 +71,7 @@ class Cacher(object):
 		self.establish_policy = establish_policy
 		self.reserve_policy = reserve_policy
 
-	def __call__(self, cls):
+	def __call__(self,cls):
 		# when using a class decorator is that the derived class is a singleton
 		class CachedClass(cls):
 			# receive the cache_fn from the decoration
@@ -331,29 +331,21 @@ class Parser:
 		# step 3: the remainder are arguments
 		inds_args = [i for i in range(len(unknown)) if i not in [m 
 			for n in inds_kwargs_bool+inds_kwargs_val for m in n]]
-		# if we have star arguments in the signature then args go there
-		if inspected.get('*'):
-			sub.add_argument('args',nargs='*')
-		else:
-			raise Exception('dev: named arguments')
 		# keyword arguments
 		for ind_name,ind_val in inds_kwargs_val:
 			sub.add_argument(unknown[ind_name],default=unknown[ind_val])
 		# keyword booleans
 		for ind_bool in inds_kwargs_bool:
 			arg = unknown[ind_bool[0]]
-			#! see sub.print_help() for why these fail
-			if 0:
-				sub.add_argument('--%s'%arg,action='store_true')
-				sub.add_argument('--no-%s'%arg,action='store_false')
 			#! no ability to do the --no-X thing yet
 			sub.add_argument(arg,action='store_true')
-		# set the function name
-		sub.set_defaults(func=func)
-		# check unknown
-		known,unknown = sub.parse_known_args()
-		if unknown: raise Exception(
-			'failure to process arguments: %s'%str(unknown))
+		# if we have star arguments in the signature then args go there
+		if inspected.get('*'):
+			sub.add_argument('args',nargs='*')
+		# explicit number of arguments if necessary
+		elif inds_args:
+			sub.add_argument('args',nargs=len(inds_args))
+		# args are still unknown to sub.parse_known_args() here
 		# connect the function to the parser
 		sub.set_defaults(func=func)
 		# now that we have prepared the parser we add the function and call
@@ -450,6 +442,8 @@ class Parser:
 		kwargs = dict([(i,j) for i,j in args.items()
 			if i not in ('func','args')])
 		args = args.get('args',())
+		print('status calling %s with args: %s and kwargs: %s'%(
+			func.__name__,str(tuple(args)),kwargs))
 		func(*args,**kwargs)
 
 	def debug(self):
