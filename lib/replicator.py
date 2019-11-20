@@ -54,12 +54,13 @@ def docker_shell(recipe,*args):
 		#! fix this
 		image='factory:centos7_user')
 
-def screen(screen='screen_anon',*args,**kwargs):
+def screen(*args,**kwargs):
 	"""
 	Run anything in a screen using `ReplicatorCore`.
 	e.g. make screen screen=anon script specs/demo_script.yaml delay spot=./here
 	"""
+	screen_name = kwargs.pop('screen','screen_anon')
 	# note that running in a remote location typically uses a 'spot' flag
 	#   however everything is passed through so the reciever has to accept it
 	cmd = feedback_args_to_command(*args,**kwargs)
-	ReplicateCore(script=cmd,screen=screen)
+	ReplicateCore(script=cmd,screen=screen_name)
