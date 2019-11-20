@@ -3,6 +3,7 @@
 import os,copy
 import ortho
 import yaml
+import multiprocessing
 from lib.yaml_mods import YAMLObjectInit
 from ortho import Handler
 from ortho import path_resolver
@@ -34,7 +35,9 @@ def spack_clone(where=None):
 	if where.split(os.path.sep)[-1]=='spack':
 		raise Exception('invalid path cannot end in "spack": %s'%where)
 	print('status cloning spack at %s'%where)
-	ortho.bash('git clone https://github.com/spack/spack',cwd=where)
+	ortho.sync(modules={
+		os.path.join(where,'spack'):
+			dict(address='https://github.com/spack/spack')})
 	#! should we have a central conf registrar?
 	ortho.conf['spack'] = os.path.join(where,'spack')
 	# +++ add spack location to the conf
@@ -73,14 +76,16 @@ class SpackEnvMaker(Handler):
 	def _run_via_spack(self,spack_spot,env_spot,command):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
-		ortho.bash('source %s && %s'%
+		result = ortho.bash('source %s && %s'%
 			(starter,command),cwd=env_spot)
+		import ipdb;ipdb.set_trace()
 	def std(self,spack,where,spack_spot):
 		os.makedirs(where,exist_ok=True)
 		with open(os.path.join(where,'spack.yaml'),'w') as fp:
 			yaml.dump({'spack':spack},fp)
+		cpu_count_opt = min(multiprocessing.cpu_count(),6)
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-			command='spack concretize -f')
+			command='spack install -j %d'%cpu_count_opt)
 
 def spack_env_maker(what):
 	"""
