@@ -136,3 +136,10 @@ def unique_ordered(seq):
 	"""Return unique items maintaining the order."""
 	vals = set()
 	return [x for x in seq if not (x in vals or vals.add(x))]
+
+def delve_merge(source,target):
+	"""Merge dictionary `source` into `target`."""
+	unrolled = catalog(source)
+	for route,val in unrolled:
+		delveset(target,*route,value=val)
+	return target

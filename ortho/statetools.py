@@ -26,6 +26,7 @@ import traceback
 from .handler import introspect_function
 from .misc import str_types,say
 from .dev import tracebacker
+from .data import delve_merge
 
 class Singleton(type):
 	# via https://stackoverflow.com/a/42239713
@@ -356,7 +357,7 @@ class Parser:
 		args = self.parser.parse_args()
 		self._call_free(incoming=args)
 
-	def __init__(self, parser_order=None):
+	def __init__(self,parser_order=None):
 		subcommand_names = [
 			func for func in dir(self)
 			if callable(getattr(self,func))
@@ -420,7 +421,7 @@ class Parser:
 		# separate Cacher methods before execute
 		else:
 			# we protect the main execution loop with a handler here
-			try: self._call(args)
+			try: result = self._call(args)
 			except Exception as e:
 				#! sometimes traceback is missing, but after adding this
 				#!   we sometimes get a double error
@@ -428,7 +429,13 @@ class Parser:
 				# traceback is necessary here or raise is not useful
 				if hasattr(self,'_try_except'): 
 					self._try_except(exception=e)
+					# make sure we are honest about the failure to execute
+					sys.exit(1)
 			else: 
+				if result and result.__class__.__name__=="CacheChange":
+					# merge all kwargs from a CacheChange into the cache
+					delve_merge(result.kwargs,self.cache)
+				else: pass
 				if hasattr(self,'_try_else'): 
 					self._try_else()
 		return
@@ -437,7 +444,7 @@ class Parser:
 		"""Main execution loop for a subcommand with handler and else"""
 		func = args.func
 		delattr(args,'func')
-		func(**vars(args))
+		return func(**vars(args))
 
 	def _call_free(self,incoming):
 		"""Custom caller for arbitrary functions."""
@@ -493,7 +500,6 @@ class StateDict(dict):
 	def __init__(self,debug=False,*args,**kwargs):
 		self._debug = debug
 		super(StateDict,self).__init__(*args,**kwargs)
-		import ipdb;ipdb.set_trace()
 
 	def _get_line(self):
 		"""Get the line that brought you here."""
@@ -539,3 +545,7 @@ class StateDict(dict):
 			print('debug state set "%s" "%s"'%(self._say(x),self._say(y)))
 			self._get_line()
 		return super(StateDict, self).__setitem__(x,y)
+
+class CacheChange:
+	def __init__(self,**kwargs):
+		self.kwargs = kwargs
