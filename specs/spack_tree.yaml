@@ -27,10 +27,15 @@ gromacs_gcc6:
   notes: |
     This sequence installs gcc 6 which is necessary for compiling for skylake.
     Then it compiles gromacs with gcc 6 and little else.
+    We pin explicitly to the system gcc (4.8.5) to prevent recompile.
+    We also use bootstrap to build modules.
   envs:
+    - check_compiler: gcc@4.8.5
+    - bootstrap: null
     - name: env_gcc_6.4.0
       via: template_basic
-      specs: ['gcc@6.4.0']
+      specs: ['gcc@6.4.0%gcc@4.8.5']
+    - find: gcc@6.4.0
     - name: env_gromacs
       via: template_basic
       specs: ['gromacs@2019.3%gcc@6.4.0']

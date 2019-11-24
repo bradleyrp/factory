@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 
-import os,copy
+import os,copy,re
 import ortho
 import yaml
 import multiprocessing
 from lib.yaml_mods import YAMLObjectInit
 from ortho import Handler
+from ortho import CacheChange
 from ortho import path_resolver
 from ortho import catalog
 from ortho import delveset
@@ -73,12 +74,13 @@ def config_or_make(config_key,builder,where=None):
 	else: return target
 
 class SpackEnvMaker(Handler):
-	def _run_via_spack(self,spack_spot,env_spot,command):
+	def blank(self): pass
+	def _run_via_spack(self,spack_spot,env_spot,command,fetch=False):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
-		result = ortho.bash('source %s && %s'%
-			(starter,command),cwd=env_spot)
-		import ipdb;ipdb.set_trace()
+		result = ortho.bash('echo $PWD && source %s && %s'%
+			(starter,command),cwd=env_spot,scroll=not fetch)
+		return result
 	def std(self,spack,where,spack_spot):
 		os.makedirs(where,exist_ok=True)
 		with open(os.path.join(where,'spack.yaml'),'w') as fp:
@@ -86,6 +88,62 @@ class SpackEnvMaker(Handler):
 		cpu_count_opt = min(multiprocessing.cpu_count(),6)
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 			command='spack install -j %d'%cpu_count_opt)
+
+class SpackEnvItem(Handler):
+	_internals = {'name':'basename','meta':'meta'}
+	def _run_via_spack(self,command,fetch=False):
+		"""Route commands to spack."""
+		return SpackEnvMaker()._run_via_spack(
+			spack_spot=self.meta['spack_dn'],
+			env_spot=self.meta['spack_envs_dn'],
+			command=command,fetch=fetch)
+	def make_env(self,name,specs,via=None):
+		"""
+		Pass this item along to SpackEnvMaker
+		"""
+		spack_envs_dn = self.meta['spack_envs_dn']
+		spack_dn = self.meta['spack_dn']
+		spot = os.path.join(spack_envs_dn,name)
+		env = {'specs':specs}
+		# typically use a Handler here but we need meta so simplifying
+		if via:
+			# start with a template from the parent file in meta
+			instruct = copy.deepcopy(self.meta[via])
+			# merge the trees
+			for route,val in catalog(env):
+				delveset(instruct,*route,value=val)
+		else: raise Exception('unclear env format')
+		print('status building spack environment at "%s"'%spot)
+		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct)
+	def find_compiler(self,find):
+		"""
+		Find a compiler, possibly also installed by spack.
+		"""
+		# the find argument should be a spec that already exists
+		self._run_via_spack(command=
+			"PATH=$(spack location -i %s)/bin:$PATH && "
+			"spack compiler find --scope site"%find)
+	def check_compiler(self,check_compiler):
+		"""
+		Confirm a background compiler to build against. Combine this
+		with careful specification of compilers-built-against-compilers to
+		prevent the recompile of a compiler against itself after it is found.
+		For example, if you compile gcc 6 against 4 and then use the 
+		`find_compiler` function it finds gcc 6 and then if you run the whole
+		procedure again and one of your environments requests gcc 6 it will
+		assume the default gcc is 6 and try to build gcc 6 against gcc 6 even 
+		though it is already built against the background 4.
+		"""
+		result = self._run_via_spack(command="spack compilers",fetch=True)
+		stdout = result['stdout']
+		if not re.match(r'^\w+@[\d\.]+',check_compiler):
+			raise Exception('unusual spack spec: %s'%check_compiler)
+		if not re.search(check_compiler,stdout):
+			raise Exception('failed compiler check: %s'%check_compiler)
+	def bootstrap(self,bootstrap):
+		"""Bootstrap installs modules."""
+		if bootstrap!=None: raise Exception('boostrap must be null')
+		self._run_via_spack(command="spack bootstrap")
 
 def spack_env_maker(what):
 	"""
@@ -118,19 +176,9 @@ class SpackSeq(Handler):
 		spack_envs_dn = config_or_make(
 			config_key='spack_envs',builder=spack_init_envs,
 			where=self.meta.get('spot_envs'))
-		for env in envs:
-			name = env.pop('name')
-			spot = os.path.join(spack_envs_dn,name)
-			# typically use a Handler here but we need meta so simplifying
-			if 'via' in env.keys():
-				# start with a template from the parent file in meta
-				instruct = copy.deepcopy(self.meta[env.pop('via')])
-				# merge the trees
-				for route,val in catalog(env):
-					delveset(instruct,*route,value=val)
-			else: raise Exception('unclear env format')
-			print('status building spack environment at "%s"'%spot)
-			SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct)
+		self.meta['spack_dn'] = spack_dn
+		self.meta['spack_envs_dn'] = spack_envs_dn
+		for env in envs: SpackEnvItem(meta=self.meta,**env)
 
 class SpackSeqSub(Handler):
 	_internals = {'name':'basename','meta':'meta'}
@@ -173,4 +221,9 @@ def spack_tree(what,name):
 	print('status installing spack seq from %s with name %s'%(what,name))
 	with open(what) as fp: 
 		tree = yaml.load(fp,Loader=yaml.SafeLoader)
-	SpackSeqSub(name=name,tree=tree).solve
+	spack = SpackSeqSub(name=name,tree=tree).solve
+	# assume no changes to the tree, it has a spot, and the spot is parent
+	spack_spot = ortho.path_resolver(
+		os.path.join(tree['spot'],'spack'))
+	# register the spack location
+	return CacheChange(spack=spack_spot)
