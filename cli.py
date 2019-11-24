@@ -81,6 +81,8 @@ class MakeUse(Handler):
         # unroll the config so we merge without overwrites
         #   otherwise repeated `make use` would override not accumulate changes
         # previously used ortho.conf directly but now we use self.cache
+        #! does this mean it is deprecated
+        #! the following was moved to ortho.delve_merge
         this_conf = self.state
         unrolled = ortho.catalog(config)
         for route,val in unrolled:
@@ -213,6 +215,12 @@ class Interface(Parser):
 
     def envs(self,name=None):
         """List environments. Used by `env.sh` to source them."""
+        # special keyword to source spack
+        if name=="_spack":
+            if 'spack' not in ortho.conf: 
+                raise Exception("spack is not registered")
+            print("source %s"%os.path.join(ortho.conf['spack'],'share','spack','setup-env.sh'))
+            return
         toc = {}
         for env,detail in self.cache.get('envs',{}).items():
             shortname = os.path.basename(env)
@@ -314,6 +322,9 @@ class Interface(Parser):
         with open(file) as fp: reqs = fp.read()
         # get the name with a regex
         name = re.findall(r'name:\s+(.*?)(?:\s|\n|\Z)',reqs)
+        if name=='spack':
+            print('warning this name collides with "spack" and cannot be '
+                'sourced with the env.sh script')
         if len(name)!=1: raise Exception('cannot identify a name in %s'%file)
         else: name = name[0]
         # +++ assume name is the install location in conda/envs
