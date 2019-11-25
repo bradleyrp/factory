@@ -1,5 +1,5 @@
 #!/bin/bash
-if [[ ! $_ == $0 ]]; then
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 	echo "[ERROR] you must source env.sh"
 	echo "[ERROR] source env.sh without arguments for usage notes"
 # note that we nest all conditionals because exit in a sourced script
@@ -31,7 +31,7 @@ else
 				# the call to get the spack environment yields the spack setup
 				source $paths
 			else	
-				echo "[STATUS] sourcing the \"$name\" environment"
+				echo "[STATUS] sourcing the \"${name}\" environment"
 				echo "[STATUS] use \"conda deactivate\" to exit"
 				# requesting an environment gives a relative path
 				resolved="$DIR/${paths[0]} $DIR/${paths[1]}"
