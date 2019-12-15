@@ -1,4 +1,4 @@
-#!/usr/bin/env pythonm
+#!/usr/bin/env python
 
 """
 Replicator REDEVELOPMENT

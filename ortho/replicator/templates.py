@@ -25,7 +25,7 @@ EOF
 # ensure that the script screens itself
 if [ -z "$STY" ]; then 
 echo "[STATUS] executing in a screen"
-exec screen -c $tmp_screen_rc -Ldm -S %(screen_name)s /bin/bash "$0"
+exec screen -dmS %(screen_name)s -L -c $tmp_screen_rc /bin/bash "$0"
 fi
 set -e
 
@@ -37,6 +37,7 @@ trap "{ rm -f $SCREEN_CONF_TMP $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT ERR
 echo "[STATUS] running the following script:"
 sed -e 's/^/| /' $BOOTSTRAP_SCRIPT
 echo "[STATUS] end of script"
+echo "[STATUS] start time $(date)"
 
 # prelim%(prelim)s
 
@@ -44,6 +45,8 @@ echo "[STATUS] end of script"
 %(contents)s
 
 # post%(post)s
+
+echo "[STATUS] end time $(date)"
 
 # end of the screen
 EOF_OUT
