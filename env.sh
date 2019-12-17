@@ -5,9 +5,18 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
 # note that we nest all conditionals because exit in a sourced script
 # causes you to leave a screen which is very annoying
 else
-	DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+	if [ "$SHELL" = "/bin/zsh" ]; then 
+		# via https://stackoverflow.com/a/3572105
+		realpath() {
+	    	[[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
+		}
+		DIR=$(dirname $(realpath "$0"))
+	else
+		# standard bash method
+		DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+	fi
 	if [ -z "$1" ]; then 
-		make envs
+		make -C $DIR envs
 		echo "[USAGE] see the list above for environments"
 		echo "[USAGE] use spack: source env.sh spack"
 		echo "[USAGE] use an environment: source env.sh <name>"
