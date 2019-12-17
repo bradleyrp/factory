@@ -36,7 +36,7 @@ class SpotPath(Handler):
 		"""
 		mount_macos(dmg,mount)
 		return dict(fs='dmg',path=mount)
-	def local(local): 
+	def local(self,local): 
 		"""
 		Default local path to a spot.
 		"""
@@ -89,8 +89,9 @@ class Volume(Handler):
 		args_out = '-v %s:%s -w %s'%(path,path,path)
 		return dict(docker_args=args_out)
 
-	def local(self,path):
+	def local(self,local):
 		"""Add the current directory to the volume."""
+		path = local
 		self._check_darwin()
 		path = path_resolver(path)
 		args_out = '-v %s:%s -w %s'%(path,path,path)
