@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+	# note that '.' does not work in place of 'source' in zsh for some reason
 	echo "[ERROR] you must source env.sh"
 	echo "[ERROR] source env.sh without arguments for usage notes"
 # note that we nest all conditionals because exit in a sourced script
