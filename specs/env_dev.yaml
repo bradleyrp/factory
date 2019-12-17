@@ -22,6 +22,10 @@ dependencies:
   - conda-forge::nodejs
   - flask
   - pipenv
+  # mesh and imaging
+  - conda-forge::scikit-image
+  - anaconda::vtk 
+  # note that I later installed vtk via pip2 for python2, possibly in this environment
   - pip: 
     # documentation tools
     - sphinx
@@ -34,3 +38,5 @@ dependencies:
     - scipy
     # api
     - connexion[swagger-ui]
+    # VTK meshes
+    - meshio
