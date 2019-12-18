@@ -78,7 +78,7 @@ class SpackEnvMaker(Handler):
 	def _run_via_spack(self,spack_spot,env_spot,command,fetch=False):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
-		result = ortho.bash('echo $PWD && source %s && %s'%
+		result = ortho.bash('source %s && %s'%
 			(starter,command),cwd=env_spot,scroll=not fetch)
 		return result
 	def std(self,spack,where,spack_spot):
@@ -140,10 +140,15 @@ class SpackEnvItem(Handler):
 			raise Exception('unusual spack spec: %s'%check_compiler)
 		if not re.search(check_compiler,stdout):
 			raise Exception('failed compiler check: %s'%check_compiler)
+	#! the bootstrap and find_compilers recipes must take null arguments
+	#!   this is unavoidable in the YAML format
 	def bootstrap(self,bootstrap):
 		"""Bootstrap installs modules."""
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
+	def find_compilers(self,find_compilers):
+		if find_compilers!=None: raise Exception('boostrap must be null')
+		self._run_via_spack(command="spack compiler find --scope site")
 
 def spack_env_maker(what):
 	"""

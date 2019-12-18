@@ -39,3 +39,18 @@ gromacs_gcc6:
     - name: env_gromacs
       via: template_basic
       specs: ['gromacs@2019.3%gcc@6.4.0']
+
+macos_vmd:
+  notes: |
+    Catalina broke 32-bit binaries so we compile vmd from source.
+    Note that it was easier to simply run VMD in a docker container.
+  envs:
+    - find_compilers: null
+    - bootstrap: null
+    - name: env_vmd_support
+      via: template_basic
+      specs:
+        - fltk@1.3.5
+        - tcl
+        - tk
+        - opengl@4.5
