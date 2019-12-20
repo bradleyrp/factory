@@ -4,6 +4,19 @@ import os
 import ortho
 from ortho import path_resolver
 
+"""
+Example spot in specs:
+	spot: !!python/object/apply:lib.macos.MacosImager
+	  kwds:
+	    name: root
+	    mount: ./nix
+	    path: ./nix.dmg.sparseimage
+	    size: 10g
+	    sparse: true
+	    fs: hfsx
+To use this: `make do specs/spot_macos.yaml`.
+"""
+
 class MacosImager:
 	"""
 	Confirm or create an image on macos.
