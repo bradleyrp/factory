@@ -5,7 +5,7 @@ Replicator REDEVELOPMENT
 Rebuild a replicator feature to replace ortho.replicator, specifically `repl`.
 """
 
-import os,re,tempfile,subprocess,string,sys
+import os,re,tempfile,subprocess,string,sys,shutil
 #! refer to ortho by name for top-level imports simplified by init?
 from ..bash import bash
 from ..dictionary import DotDict
@@ -51,7 +51,7 @@ def constructor_site_hook(loader,node):
 	# process the site
 	from ortho import conf
 	spots = conf.get('spots',{})
-	if name in spots:
+	if name in spots: 
 		return SpotPath(**spots[name]).solve
 	# the root keyword points to the local directory
 	elif name=='root': return dict(local='./')
@@ -106,6 +106,13 @@ class Volume(Handler):
 		args_out = '-v %s:%s -v %s:%s -w %s'%(path,path,pwd,pwd,pwd)
 		return dict(docker_args=args_out)
 
+class DockerFileMaker(Handler):
+	#! this replicates ortho.replicator.replicator.DockerFileMaker
+	#!   however there are several features which need to be ported in
+	def raw(self,raw):
+		"""Set a verbatim Dockerfile under the raw key."""
+		self.dockerfile = raw
+
 class DockerContainer(Handler):
 	_internals = {'name':'real_name','meta':'meta'}
 	def get_container(self,name):
@@ -116,6 +123,7 @@ class DockerContainer(Handler):
 			raise Exception(
 				'docker container name must be <repo>:<tag> but we got: %s:%s'%
 				name)
+		print('status checking containers')
 		containers = bash(
 			'docker images --format "{{.Repository}} {{.Tag}}"',
 			scroll=False,v=True)
@@ -126,10 +134,10 @@ class DockerContainer(Handler):
 		if (repo,name) in avail:
 			return '%s:%s'%(repo,name)
 		#! is this a possible outcome?
-		elif repo==None and (None,name) in avail:
+		elif repo==None and (None,name) in avail: 
 			return name
-		else: 
-			raise Exception('cannot find image: %s in repo: %s'%(name,repo))
+		# rather than build here we defer to ReplicateCore._docker_compose
+		else: return False
 
 class DockerExecution(Handler):
 	def line(self,line):
@@ -186,7 +194,44 @@ class ReplicateCore(Handler):
 	DEV: replacement for the replicator functions
 	"""
 
-	def _docker(self,image,volume={},visit=False,**kwargs):
+	def _docker_compose(self,image,dockerfile,compose):
+		"""
+		Run the standard docker-compose loop.
+		Note that ReplicateCore._docker can be used to run docker with a 
+		preexisting image otherwise you need the present function to build.
+		"""
+		requires_python_check('yaml')
+		import yaml
+		if not dockerfile or not compose:
+			raise Exception('we require dockerfile and compose arguments')
+		#! account for self.spot['docker_args'] possible collision with compose
+		# run compose build in a temorary location
+		dn = tempfile.mkdtemp()
+		# build the Dockerfile
+		dockerfile_obj = DockerFileMaker(**dockerfile)
+		# run compose from the temporary location
+		try:
+			print('status compose from %s'%dn)
+			with open(os.path.join(dn,'Dockerfile'),'w') as fp:
+				fp.write(dockerfile_obj.dockerfile)
+			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
+				yaml.dump(compose,fp)
+			# run docker compose
+			bash('docker-compose build',cwd=dn)
+		except Exception as e:
+			# leave no trace
+			shutil.rmtree(dn)	
+			raise
+		# cleanup
+		shutil.rmtree(dn)
+		# send this back for self.container
+		# note that the user must ensure that the image name in the compose 
+		#   file matches the image_name in the recipe. docker handles the rest
+		# the following serves as a check that the image was created
+		return DockerContainer(name=image).solve
+
+	def _docker(self,image,volume={},visit=False,
+		compose_bundle=None,rebuild=False,**kwargs):
 		"""
 		Run a one-liner command in docker.
 		Not suitable for complex bash commands.
@@ -200,7 +245,9 @@ class ReplicateCore(Handler):
 
 		# step 2: locate the container
 		self.container = DockerContainer(name=image).solve
-
+		# if no container we redirect to _docker_compose
+		if not self.container or rebuild:
+			self.container = self._docker_compose(image=image,**compose_bundle)
 		# step 3: prepare the content of the execution
 		#! keep the '-i' flag?
 		if docker_args: docker_args += ' '
@@ -219,7 +266,7 @@ class ReplicateCore(Handler):
 		# case B: write a script
 		elif self.do['kind']=='script': pass
 		else: raise Exception('dev')
-
+		
 		# step 4: execute the docker run command
 		#! announcement for the script is clumsy because of newlines and
 		#!   escaped characters
@@ -243,6 +290,7 @@ class ReplicateCore(Handler):
 		Run a docker container in "mimic" mode where it substitutes for the
 		host operation system and maintains the right paths.
 		"""
+		print('status running ReplicateCore.docker_mimic')
 		return self._docker(volume=volume,image=image,visit=visit,**kwargs)
 
 	def screen(self,screen,script,**kwargs):

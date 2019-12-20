@@ -38,13 +38,19 @@ def docker(recipe,*args,**kwargs):
 		# test: make docker specs/recipes/basics_redev.yaml
 		recipe = RecipeRead(path=recipe).solve
 	else: raise Exception('dev')
-
+	
 	# STEP B: translate recipe into call to ReplicateCore
 	# empty arguments triggers a visit to the container
 	if not args: cmd,visit = '/bin/bash',True
 	else: cmd = feedback_args_to_command(*args,**kwargs)
 	image = recipe['image_name']
-	ReplicateCore(line=cmd,visit=visit,volume=recipe['site'],image=image)
+	# bundle the compose portion in case we need to build
+	compose_bundle = dict(
+		dockerfile=recipe.get('dockerfile'),
+		compose=recipe.get('compose'))
+	ReplicateCore(line=cmd,visit=visit,
+		volume=recipe['site'],image=image,
+		compose_bundle=compose_bundle)
 
 def docker_shell(recipe,*args):
 	raise Exception('dev')
