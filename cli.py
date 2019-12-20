@@ -354,6 +354,11 @@ class Interface(Parser):
                     (key,env['uname'][key],key,uname[key]))
         set_env_cursor(spot)
 
+    def config(self):
+        """Print the config."""
+        import pprint
+        pprint.pprint(self.cache)
+
     def check_config(self):
         """Check the config against an incoming pipe."""
         print('status waiting for a pipe')
