@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # template for a script that screens itself
+#! note that we need to roll back the Logfile flag because it will fail on macos (old screen)
 screen_maker = """#!/bin/bash
 
 # note that set -x is too verbose
