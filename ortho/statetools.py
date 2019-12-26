@@ -266,7 +266,7 @@ class Parser:
 				sub.set_defaults(**{arg:val})
 			# we treat the None as if it is expecting an argument
 			#   so that you can use None to rely on default kwargs
-			elif isinstance(val, str_types) or isinstance(val, type(None)):
+			elif isinstance(val,str_types) or isinstance(val, type(None)):
 				sub.add_argument('--%s'%arg,
 					dest=arg,default=val,type=str,
 					help='Default for "%s": "%s".' %
@@ -310,15 +310,16 @@ class Parser:
 			print('status instructions follow:\n')
 			print('\n'.join(['  %s'%i for i in func.__doc__.splitlines()]))
 		sub = self.subparsers.add_parser(name)
-		#! sub.add_argument('subcommand')
-		# leave early if we are looking for help to prevent confusing notes
-		#!!! if '-h' in sys.argv: return
 		# build the parser from the args: this trick allows arbitrary args
 		known_args,unknown = self.parser.parse_known_args()
 		obs_known_args = vars(known_args)
 		if obs_known_args: 
 			# known_args are not added to parser so we catch them here
 			raise Exception('preemptively got some args: %s'%obs_known_args)
+		# step 0: identify arguments from inspect args
+		# explicit arguments are those not preceded by stars
+		args_explicit = [i for i in inspected['args'] if i not in 
+			[inspected.get(j,[]) for j in ['*','**']]]
 		# step 1: identify keyword arguments with values from the list
 		inds_kwargs_val = [(ii,ii+1) for ii,i in enumerate(unknown) 
 			if i.startswith(('-','--')) 
@@ -329,6 +330,12 @@ class Parser:
 			if i.startswith(('-','--')) 
 			and ii==len(unknown)-1 or (ii<len(unknown)-1 
 			and unknown[ii+1].startswith(('-','--')))]
+		# the first boolean kwargs are actually args so we subtract them here
+		if len(inds_kwargs_bool)<len(args_explicit):
+			raise Exception(('found fewer CLI args than required: args are %s'
+				' while we received: %s')%(str(args_explicit,unknown)))
+		elif len(inds_kwargs_bool)>=len(args_explicit):
+			inds_kwargs_bool = inds_kwargs_bool[len(args_explicit):]
 		# step 3: the remainder are arguments
 		inds_args = [i for i in range(len(unknown)) if i not in [m 
 			for n in inds_kwargs_bool+inds_kwargs_val for m in n]]
@@ -346,10 +353,6 @@ class Parser:
 		# explicit number of arguments if necessary
 		elif inds_args:
 			sub.add_argument('args',nargs=len(inds_args))
-		#! note that the following signature and call fail:
-		#!   def screen(screen='anon',*args,**kwargs)
-		#!   ./fac screen screen=spack spack specs/spack_tree.yaml
-		#!   however removing the kwargs screen='anon' works
 		# args are still unknown to sub.parse_known_args() here
 		# connect the function to the parser
 		sub.set_defaults(func=func)
