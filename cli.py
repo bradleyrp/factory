@@ -356,6 +356,7 @@ class Interface(Parser):
 
     def config(self):
         """Print the config."""
+        print('status running python from %s'%sys.executable)
         import pprint
         pprint.pprint(self.cache)
 
