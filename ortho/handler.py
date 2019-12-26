@@ -59,6 +59,8 @@ class Handler(object):
 	_internals = {'name':'name','meta':'meta'}
 	# whether to allow inexact matching (we still prefer strict matching)
 	lax = True
+	# report keys
+	verbose = False
 	def _report(self):
 		print('debug Handler summary follows')
 		print(
@@ -222,7 +224,9 @@ class Handler(object):
 		#!   in which we need the taxonomy beforehand. perhaps a replicator?
 		if not kwargs and inspect: return
 		self.classify_fail = classify_fail
+		if self.verbose: print('status Handler has keys: %s'%kwargs.keys())
 		fname = self._classify(*kwargs.keys())
+		if self.verbose: print('status Handler calls `%s`'%fname)
 		self.style = fname
 		self.kwargs = kwargs
 		if not hasattr(self,fname): 
