@@ -42,22 +42,6 @@ class SpotPath(Handler):
 		"""
 		return dict(path=local)
 
-def constructor_site_hook(loader,node):
-	"""
-	Use this as a constructor for the `!spots` yaml tag to get an alternate
-	location for running something. Works with SpotPath and sends to Volume.
-	"""
-	name = loader.construct_scalar(node)
-	# process the site
-	from ortho import conf
-	spots = conf.get('spots',{})
-	if name in spots: 
-		return SpotPath(**spots[name]).solve
-	# the root keyword points to the local directory
-	elif name=='root': return dict(local='./')
-	# pass through the name for a literal path
-	else: return dict(local=name)
-
 class Volume(Handler):
 	"""
 	Handle external volumes for a replicator.
@@ -112,6 +96,8 @@ class DockerFileMaker(Handler):
 	def raw(self,raw):
 		"""Set a verbatim Dockerfile under the raw key."""
 		self.dockerfile = raw
+	def sequence(self,series):
+		import ipdb;ipdb.set_trace()
 
 class DockerContainer(Handler):
 	_internals = {'name':'real_name','meta':'meta'}
@@ -175,19 +161,84 @@ class ScriptPrelim(Handler):
 				staged[name] = tmp_fn
 		return staged
 
+
+
 class RecipeRead(Handler):
 	"""Interpret the reproducibility recipes."""
+	verbose = True
+	yaml = None
 
-	def explicit_path(self,path): 
-		"""Process a recipe from an explicit path."""
-		requires_python_check('yaml')
-		import yaml
+	def _get_yaml(self):
+		"""Import yaml once inside this class."""
+		#! this saves some repetition but probably does not improve speed
+		if not self.yaml: 
+			requires_python_check('yaml')
+			import yaml
+			self.yaml = yaml
+		return self.yaml
+
+	def _add_hooks(self,hooks):
+		yaml = self._get_yaml()
 		# +++ HOOKS are loaded here
-		#! addition of hooks could itself be a hook from ortho.conf
-		yaml.add_constructor('!spots',constructor_site_hook)
+		if hooks:
+			for name,hook in hooks.items():
+				yaml.add_constructor(name,hook)		
+
+	def explicit_path(self,path,hooks=None): 
+		"""Process a recipe from an explicit path."""
+		yaml = self._get_yaml()
+		if hooks: self._add_hooks(hooks)
 		with open(path) as fp: 
 			recipe = yaml.load(fp,Loader=yaml.Loader)
-		return recipe
+		return dict(recipe=recipe)
+
+	def subselect(self,path,subselect_name,hooks=None):
+		"""
+		Assemble a recipe from multiple recipes in a single file.
+		This recipe is triggered by a subselect_name which comes from the CLI
+		specifically via `make docker <spec> <name>` and the rest follows below.
+		"""
+
+		yaml = self._get_yaml()
+		if hooks: self._add_hooks(hooks)
+		with open(path) as fp: 
+			recipe = yaml.load(fp,Loader=yaml.Loader)
+		"""
+		pseudocode: the subselect method requires:
+			a recipe with only one select tree
+			a name in that select tree
+			possibly importing other codes
+		"""
+		# identify the item in the spec file that provides a selection
+		subsel_hook_name = [i for i,j in recipe.items() 
+			if j.__class__.__name__=='function' 
+			and j.__name__=='tree_subselect']
+		if len(subsel_hook_name)!=1:
+			if len(subsel_hook_name)>1:
+				msg = '. matching keys are: %s'%subsel_hook_name
+			else: msg = ''
+			raise Exeception('failed to uniquely identify a tree_subselect '
+				'function populated from the !select tag'+msg)
+		else: select_func = recipe.pop(subsel_hook_name[0])
+
+		# make the selection
+		selected = select_func(subselect_name)
+		if not selected:
+			raise Exception('cannot find selection: %s'%subselect_name)
+		# confirm the whole file has been resolved
+		#if recipe:
+		#	raise Exception('unprocessed keys: %s'%str(recipe.keys()))
+		#!!! resolve imports
+		if 0:
+			if recipe.keys()!={'select'}:
+				#!!! no! make this process the tree below it please! use the hook to make sure there is nothing else in the file. allow alternate imports perhaps? make this recursive ...!!!
+				raise Exception("spec file must have keys: {'select'} to use "
+					"the `docker <spec> <name>` method")
+		#print('subselect')
+		#import ipdb;ipdb.set_trace()
+		#!!! right now the other parts of the recipe are incomplete
+		#! do the imports without anticipating anything?
+		return dict(recipe=selected,ref=recipe)
 
 class ReplicateCore(Handler):
 	"""
@@ -208,6 +259,7 @@ class ReplicateCore(Handler):
 		# run compose build in a temorary location
 		dn = tempfile.mkdtemp()
 		# build the Dockerfile
+		import ipdb;ipdb.set_trace()
 		dockerfile_obj = DockerFileMaker(**dockerfile)
 		# run compose from the temporary location
 		try:
