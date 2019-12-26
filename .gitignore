@@ -20,3 +20,6 @@ conda/
 cache.json
 .envcursor
 local*/
+*.dmg
+*.dmg.sparseimage
+nix/
