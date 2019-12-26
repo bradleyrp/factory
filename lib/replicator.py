@@ -13,65 +13,8 @@ from ortho.replicator.replicator_dev import ReplicateCore
 from ortho.replicator.replicator_dev import RecipeRead
 from ortho.replicator.replicator_dev import SpotPath
 from ortho import requires_python_check
-#! from ortho.replicator.replicator import replicator_read_yaml,many_files
+#! deprecated replicator_read_yaml,many_files
 from ortho import path_resolver
-
-"""
-note that import of replicator_dev also provides handlers
-including !spots and !selector
-"""
-
-def constructor_site_hook(loader,node):
-	"""
-	Use this as a constructor for the `!spots` yaml tag to get an alternate
-	location for running something. Works with SpotPath and sends to Volume.
-	"""
-	name = loader.construct_scalar(node)
-	# process the site
-	from ortho import conf
-	spots = conf.get('spots',{})
-	if name in spots: 
-		return SpotPath(**spots[name]).solve
-	# the root keyword points to the local directory
-	elif name=='root': return dict(local='./')
-	# pass through the name for a literal path
-	else: return dict(local=name)
-
-def subselect_hook(loader,node):
-	"""Select a portion of a recipe."""
-	# note that ortho.replicator.replicator_dev is expecting this function
-	#   to make a subselection and identifies the function below by name
-	subtree = loader.construct_mapping(node)
-	def tree_subselect(name):
-		"""Promote a child node to the parent to whittle a tree."""
-		return subtree.get(name)
-	return tree_subselect
-
-def spec_import_hook(loader,node):
-	"""Import another spec file."""
-	requires_python_check('yaml')
-	import yaml
-	this = loader.construct_mapping(node)
-	parent_fn = loader.name
-	if not os.path.isfile(parent_fn):
-		raise Exception('failed to check file: %s'%parent_fn)
-	# import from the other file as either relative or absolute path
-	path = os.path.join(os.path.dirname(parent_fn),this['from'])
-	if not os.path.isfile(path):
-		path = os.path.realpath(this['from'])
-		if not os.path.isfile(path):
-			raise Exception('cannot find: %s'%this['from'])
-	with open(path) as fp: 
-		imported = yaml.load(fp,Loader=yaml.Loader)
-	if this['what'] not in imported:
-		raise Exception('cannot find %s in %s'%(this['what'],this['from']))
-	return imported[this['what']]
-
-# package hooks
-yaml_hooks = {
-	'!spots':constructor_site_hook,
-	'!select':subselect_hook,
-	'!import_spec':spec_import_hook,}
 
 def feedback_args_to_command(*args,**kwargs):
 	"""
@@ -107,8 +50,7 @@ def docker(recipe,*args,name=None,**kwargs):
 	# a path to a recipe file skips all of the gathering
 	if os.path.isfile(recipe):
 		# test: make docker specs/recipes/basics_redev.yaml
-		recipe_pack = RecipeRead(path=recipe,hooks=yaml_hooks,
-			**kwargs_recipe_read).solve
+		recipe_pack = RecipeRead(path=recipe,**kwargs_recipe_read).solve
 	else: raise Exception('dev')
 	# unpack the recipe
 	recipe = recipe_pack['recipe']
@@ -127,7 +69,11 @@ def docker(recipe,*args,name=None,**kwargs):
 	# bundle the compose portion in case we need to build
 	compose_bundle = dict(
 		dockerfile=recipe.get('dockerfile'),
-		compose=recipe.get('compose'))
+		compose=recipe.get('compose'),
+		# dockerfile reference comes from the dockerfiles key on the parent
+		#   file but can be imported there from another file
+		#! note that this scheme does not allow dockerfiles from many sources
+		dockerfiles_index=ref['dockerfiles'])
 	# the reference data that is paired with recipe from RecipeRead passes
 	#   through to meta for the handler so ReplicateCore methods have access
 	ReplicateCore(line=cmd,visit=visit,

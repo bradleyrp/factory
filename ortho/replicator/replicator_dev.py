@@ -96,8 +96,18 @@ class DockerFileMaker(Handler):
 	def raw(self,raw):
 		"""Set a verbatim Dockerfile under the raw key."""
 		self.dockerfile = raw
-	def sequence(self,series):
-		import ipdb;ipdb.set_trace()
+	def sequence(self,series,dockerfiles_index):
+		"""Construct a dockerfile from a set of components."""
+		dockerfile = []
+		for item in series:
+			item_lookup = dockerfiles_index.get(item,None)
+			if not item_lookup:
+				raise Exception('cannot find dockerfile: %s'%item)
+			comment = '# section: %s\n'%item
+			dockerfile.append(comment)
+			#! no substitution feature yet
+			dockerfile.append(item_lookup)
+		self.dockerfile = '\n'.join(dockerfile)
 
 class DockerContainer(Handler):
 	_internals = {'name':'real_name','meta':'meta'}
@@ -161,7 +171,57 @@ class ScriptPrelim(Handler):
 				staged[name] = tmp_fn
 		return staged
 
+def constructor_site_hook(loader,node):
+	"""
+	Use this as a constructor for the `!spots` yaml tag to get an alternate
+	location for running something. Works with SpotPath and sends to Volume.
+	"""
+	name = loader.construct_scalar(node)
+	# process the site
+	from ortho import conf
+	spots = conf.get('spots',{})
+	if name in spots: 
+		return SpotPath(**spots[name]).solve
+	# the root keyword points to the local directory
+	elif name=='root': return dict(local='./')
+	# pass through the name for a literal path
+	else: return dict(local=name)
 
+def subselect_hook(loader,node):
+	"""Select a portion of a recipe."""
+	# note that ortho.replicator.replicator_dev is expecting this function
+	#   to make a subselection and identifies the function below by name
+	subtree = loader.construct_mapping(node)
+	def tree_subselect(name):
+		"""Promote a child node to the parent to whittle a tree."""
+		return subtree.get(name)
+	return tree_subselect
+
+def spec_import_hook(loader,node):
+	"""Import another spec file."""
+	requires_python_check('yaml')
+	import yaml
+	this = loader.construct_mapping(node)
+	parent_fn = loader.name
+	if not os.path.isfile(parent_fn):
+		raise Exception('failed to check file: %s'%parent_fn)
+	# import from the other file as either relative or absolute path
+	path = os.path.join(os.path.dirname(parent_fn),this['from'])
+	if not os.path.isfile(path):
+		path = os.path.realpath(this['from'])
+		if not os.path.isfile(path):
+			raise Exception('cannot find: %s'%this['from'])
+	with open(path) as fp: 
+		imported = yaml.load(fp,Loader=yaml.Loader)
+	if this['what'] not in imported:
+		raise Exception('cannot find %s in %s'%(this['what'],this['from']))
+	return imported[this['what']]
+
+# package hooks
+yaml_hooks_recipes_default = {
+	'!spots':constructor_site_hook,
+	'!select':subselect_hook,
+	'!import_spec':spec_import_hook,}
 
 class RecipeRead(Handler):
 	"""Interpret the reproducibility recipes."""
@@ -177,30 +237,32 @@ class RecipeRead(Handler):
 			self.yaml = yaml
 		return self.yaml
 
-	def _add_hooks(self,hooks):
+	def _add_hooks(self,**hooks):
 		yaml = self._get_yaml()
+		# load the default hooks
+		for name,hook in yaml_hooks_recipes_default.items():
+			yaml.add_constructor(name,hook)
 		# +++ HOOKS are loaded here
 		if hooks:
 			for name,hook in hooks.items():
-				yaml.add_constructor(name,hook)		
+				yaml.add_constructor(name,hook)
 
-	def explicit_path(self,path,hooks=None): 
+	def explicit_path(self,path,hooks={}): 
 		"""Process a recipe from an explicit path."""
 		yaml = self._get_yaml()
-		if hooks: self._add_hooks(hooks)
+		self._add_hooks(**hooks)
 		with open(path) as fp: 
 			recipe = yaml.load(fp,Loader=yaml.Loader)
 		return dict(recipe=recipe)
 
-	def subselect(self,path,subselect_name,hooks=None):
+	def subselect(self,path,subselect_name,hooks={}):
 		"""
 		Assemble a recipe from multiple recipes in a single file.
 		This recipe is triggered by a subselect_name which comes from the CLI
 		specifically via `make docker <spec> <name>` and the rest follows below.
 		"""
-
 		yaml = self._get_yaml()
-		if hooks: self._add_hooks(hooks)
+		self._add_hooks(**hooks)
 		with open(path) as fp: 
 			recipe = yaml.load(fp,Loader=yaml.Loader)
 		"""
@@ -245,7 +307,7 @@ class ReplicateCore(Handler):
 	DEV: replacement for the replicator functions
 	"""
 
-	def _docker_compose(self,image,dockerfile,compose):
+	def _docker_compose(self,image,dockerfile,compose,dockerfiles_index=None):
 		"""
 		Run the standard docker-compose loop.
 		Note that ReplicateCore._docker can be used to run docker with a 
@@ -259,8 +321,8 @@ class ReplicateCore(Handler):
 		# run compose build in a temorary location
 		dn = tempfile.mkdtemp()
 		# build the Dockerfile
-		import ipdb;ipdb.set_trace()
-		dockerfile_obj = DockerFileMaker(**dockerfile)
+		dockerfile_obj = DockerFileMaker(dockerfiles_index=dockerfiles_index,
+			**dockerfile)
 		# run compose from the temporary location
 		try:
 			print('status compose from %s'%dn)
