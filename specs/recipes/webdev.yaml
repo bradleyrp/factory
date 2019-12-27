@@ -1,0 +1,108 @@
+dockerfiles: !import_spec 
+  from: ./dockerfiles.yaml
+  what: dockerfiles
+dockerfile_wd01: &dockerfile_wd01
+  dockerfile:
+    sequence:
+      - bionic
+      - ubuntu_build
+      - ubuntu_python_latest
+      - node_nvm
+      - user_sudo_ubuntu
+select: !select
+  ubuntu:
+    image_name: &image_name_ubuntu factory:ubuntu_build
+    command: docker-compose run --service-ports deploy
+    site: !spots root
+    compose:
+      version: '3'
+      services:
+        deploy:
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *image_name_ubuntu
+          volumes: []
+    dockerfile:
+      series:
+        - bionic
+        - ubuntu_build
+  e01:
+    notes: |
+      OBJECTIVE: Generic web development.
+      Currently marked "e01" for "explore".
+      Points to several projects in the development spot.
+      !!! notes need updated
+    site: !spots root
+    image_name: &image_name_e01 factory:wd01
+    command: docker-compose run --service-ports deploy
+    compose:
+      version: '3'
+      services:
+        deploy:
+          entrypoint: ['/bin/bash','-l']
+          #! update the name if you add more stuff
+          image: *image_name_e01
+          volumes:
+            - ./devspot/e01:/home/user/dev
+          ports: 
+            - 5000:5000
+            - 8000:8000
+            - 4200:4200
+          hostname: localhost
+    dockerfile: *dockerfile_wd01
+  e01p2:
+    notes: |
+      EXAMPLE APPLICATION: flask with mongodb
+      We have a swarm and a compose version.
+        swarm:
+          Run `docker swarm init` to start.
+          Shutdown is easy with `docker stack rm e01p2`.
+          End the swarm with `docker swarm leave --force`.
+          See e01p2s for this version.
+        compose: 
+          This recipe does the standard compose. 
+          To shutdown the services you need to run `docker-compose stop` 
+            at the site of the docker-compose.yaml, which is less convenient.
+      Note that this recipe is the first canonical multi-service recipe.
+    via: e01
+    mods:
+      # turn off cleanup to get the docker information you need
+      cleanup: False
+      compose:
+        services:
+          deploy:
+            entrypoint: ['/bin/bash','script.sh']
+            volumes:
+              - ./script.sh:/home/user/script.sh
+              - ./devspot/e01:/home/user/dev
+            environment: 
+              STACK_NAME: e01p2
+            container_name: e01p2_deploy
+            ports: 
+              - 5000:5000
+          mongo:
+            image: mongo
+            restart: always
+            environment:
+              MONGO_INITDB_ROOT_USERNAME: root
+              MONGO_INITDB_ROOT_PASSWORD: example
+            container_name: e01p2_mongo
+          mongo-express:
+            image: mongo-express
+            restart: always
+            ports:
+              - 8081:8081
+            environment:
+              ME_CONFIG_MONGODB_ADMINUSERNAME: root
+              ME_CONFIG_MONGODB_ADMINPASSWORD: example
+            container_name: e01p2_mongo-express
+        version: '3.1'
+      script: |
+        #!/bin/bash
+        set -e -x
+        cd dev/proj02
+        source venv/bin/activate 
+        cd FlaskWithMongoDB
+        export FLASK_ENV=development FLASK_APP=app.py 
+        flask run --host=0.0.0.0
+      command: docker-compose up -d

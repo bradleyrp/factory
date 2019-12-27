@@ -1,0 +1,55 @@
+dockerfiles: 
+  bionic: |
+    FROM ubuntu:bionic
+  ubuntu_build: |
+    # section: basic requirements
+    ENV DEBIAN_FRONTEND noninteractive
+    RUN apt-get -y clean
+    RUN apt-get -y update
+    RUN apt-get install -y --no-install-recommends apt-utils
+    RUN apt-get install -y build-essential
+    RUN apt-get install -y git
+    RUN apt-get install -y make
+    RUN apt-get install -y wget
+    RUN apt-get install -y curl
+    RUN apt-get install -y vim
+    RUN apt-get install -y jq
+    RUN apt-get install -y libssl-dev
+    RUN apt-get install -y screen
+  ubuntu_python_latest: |
+    # section: latest python3
+    RUN apt-get install -y python3
+    # redundant if this is latest
+    RUN apt-get install -y python3 python3-dev python3-pip python3-venv
+    RUN apt-get install -y python3.7 python3.7-dev python3.7-venv
+    # note that the latest python is the default after update-alternatives
+    RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.6 1
+    RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.7 2
+  node_nvm: |
+    # section: install nvm and node as root
+    RUN mkdir /usr/local/nvm
+    RUN mkdir /usr/local/node
+    # note that nvm typically installs to ~/.nvm
+    # note that nvm is typically installed by users, not root
+    ENV NVM_DIR /usr/local/nvm
+    RUN export nvm_ver=$(curl -sSl \
+      https://api.github.com/repos/nvm-sh/nvm/releases/latest \
+      | jq -r ".name") \
+      && curl -sSl \
+      "https://raw.githubusercontent.com/creationix/nvm/$nvm_ver/install.sh" \
+      | /bin/bash
+    RUN /bin/bash -c "source /usr/local/nvm/nvm.sh && nvm install node"
+    RUN cp /usr/local/nvm/nvm.sh /etc/profile.d/z10-nvm.sh
+  user_sudo_ubuntu: |
+    # section: make_user with sudo
+    RUN getent group 100 > /dev/null 2>&1 || (groupmod -g 100 users)
+    RUN useradd -m -u 1000 -g 100 user
+    RUN echo 'user:secret' | chpasswd
+    RUN apt-get install -y sudo
+    RUN sudo adduser user sudo
+    USER user
+    RUN touch ~/.sudo_as_admin_successful
+    WORKDIR /home/user
+  firefox_attempt: |
+    RUN apt-get update
+    RUN apt-get install -y firefox
