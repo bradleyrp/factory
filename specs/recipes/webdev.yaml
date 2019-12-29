@@ -2,13 +2,12 @@ dockerfiles: !import_spec
   from: ./dockerfiles.yaml
   what: dockerfiles
 dockerfile_wd01: &dockerfile_wd01
-  dockerfile:
-    sequence:
-      - bionic
-      - ubuntu_build
-      - ubuntu_python_latest
-      - node_nvm
-      - user_sudo_ubuntu
+  series:
+    - bionic
+    - ubuntu_build
+    - ubuntu_python_latest
+    - node_nvm
+    - user_sudo_ubuntu
 select: !select
   ubuntu:
     image_name: &image_name_ubuntu factory:ubuntu_build
@@ -40,7 +39,7 @@ select: !select
       services:
         deploy:
           entrypoint: ['/bin/bash','-l']
-          #! update the name if you add more stuff
+          build: .
           image: *image_name_e01
           volumes:
             - ./devspot/e01:/home/user/dev
@@ -66,8 +65,6 @@ select: !select
       Note that this recipe is the first canonical multi-service recipe.
     via: e01
     mods:
-      # turn off cleanup to get the docker information you need
-      cleanup: False
       compose:
         services:
           deploy:
@@ -106,3 +103,6 @@ select: !select
         export FLASK_ENV=development FLASK_APP=app.py 
         flask run --host=0.0.0.0
       command: docker-compose up -d
+  e01b:
+    notes: Example for testing recursion with the "via" key.
+    via: e01p2

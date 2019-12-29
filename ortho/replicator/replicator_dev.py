@@ -5,7 +5,7 @@ Replicator REDEVELOPMENT
 Rebuild a replicator feature to replace ortho.replicator, specifically `repl`.
 """
 
-import os,re,tempfile,subprocess,string,sys,shutil
+import os,re,tempfile,subprocess,string,sys,shutil,copy
 #! refer to ortho by name for top-level imports simplified by init?
 from ..bash import bash
 from ..dictionary import DotDict
@@ -103,11 +103,13 @@ class DockerFileMaker(Handler):
 			item_lookup = dockerfiles_index.get(item,None)
 			if not item_lookup:
 				raise Exception('cannot find dockerfile: %s'%item)
-			comment = '# section: %s\n'%item
+			comment = '# dockerfile from series: %s\n'%item
 			dockerfile.append(comment)
 			#! no substitution feature yet
 			dockerfile.append(item_lookup)
 		self.dockerfile = '\n'.join(dockerfile)
+		print('status dockerfile follows')
+		print('\n'.join(['| '+i for i in self.dockerfile.splitlines()]))
 
 class DockerContainer(Handler):
 	_internals = {'name':'real_name','meta':'meta'}
@@ -189,13 +191,27 @@ def constructor_site_hook(loader,node):
 
 def subselect_hook(loader,node):
 	"""Select a portion of a recipe."""
-	# note that ortho.replicator.replicator_dev is expecting this function
-	#   to make a subselection and identifies the function below by name
+	# see twin function get_recupe_subselector to unpack this
 	subtree = loader.construct_mapping(node)
-	def tree_subselect(name):
+	def tree_subselect(name=None):
 		"""Promote a child node to the parent to whittle a tree."""
-		return subtree.get(name)
+		if not name: return subtree
+		else: return subtree.get(name)
 	return tree_subselect
+
+def get_recipe_subselector(recipe):
+	"""Unpack a subtree."""
+	subsel_hook_name = [i for i,j in recipe.items() 
+		if j.__class__.__name__=='function' 
+		and j.__name__=='tree_subselect']
+	if len(subsel_hook_name)!=1:
+		if len(subsel_hook_name)>1:
+			msg = '. matching keys are: %s'%subsel_hook_name
+		else: msg = ''
+		raise Exeception('failed to uniquely identify a tree_subselect '
+			'function populated from the !select tag'+msg)
+	else: select_func = recipe.pop(subsel_hook_name[0])
+	return select_func
 
 def spec_import_hook(loader,node):
 	"""Import another spec file."""
@@ -247,24 +263,27 @@ class RecipeRead(Handler):
 			for name,hook in hooks.items():
 				yaml.add_constructor(name,hook)
 
-	def explicit_path(self,path,hooks={}): 
+	def explicit_path(self,path,hooks=None): 
 		"""Process a recipe from an explicit path."""
+		if not hooks: hooks = {}
 		yaml = self._get_yaml()
 		self._add_hooks(**hooks)
 		with open(path) as fp: 
 			recipe = yaml.load(fp,Loader=yaml.Loader)
 		return dict(recipe=recipe)
 
-	def subselect(self,path,subselect_name,hooks={}):
+	def subselect(self,path,subselect_name,hooks=None):
 		"""
 		Assemble a recipe from multiple recipes in a single file.
 		This recipe is triggered by a subselect_name which comes from the CLI
 		specifically via `make docker <spec> <name>` and the rest follows below.
 		"""
+		if not hooks: hooks = {}
 		yaml = self._get_yaml()
 		self._add_hooks(**hooks)
 		with open(path) as fp: 
 			recipe = yaml.load(fp,Loader=yaml.Loader)
+		recipe_full = copy.deepcopy(recipe)
 		"""
 		pseudocode: the subselect method requires:
 			a recipe with only one select tree
@@ -272,35 +291,12 @@ class RecipeRead(Handler):
 			possibly importing other codes
 		"""
 		# identify the item in the spec file that provides a selection
-		subsel_hook_name = [i for i,j in recipe.items() 
-			if j.__class__.__name__=='function' 
-			and j.__name__=='tree_subselect']
-		if len(subsel_hook_name)!=1:
-			if len(subsel_hook_name)>1:
-				msg = '. matching keys are: %s'%subsel_hook_name
-			else: msg = ''
-			raise Exeception('failed to uniquely identify a tree_subselect '
-				'function populated from the !select tag'+msg)
-		else: select_func = recipe.pop(subsel_hook_name[0])
-
+		select_func = get_recipe_subselector(recipe)
 		# make the selection
 		selected = select_func(subselect_name)
 		if not selected:
 			raise Exception('cannot find selection: %s'%subselect_name)
-		# confirm the whole file has been resolved
-		#if recipe:
-		#	raise Exception('unprocessed keys: %s'%str(recipe.keys()))
-		#!!! resolve imports
-		if 0:
-			if recipe.keys()!={'select'}:
-				#!!! no! make this process the tree below it please! use the hook to make sure there is nothing else in the file. allow alternate imports perhaps? make this recursive ...!!!
-				raise Exception("spec file must have keys: {'select'} to use "
-					"the `docker <spec> <name>` method")
-		#print('subselect')
-		#import ipdb;ipdb.set_trace()
-		#!!! right now the other parts of the recipe are incomplete
-		#! do the imports without anticipating anything?
-		return dict(recipe=selected,ref=recipe)
+		return dict(recipe=selected,ref=recipe,parent=recipe_full)
 
 class ReplicateCore(Handler):
 	"""
@@ -334,9 +330,10 @@ class ReplicateCore(Handler):
 			bash('docker-compose build',cwd=dn)
 		except Exception as e:
 			# leave no trace
-			shutil.rmtree(dn)	
+			shutil.rmtree(dn)
 			raise
 		# cleanup
+		import ipdb;ipdb.set_trace()
 		shutil.rmtree(dn)
 		# send this back for self.container
 		# note that the user must ensure that the image name in the compose 
@@ -362,10 +359,13 @@ class ReplicateCore(Handler):
 		# if no container we redirect to _docker_compose
 		if not self.container or rebuild:
 			self.container = self._docker_compose(image=image,**compose_bundle)
+		if not self.container:
+			raise Exception('failed to get a container')
 		# step 3: prepare the content of the execution
 		#! keep the '-i' flag?
 		if docker_args: docker_args += ' '
-		cmd = 'docker run -u 0 -i%s %s%s'%('t' if visit else '',
+		# removed "-u 0" which runs as root
+		cmd = 'docker run -i%s %s%s'%('t' if visit else '',
 			docker_args,self.container)
 		# kwargs contains either line or script for the execution step
 		self.do = DockerExecution(**kwargs).solve
