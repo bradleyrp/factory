@@ -303,12 +303,23 @@ class ReplicateCore(Handler):
 	DEV: replacement for the replicator functions
 	"""
 
-	def _docker_compose(self,image,dockerfile,compose,dockerfiles_index=None):
+	def _docker_compose(self,image,dockerfile,compose,
+		compose_cmd=None,mode='build',dockerfiles_index=None):
 		"""
 		Run the standard docker-compose loop.
 		Note that ReplicateCore._docker can be used to run docker with a 
 		preexisting image otherwise you need the present function to build.
 		"""
+		# the default mode is build for a command to be specified later
+		if mode=='build':
+			if compose_cmd:
+				raise Exception(
+					'cannot set compose_cmd if mode is build: %s'%compose_cmd)
+			compose_cmd = 'docker-compose build'
+		elif mode=='compose':
+			if not compose_cmd:
+				raise Exception('compose mode requires a compose_cmd')
+		else: raise Exception('invalid mode: %s'%mode)
 		requires_python_check('yaml')
 		import yaml
 		if not dockerfile or not compose:
@@ -327,13 +338,12 @@ class ReplicateCore(Handler):
 			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
 				yaml.dump(compose,fp)
 			# run docker compose
-			bash('docker-compose build',cwd=dn)
+			bash(compose_cmd,cwd=dn)
 		except Exception as e:
 			# leave no trace
 			shutil.rmtree(dn)
 			raise
 		# cleanup
-		import ipdb;ipdb.set_trace()
 		shutil.rmtree(dn)
 		# send this back for self.container
 		# note that the user must ensure that the image name in the compose 
@@ -361,12 +371,24 @@ class ReplicateCore(Handler):
 			self.container = self._docker_compose(image=image,**compose_bundle)
 		if not self.container:
 			raise Exception('failed to get a container')
+
 		# step 3: prepare the content of the execution
-		#! keep the '-i' flag?
-		if docker_args: docker_args += ' '
-		# removed "-u 0" which runs as root
-		cmd = 'docker run -i%s %s%s'%('t' if visit else '',
-			docker_args,self.container)
+		# step 3b: check for a command flag
+		compose_command = compose_bundle.get('command')
+		if compose_command:
+			cmd = compose_command
+		else:
+			#! keep the '-i' flag?
+			if docker_args: docker_args += ' '
+			# removed "-u 0" which runs as root
+			cmd = 'docker run -i%s %s%s'%('t' if visit else '',
+				docker_args,self.container)
+
+		# the cmd is routed to kwargs as line here
+		#! previously set in ReplicateWrap.std
+		#! temporary placeholder; this is inelegant
+		kwargs['line'] = cmd
+
 		# kwargs contains either line or script for the execution step
 		self.do = DockerExecution(**kwargs).solve
 
@@ -380,7 +402,8 @@ class ReplicateCore(Handler):
 		# case B: write a script
 		elif self.do['kind']=='script': pass
 		else: raise Exception('dev')
-		
+		import ipdb;ipdb.set_trace()
+
 		# step 4: execute the docker run command
 		#! announcement for the script is clumsy because of newlines and
 		#!   escaped characters
@@ -425,7 +448,7 @@ class ReplicateCore(Handler):
 		if 0:
 			formatter = string.Formatter()
 			reqs = formatter.parse(script)
-			import ipdb;ipdb.set_trace()
+			#! set trace here
 		script = script%dict(spot=spot if spot else '')
 		# add staged variables to the script
 		if prelim:

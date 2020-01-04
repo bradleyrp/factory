@@ -20,6 +20,7 @@ from ortho import catalog,delveset
 
 def feedback_args_to_command(*args,**kwargs):
 	"""
+	A composition: allow `./fac docker` to host another `./fac` command.
 	Convert arguments back into a command which is composed with a replicator.
 	This function helps us to reconstitute arguments when calling the make/fac
 	interface from a replicator method such as screen or docker.
@@ -33,23 +34,26 @@ def feedback_args_to_command(*args,**kwargs):
 	return cmd
 
 class ReplicateWrap(Handler):
-	def std(self,args,site,image_name,command,compose,dockerfile,notes=None):
+	def std(self,args,site,image_name,command,compose,dockerfile,
+		notes=None,script=None):
 		"""Standard method for translating a recipe into a ReplicateCore."""
 		# STEP B: translate recipe into call to ReplicateCore
 		# empty arguments triggers a visit to the container
 		# use of explicit kwargs for name, spec above mean that args can
 		#   pass through to another call to fac to nest/compose the replicator
-		if not args: cmd,visit = '/bin/bash',True
+		# note that a cmd of None and no recipe command means we just visit
+		#! is cmd and visit redundant in this case?
+		if not args: cmd,visit = None,True
 		# the following allows args to be reformulated for fac specifically
-		else: cmd = feedback_args_to_command(*args,**kwargs)
-		ref = self.meta
+		else: cmd,visit = feedback_args_to_command(*args,**kwargs),False
+		ref = self.meta['ref']
 		# bundle the compose portion in case we need to build
 		compose_bundle = dict(
 			dockerfile=dockerfile,
 			compose=compose,
 			# dockerfile reference comes from the dockerfiles key on the parent
 			#   file but can be imported there from another file
-			#! note that this scheme does not allow dockerfiles from many sources
+			#! note this scheme does not allow dockerfiles from many sources
 			dockerfiles_index=ref['dockerfiles'])
 		# the reference data that is paired with recipe from RecipeRead passes
 		#   through to meta for the handler so ReplicateCore methods have access
@@ -100,33 +104,8 @@ class ReplicateWrap(Handler):
 		# apply the final set of mods for the leaf recipe
 		for path,value in catalog(mods_this):
 			delveset(outgoing,*path,value=value)
-		import ipdb;ipdb.set_trace()
 		# make sure the last modifications are the ones for this recipe
 		return self.std(args=args,**outgoing)
-
-	# inspecting old code
-	if 0:
-		fname = self._classify(*self.meta['complete'][first].keys())
-		if fname=='via': 
-			raise Exception(
-				'eldest parent of this "via" graph needs a parent: %s'%str(
-					paths_this))
-		outgoing = copy.deepcopy(self.meta['complete'][first])
-		for stage in paths_this[1:]:
-			outgoing.update(**copy.deepcopy(self.meta['complete'][stage].get('overrides',{})))
-		# for the simplest case we must apply the overrides
-		outgoing.update(**overrides)
-		#!!! this needs tested!
-		# the mods keyword can be used to surgically alter the tree of hashes
-		if mods:
-			for path,value in catalog(mods):
-				delveset(outgoing,*path,value=value)
-		# via calls docker_compose typically
-		#! make sure the following does not cause conflicts
-		outgoing['indirect'] = False
-		#! pass cname from CLI to the target function
-		if cname: outgoing['cname'] = cname
-		getattr(self,fname)(**outgoing)
 
 def docker(recipe,*args,name=None,**kwargs):
 	"""
@@ -134,7 +113,6 @@ def docker(recipe,*args,name=None,**kwargs):
 	make docker spot=./here script specs/demo_script.yaml delay
 	"""
 	visit = kwargs.pop('visit',False)
-
 	# transform incoming arguments to RecipeRead
 	kwargs_recipe_read = {}
 	if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
@@ -152,10 +130,6 @@ def docker(recipe,*args,name=None,**kwargs):
 	# unpack the recipe
 	recipe = recipe_pack['recipe']
 	ref = recipe_pack['ref']
-	# further steps are handled elsewhere to account for different recipes
-	# we cannot encode recursion through multiple "via" keys by directly
-	#   calling the ReplicateWrap with the current recipe hence we have a 
-	#!! is this true?
 	recipe_out = ReplicateWrap(meta=recipe_pack,args=args,**recipe)
 
 def docker_shell(recipe,*args):
