@@ -331,10 +331,13 @@ class Parser:
 			and ii==len(unknown)-1 or (ii<len(unknown)-1 
 			and unknown[ii+1].startswith(('-','--')))]
 		# the first boolean kwargs are actually args so we subtract them here
-		if len(inds_kwargs_bool)<len(args_explicit):
-			raise Exception(('found fewer CLI args than required: args are %s'
-				' while we received: %s')%(str(args_explicit,unknown)))
-		elif len(inds_kwargs_bool)>=len(args_explicit):
+		#! deprecated. the original use-case should be recovered
+		if 0:
+			if len(inds_kwargs_bool)<len(args_explicit):
+				raise Exception((
+					'found fewer CLI args than required: args are %s'
+					' while we received: %s')%(str(args_explicit),str(unknown)))
+		if len(inds_kwargs_bool)>=len(args_explicit):
 			inds_kwargs_bool = inds_kwargs_bool[len(args_explicit):]
 		# step 3: the remainder are arguments
 		inds_args = [i for i in range(len(unknown)) if i not in [m 
