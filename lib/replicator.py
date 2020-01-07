@@ -34,19 +34,27 @@ def feedback_args_to_command(*args,**kwargs):
 	return cmd
 
 class ReplicateWrap(Handler):
-	def std(self,args,site,image_name,command,compose,dockerfile,
-		notes=None,script=None):
+	def std(self,args,site,image_name,compose,dockerfile,
+		nickname=None,command=None,notes=None,script=None,visit=False):
 		"""Standard method for translating a recipe into a ReplicateCore."""
-		# STEP B: translate recipe into call to ReplicateCore
-		# empty arguments triggers a visit to the container
-		# use of explicit kwargs for name, spec above mean that args can
-		#   pass through to another call to fac to nest/compose the replicator
-		# note that a cmd of None and no recipe command means we just visit
-		#! is cmd and visit redundant in this case?
-		if not args: cmd,visit = None,True
-		# the following allows args to be reformulated for fac specifically
-		else: cmd,visit = feedback_args_to_command(*args,**kwargs),False
-		ref = self.meta['ref']
+		if args and command:
+			raise Exception(
+				'cannot choose between args and command: "%s" vs "%s"'%
+				(str(args),command))
+		elif args and not command:
+			# arguments trigger a composed/recursive call to the factory
+			command = feedback_args_to_command(*args,**kwargs)
+			mode = 'compose'
+		elif not args and command: 
+			mode = 'compose'
+		elif not args and not command:
+			# visit if empty arguments and no command from the recipe
+			command = '/bin/bash'
+			mode = 'visit'
+		else: raise Exception('invalid')
+		# pass the reference data
+		ref = self.meta.get('ref',{})
+
 		# bundle the compose portion in case we need to build
 		compose_bundle = dict(
 			dockerfile=dockerfile,
@@ -54,14 +62,16 @@ class ReplicateWrap(Handler):
 			# dockerfile reference comes from the dockerfiles key on the parent
 			#   file but can be imported there from another file
 			#! note this scheme does not allow dockerfiles from many sources
-			dockerfiles_index=ref['dockerfiles'])
+			dockerfiles_index=ref.get('dockerfiles'))
+
 		# the reference data that is paired with recipe from RecipeRead passes
-		#   through to meta for the handler so ReplicateCore methods have access
-		ReplicateCore(line=cmd,visit=visit,
-			volume=site,image=image_name,
+		#   through to meta for the handler so ReplicateCore methods can see
+		# nickname and mode come from the code. the rest comes from the recipe
+		ReplicateCore(mode=mode,nickname=nickname,visit=visit,
+			volume=site,image=image_name,line=command,
 			compose_bundle=compose_bundle,meta=ref)
 
-	def via(self,via,args=None,mods=None,notes=None):
+	def via(self,via,args=None,mods=None,notes=None,nickname=None):
 		"""Extend one recipe with another."""
 		if not mods: mods = {}
 		recipe_pack = self.meta
@@ -105,13 +115,14 @@ class ReplicateWrap(Handler):
 		for path,value in catalog(mods_this):
 			delveset(outgoing,*path,value=value)
 		# make sure the last modifications are the ones for this recipe
-		return self.std(args=args,**outgoing)
+		return self.std(args=args,nickname=nickname,**outgoing)
 
 def docker(recipe,*args,name=None,**kwargs):
 	"""
 	Run anything in a docker using `ReplicatorCore`.
 	make docker spot=./here script specs/demo_script.yaml delay
 	"""
+	#! is this deprecated by the new workflow
 	visit = kwargs.pop('visit',False)
 	# transform incoming arguments to RecipeRead
 	kwargs_recipe_read = {}
@@ -120,17 +131,26 @@ def docker(recipe,*args,name=None,**kwargs):
 	# the only exception is a single argument which is a spec file
 	if not name and len(args)==1: name,args = args[0],()
 	if name: kwargs_recipe_read['subselect_name'] = name
-	# STEP A: get the recipe note that step B occurs in ReplicateWrap
+	# STEP A: get the recipe. note that step B occurs in ReplicateWrap
 	#! intervene here with a basic default recipe if no yaml?
-	# a path to a recipe file skips all of the gathering
 	if os.path.isfile(recipe):
 		# test: make docker specs/recipes/basics_redev.yaml
 		recipe_pack = RecipeRead(path=recipe,**kwargs_recipe_read).solve
 	else: raise Exception('dev')
 	# unpack the recipe
 	recipe = recipe_pack['recipe']
-	ref = recipe_pack['ref']
-	recipe_out = ReplicateWrap(meta=recipe_pack,args=args,**recipe)
+	recipe_out = ReplicateWrap(meta=recipe_pack,args=args,
+		nickname=name,**recipe)
+
+def compose_cleanup(dn,sure=False):
+	"""Clean up a compose link from ReplicateCore."""
+	from ortho import confirm
+	import shutil
+	if not os.path.islink(dn):
+		raise Exception('not a link: %s'%dn)
+	if sure or confirm('okay to remove %s'%dn):
+		shutil.rmtree(os.readlink(dn))
+		os.unlink(dn)
 
 def docker_shell(recipe,*args):
 	raise Exception('dev')

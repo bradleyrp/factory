@@ -93,8 +93,9 @@ class Volume(Handler):
 class DockerFileMaker(Handler):
 	#! this replicates ortho.replicator.replicator.DockerFileMaker
 	#!   however there are several features which need to be ported in
-	def raw(self,raw):
+	def raw(self,raw,dockerfiles_index=None):
 		"""Set a verbatim Dockerfile under the raw key."""
+		# note that we ignore other keys when we have the raw file
 		self.dockerfile = raw
 	def sequence(self,series,dockerfiles_index):
 		"""Construct a dockerfile from a set of components."""
@@ -304,7 +305,8 @@ class ReplicateCore(Handler):
 	"""
 
 	def _docker_compose(self,image,dockerfile,compose,
-		compose_cmd=None,mode='build',dockerfiles_index=None):
+		compose_cmd=None,mode='build',visit=False,
+		cleanup=True,dockerfiles_index=None):
 		"""
 		Run the standard docker-compose loop.
 		Note that ReplicateCore._docker can be used to run docker with a 
@@ -333,32 +335,49 @@ class ReplicateCore(Handler):
 		# run compose from the temporary location
 		try:
 			print('status compose from %s'%dn)
+			#! link here instead with ln_name? in case you are visiting?
 			with open(os.path.join(dn,'Dockerfile'),'w') as fp:
 				fp.write(dockerfile_obj.dockerfile)
 			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
 				yaml.dump(compose,fp)
 			# run docker compose
-			bash(compose_cmd,cwd=dn)
+			if visit:
+				# we require a TTY to enter the container so we use os.system
+				# possible security issue
+				# this requires `visit: True` in the recipe alongside command
+				print('status running docker: %s'%compose_cmd)
+				here = os.getcwd()
+				os.chdir(dn)
+				os.system(compose_cmd)
+				os.chdir(here)
+			else:
+				# background execution
+				bash(compose_cmd,cwd=dn,v=True)
 		except Exception as e:
 			# leave no trace
 			shutil.rmtree(dn)
 			raise
 		# cleanup
-		shutil.rmtree(dn)
-		# send this back for self.container
-		# note that the user must ensure that the image name in the compose 
-		#   file matches the image_name in the recipe. docker handles the rest
-		# the following serves as a check that the image was created
-		return DockerContainer(name=image).solve
+		if cleanup:
+			shutil.rmtree(dn)
+			# send this back for self.container
+			# note that the user must ensure that the image name in the compose 
+			#   file matches the image_name in the recipe. docker handles the rest
+			# the following serves as a check that the image was created
+			return DockerContainer(name=image).solve
+		# if not cleaning up we return the temporary directory
+		else: return dn
 
-	def _docker(self,image,volume={},visit=False,
-		compose_bundle=None,rebuild=False,**kwargs):
+	def _docker(self,image,volume={},
+		compose_bundle=None,rebuild=False,mode=None,nickname=None,visit=False,
+		**kwargs):
 		"""
 		Run a one-liner command in docker.
 		Not suitable for complex bash commands.
 		"""
 		# you cannot use decorators with Handler
 		is_terminal_command('docker')
+		if not mode: raise Exception('docker function requires a mode')
 
 		# step 1: assemble the volume
 		self.spot = Volume(**volume).solve
@@ -366,69 +385,96 @@ class ReplicateCore(Handler):
 
 		# step 2: locate the container
 		self.container = DockerContainer(name=image).solve
-		# if no container we redirect to _docker_compose
-		if not self.container or rebuild:
+		# if no container we redirect to _docker_compose if we are visiting
+		#   because a visit will create a manual docker command
+		if (not self.container or rebuild) and mode=='visit':
 			self.container = self._docker_compose(image=image,**compose_bundle)
-		if not self.container:
-			raise Exception('failed to get a container')
+		# we can run a command directly in the docker-compose folder
+		elif mode=='compose':
 
-		# step 3: prepare the content of the execution
-		# step 3b: check for a command flag
-		compose_command = compose_bundle.get('command')
-		if compose_command:
-			cmd = compose_command
-		else:
-			#! keep the '-i' flag?
+			# nickname is a simple method for preventing reexecution
+			# the nickname links us to the temporary location of the compose
+			# the nickname comes from the name kwarg to `make docker`
+			ln_name = 'up-%s'%nickname
+			if nickname and (
+				os.path.isfile(ln_name) or os.path.islink(ln_name)):
+				raise Exception(('found link %s which might indicate that '
+					'these containers are up. remove to continue.'%ln_name))
+
+			# kwargs contains either line or script for the execution step
+			self.do = DockerExecution(**kwargs).solve
+			if self.do['kind']=='line':
+				compose_cmd = self.do['line']
+			elif self.do['kind']=='script':
+				raise Exception('dev')
+			else: raise Exception('dev')
+
+			# note that the container may exist at this point but either way
+			#   we still need to run compose with the right command
+			spot = self._docker_compose(image=image,mode='compose',visit=visit,
+				compose_cmd=compose_cmd,cleanup=False,**compose_bundle)
+			# note that execution concludes with compose when the recipe
+			#   specifies a command. we report the compose location
+			print('status docker-compose runs from: %s'%spot)
+			os.symlink(spot,ln_name)
+			print('status linked to %s'%ln_name)
+			return
+
+		elif not self.container:
+			raise Exception('failed to get a container')
+		elif mode=='visit': pass
+		else: raise Exception('dev')
+
+		# remaining execution occurs with a manual command
+		if mode=='visit':
+
+			# run docker commands without compose if you turn off visit here
+			visit_direct = True
+			# reformat the docker call if necessary
+			self.do = DockerExecution(**kwargs).solve
+			# in the visit mode we reformulate a docker command
 			if docker_args: docker_args += ' '
 			# removed "-u 0" which runs as root
-			cmd = 'docker run -i%s %s%s'%('t' if visit else '',
+			# wrap the command in a `docker run` with arguments and volumes
+			cmd = 'docker run -i%s %s%s'%('t' if visit_direct else '',
 				docker_args,self.container)
+			# case A: one-liner
+			if self.do['kind']=='line':
+				cmd += ' /bin/sh -c "%s"'%self.do['line']
+			# case B: write a script
+			elif self.do['kind']=='script': pass
+			else: raise Exception('dev')
 
-		# the cmd is routed to kwargs as line here
-		#! previously set in ReplicateWrap.std
-		#! temporary placeholder; this is inelegant
-		kwargs['line'] = cmd
+			# execute the docker run command
+			#! stdout for the script is clumsy because of newlines, escape
+			# script execution via stdin to docker
+			if self.do['kind']=='script':
+				script = self.do['script']
+				print('status script:\n'+str(script))
+				print('status command: %s'%cmd)
+				proc = subprocess.Popen(cmd.split(),stdin=subprocess.PIPE)
+				proc.communicate(script.encode())
+			
+			# we require a TTY to enter the container so we use os.system
+			elif visit_direct:
 
-		# kwargs contains either line or script for the execution step
-		self.do = DockerExecution(**kwargs).solve
+				# possible security issue
+				print('status running docker: %s'%cmd)
+				os.system(cmd)
+			
+			# standard execution
+			else: bash(cmd,scroll=True,v=True)
 
-		# case A: one-liner
-		if visit:
-			if not self.do['kind']=='line': 
-				raise Exception('visit requires line')
-			cmd += ' '+self.do['line']
-		elif self.do['kind']=='line':
-			cmd += ' /bin/sh -c "%s"'%self.do['line']
-		# case B: write a script
-		elif self.do['kind']=='script': pass
 		else: raise Exception('dev')
-		import ipdb;ipdb.set_trace()
-
-		# step 4: execute the docker run command
-		#! announcement for the script is clumsy because of newlines and
-		#!   escaped characters
-		# script execution via stdin to docker
-		if self.do['kind']=='script':
-			script = self.do['script']
-			print('status script:\n'+str(script))
-			print('status command: %s'%cmd)
-			proc = subprocess.Popen(cmd.split(),stdin=subprocess.PIPE)
-			proc.communicate(script.encode())
-		# we require a TTY to enter the container so we use os.system
-		elif visit:
-			# possible security issue
-			print('status running docker: %s'%cmd)
-			os.system(cmd)
-		# standard execution
-		else: bash(cmd,scroll=True if not visit else False,v=True)
-
-	def docker_mimic(self,image,volume,visit=False,**kwargs):
+	
+	def docker_mimic(self,image,volume,nickname=None,visit=False,**kwargs):
 		"""
 		Run a docker container in "mimic" mode where it substitutes for the
 		host operation system and maintains the right paths.
 		"""
 		print('status running ReplicateCore.docker_mimic')
-		return self._docker(volume=volume,image=image,visit=visit,**kwargs)
+		return self._docker(volume=volume,image=image,
+			visit=visit,nickname=nickname,**kwargs)
 
 	def screen(self,screen,script,**kwargs):
 		"""
