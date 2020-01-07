@@ -25,6 +25,9 @@ dependencies:
   # mesh and imaging
   - conda-forge::scikit-image
   - anaconda::vtk 
+  # vim for checking plugins
+  - vim
+  - conda-forge::ncurses
   # note that I later installed vtk via pip2 for python2, possibly in this environment
   - pip: 
     # documentation tools
@@ -40,3 +43,7 @@ dependencies:
     - connexion[swagger-ui]
     # VTK meshes
     - meshio
+    # watch files
+    - watchdog
+    # for passWORD
+    - pycrypto
