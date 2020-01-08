@@ -12,6 +12,7 @@ select: !select
   ubuntu:
     image_name: &image_name_ubuntu factory:ubuntu_build
     command: docker-compose run --service-ports deploy
+    visit: True
     site: !spots root
     compose:
       version: '3'
