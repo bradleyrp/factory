@@ -35,7 +35,11 @@ def feedback_args_to_command(*args,**kwargs):
 
 class ReplicateWrap(Handler):
 	def std(self,args,site,image_name,compose,dockerfile,
-		nickname=None,command=None,notes=None,script=None,visit=False):
+		command=None,notes=None,script=None,visit=False,
+		#! note that there is kwargs bloat here
+		# user-facing meta-level arguments
+		nickname=None,rebuild=False,unlink=False,
+		macos_gui=False):
 		"""Standard method for translating a recipe into a ReplicateCore."""
 		if args and command:
 			raise Exception(
@@ -67,11 +71,16 @@ class ReplicateWrap(Handler):
 		# the reference data that is paired with recipe from RecipeRead passes
 		#   through to meta for the handler so ReplicateCore methods can see
 		# nickname and mode come from the code. the rest comes from the recipe
-		ReplicateCore(mode=mode,nickname=nickname,visit=visit,
+		ReplicateCore(mode=mode,
+			# user-facing meta-level arguments from the CLI
+			nickname=nickname,rebuild=rebuild,
+			visit=visit,macos_gui=macos_gui,unlink=unlink,
 			volume=site,image=image_name,line=command,
 			compose_bundle=compose_bundle,meta=ref)
 
-	def via(self,via,args=None,mods=None,notes=None,nickname=None):
+	def via(self,via,args=None,mods=None,notes=None,
+		# user-facing meta-level arguments
+		nickname=None,rebuild=False,unlink=False):
 		"""Extend one recipe with another."""
 		if not mods: mods = {}
 		recipe_pack = self.meta
@@ -112,12 +121,15 @@ class ReplicateWrap(Handler):
 				for path,value in catalog(mods_this):
 					delveset(outgoing,*path,value=value)
 		# apply the final set of mods for the leaf recipe
-		for path,value in catalog(mods_this):
+		for path,value in catalog(mods):
 			delveset(outgoing,*path,value=value)
 		# make sure the last modifications are the ones for this recipe
-		return self.std(args=args,nickname=nickname,**outgoing)
+		return self.std(args=args,
+			# user-facing meta-level arguments
+			nickname=nickname,rebuild=rebuild,unlink=unlink,
+			**outgoing)
 
-def docker(recipe,*args,name=None,**kwargs):
+def docker(recipe,*args,name=None,unlink=False,rebuild=False,**kwargs):
 	"""
 	Run anything in a docker using `ReplicatorCore`.
 	make docker spot=./here script specs/demo_script.yaml delay
@@ -140,7 +152,9 @@ def docker(recipe,*args,name=None,**kwargs):
 	# unpack the recipe
 	recipe = recipe_pack['recipe']
 	recipe_out = ReplicateWrap(meta=recipe_pack,args=args,
-		nickname=name,**recipe)
+		# user-facing meta-level arguments
+		nickname=name,rebuild=rebuild,unlink=unlink,
+		**recipe)
 
 def compose_cleanup(dn,sure=False):
 	"""Clean up a compose link from ReplicateCore."""
@@ -149,8 +163,13 @@ def compose_cleanup(dn,sure=False):
 	if not os.path.islink(dn):
 		raise Exception('not a link: %s'%dn)
 	if sure or confirm('okay to remove %s'%dn):
-		shutil.rmtree(os.readlink(dn))
+		remote = os.readlink(dn)
+		print('status removing %s'%remote)
+		shutil.rmtree(remote)
+		print('status removing %s'%dn)
 		os.unlink(dn)
+		return True
+	else: return False
 
 def docker_shell(recipe,*args):
 	raise Exception('dev')

@@ -5,7 +5,7 @@ Replicator REDEVELOPMENT
 Rebuild a replicator feature to replace ortho.replicator, specifically `repl`.
 """
 
-import os,re,tempfile,subprocess,string,sys,shutil,copy
+import os,re,tempfile,subprocess,string,sys,shutil,copy,time
 #! refer to ortho by name for top-level imports simplified by init?
 from ..bash import bash
 from ..dictionary import DotDict
@@ -299,6 +299,31 @@ class RecipeRead(Handler):
 			raise Exception('cannot find selection: %s'%subselect_name)
 		return dict(recipe=selected,ref=recipe,parent=recipe_full)
 
+def macos_socat():
+	"""Run socat in a screen to use GUIs on macos."""
+	screen_name = 'macos_socat_gui'
+	script = ('socat TCP-LISTEN:6000,reuseaddr,'
+		'fork UNIX-CLIENT:\\\"$DISPLAY\\\"')
+	started_screen = ReplicateCore(screen=screen_name,script=script).solve
+	# no need to check if we have not even started the screen
+	if not started_screen: return
+	# confirm screen is running
+	#! should this be part of ReplicateCore.screen?
+	time.sleep(1)
+	screen_names = inspect_screens()
+	if screen_name not in screen_names:
+		raise Exception('screen failure!')
+
+def inspect_screens():
+	check_screen = bash('screen -ls',scroll=False,permit_fail=True)
+	screen_ls = re.findall(r'^\s*(\d+)\.(\w+)',check_screen['stdout'],
+		flags=re.DOTALL+re.MULTILINE)
+	if screen_ls:
+		screen_names = list(zip(*screen_ls))[1]
+		print('status found screens: %s '%str(screen_names))
+		return screen_names
+	else: return []
+
 class ReplicateCore(Handler):
 	"""
 	DEV: replacement for the replicator functions
@@ -369,7 +394,10 @@ class ReplicateCore(Handler):
 		else: return dn
 
 	def _docker(self,image,volume={},
-		compose_bundle=None,rebuild=False,mode=None,nickname=None,visit=False,
+		compose_bundle=None,rebuild=False,mode=None,
+		# user-facing meta-level arguments
+		nickname=None,unlink=False,
+		visit=False,
 		**kwargs):
 		"""
 		Run a one-liner command in docker.
@@ -388,19 +416,38 @@ class ReplicateCore(Handler):
 		# if no container we redirect to _docker_compose if we are visiting
 		#   because a visit will create a manual docker command
 		if (not self.container or rebuild) and mode=='visit':
+			if rebuild:
+				raise Exception('dev: need to modify compose to force build')
 			self.container = self._docker_compose(image=image,**compose_bundle)
 		# we can run a command directly in the docker-compose folder
 		elif mode=='compose':
 
+			# rebuild from CLI triggers a build with no cache
+			if rebuild:
+				if kwargs.keys()!={'line'}: raise Exception('dev')
+				names_services = compose_bundle.get(
+					'compose',{}).get('services',{}).keys()
+				if len(names_services)!=1: raise Exception('dev')
+				name_service = list(names_services)[0]
+				kwargs['line'] = ('docker-compose build %s && '%
+					name_service + kwargs['line'])
 			# nickname is a simple method for preventing reexecution
 			# the nickname links us to the temporary location of the compose
 			# the nickname comes from the name kwarg to `make docker`
 			ln_name = 'up-%s'%nickname
 			if nickname and (
 				os.path.isfile(ln_name) or os.path.islink(ln_name)):
-				raise Exception(('found link %s which might indicate that '
-					'these containers are up. remove to continue.'%ln_name))
-
+				#! add a `clean` flag to automatically confirm? 
+				#!   note that flags are getting complicated at this point
+				#! unorthodox import of lib.replicator which should
+				#!   eventually be farmed in to this file
+				from lib.replicator import compose_cleanup
+				cont = compose_cleanup(ln_name,sure=unlink)
+				# compose_cleanup will ask for confirm
+				if not cont:
+					raise Exception(('found link %s which might indicate that '
+						'these containers are up. remove to continue.'%ln_name))
+				else: pass
 			# kwargs contains either line or script for the execution step
 			self.do = DockerExecution(**kwargs).solve
 			if self.do['kind']=='line':
@@ -412,12 +459,15 @@ class ReplicateCore(Handler):
 			# note that the container may exist at this point but either way
 			#   we still need to run compose with the right command
 			spot = self._docker_compose(image=image,mode='compose',visit=visit,
-				compose_cmd=compose_cmd,cleanup=False,**compose_bundle)
-			# note that execution concludes with compose when the recipe
-			#   specifies a command. we report the compose location
-			print('status docker-compose runs from: %s'%spot)
-			os.symlink(spot,ln_name)
-			print('status linked to %s'%ln_name)
+				compose_cmd=compose_cmd,cleanup=visit,**compose_bundle)
+			if visit:
+				print('status no link to compose folder because visit')
+			else:
+				# note that execution concludes with compose when the recipe
+				#   specifies a command. we report the compose location
+				print('status docker-compose runs from: %s'%spot)
+				os.symlink(spot,ln_name)
+				print('status linked to %s'%ln_name)
 			return
 
 		elif not self.container:
@@ -467,19 +517,33 @@ class ReplicateCore(Handler):
 
 		else: raise Exception('dev')
 	
-	def docker_mimic(self,image,volume,nickname=None,visit=False,**kwargs):
+	def docker_mimic(self,image,volume,
+		macos_gui=False,
+		# user-facing meta-level arguments
+		nickname=None,rebuild=False,unlink=False,
+		visit=False,**kwargs):
 		"""
 		Run a docker container in "mimic" mode where it substitutes for the
 		host operation system and maintains the right paths.
 		"""
+		if macos_gui: macos_socat()
 		print('status running ReplicateCore.docker_mimic')
-		return self._docker(volume=volume,image=image,
-			visit=visit,nickname=nickname,**kwargs)
+		return self._docker(volume=volume,image=image,visit=visit,
+			# user-facing meta-level arguments
+			nickname=nickname,rebuild=rebuild,unlink=unlink,
+			**kwargs)
 
-	def screen(self,screen,script,**kwargs):
+	def screen(self,screen,script,exclusive=True,**kwargs):
 		"""
 		Run something in a screen.
 		"""
+		# ensure only one screen with this name is running
+		if exclusive:
+			screen_names = inspect_screens()
+			if screen in screen_names:
+				print('status found screen "%s" so we will not start it'%screen)
+				return False
+			else: pass
 		print('status starting a screen named: %s'%screen)
 		spot = kwargs.pop('spot',None)
 		# spillover kwargs go to a ScriptPrelim class
@@ -494,7 +558,7 @@ class ReplicateCore(Handler):
 		if 0:
 			formatter = string.Formatter()
 			reqs = formatter.parse(script)
-			#! set trace here
+			#! set_trace here
 		script = script%dict(spot=spot if spot else '')
 		# add staged variables to the script
 		if prelim:
