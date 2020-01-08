@@ -328,8 +328,8 @@ class Parser:
 		# step 2: identify lone kwargs which must be booleans
 		inds_kwargs_bool = [(ii,) for ii,i in enumerate(unknown) 
 			if i.startswith(('-','--')) 
-			and ii==len(unknown)-1 or (ii<len(unknown)-1 
-			and unknown[ii+1].startswith(('-','--')))]
+			and (ii==len(unknown)-1 or (ii<len(unknown)-1 
+			and unknown[ii+1].startswith(('-','--'))))]
 		# the first boolean kwargs are actually args so we subtract them here
 		#! deprecated. the original use-case should be recovered
 		if 0:
@@ -337,8 +337,25 @@ class Parser:
 				raise Exception((
 					'found fewer CLI args than required: args are %s'
 					' while we received: %s')%(str(args_explicit),str(unknown)))
-		if len(inds_kwargs_bool)>=len(args_explicit):
-			inds_kwargs_bool = inds_kwargs_bool[len(args_explicit):]
+		#! deprecated and incorrect!
+		if 0:
+			if len(inds_kwargs_bool)>=len(args_explicit):
+				inds_kwargs_bool = inds_kwargs_bool[len(args_explicit):]
+		# step 2b: if we are using `make` instead of `./fac` then stray 
+		#   arguments that might be booleans might not have the prefix "--" 
+		#   because the prefix code does not already know they are booleans so
+		#   in this step we pick them off. if you are expecting an arg that is
+		#   identical to a boolean kwarg then you will have a name collision
+		#   however ./fac will work correctly. note that this is an artefact of
+		#   the scheme whereby we construct the parser *after* the call when 
+		#   using free functions (i.e. those with *args or **kwargs) that are
+		#   basically hooked into the main Parser.
+		floating_kwargs = [i for i,j in 
+			inspected['kwargs'].items() if isinstance(j,bool)]
+		inds_kwargs_bool += [(ii,) for ii,i in enumerate(unknown) 
+			if i in floating_kwargs]
+		# fix the sys.argv by modifying these so they are not mistaken for args
+		sys.argv = [i for i in sys.argv if i not in floating_kwargs]
 		# step 3: the remainder are arguments
 		inds_args = [i for i in range(len(unknown)) if i not in [m 
 			for n in inds_kwargs_bool+inds_kwargs_val for m in n]]
