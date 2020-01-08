@@ -1,0 +1,73 @@
+dockerfiles: 
+  #! fix this to use same import_spec as webdev.yaml and merge dockerfiles key
+  bionic: |
+    FROM ubuntu:bionic
+  ubuntu_build: |
+    # section: basic requirements
+    ENV DEBIAN_FRONTEND noninteractive
+    RUN apt-get -y clean
+    RUN apt-get -y update
+    RUN apt-get install -y --no-install-recommends apt-utils
+    RUN apt-get install -y build-essential
+    RUN apt-get install -y git
+    RUN apt-get install -y make
+    RUN apt-get install -y wget
+    RUN apt-get install -y curl
+    RUN apt-get install -y vim
+    RUN apt-get install -y jq
+    RUN apt-get install -y libssl-dev
+    RUN apt-get install -y screen
+  carp_meshalyzer_reqs: |
+    # section: install carp and meshalyzer
+    RUN apt-get -y update --fix-missing
+    RUN apt-get install -y fltk1.3-dev
+    RUN apt-get install -y libpng-dev
+    RUN apt-get install -y libglew-dev 
+    RUN apt-get install -y freeglut3-dev
+  carp_meshalyzer: |
+    RUN cd /tmp && \
+        mkdir -p ./build-carp && \
+        mkdir /usr/local/carp-1.1 && \
+        cd ./build-carp && \
+        wget https://carp.medunigraz.at/carpentry/cme.linux.tar.gz && \
+        tar xvf cme.linux.tar.gz && \
+        cd cme-1.1-linux && \
+        echo "/usr/local/carp-1.1\ny\ny\ny\n" \
+        | ./install_linux.sh
+    RUN ln -s /usr/local/carp-1.1/meshalyzer/src/meshalyzer /usr/bin/meshalyzer
+    # SHELL ["/bin/bash", "-c", "source /usr/local/carp-1.1/config.sh"]
+    RUN echo "source /usr/local/carp-1.1/config.sh" >> /etc/bash.bashrc
+  #! try: /usr/local/carp-1.1/meshalyzer/src/meshalyzer
+dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
+  series:
+    - bionic
+    - ubuntu_build
+    - carp_meshalyzer_reqs
+    - carp_meshalyzer
+select: !select
+  carp_meshalyzer:
+    image_name: &image_name_ubuntu heartland:carp_meshalyzer
+    command: docker-compose run --service-ports deploy
+    # visit runs command (`docker-compose run`) with a tty
+    visit: True
+    site: !spots root
+    compose:
+      version: '3'
+      services:
+        deploy:
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *image_name_ubuntu
+          volumes: []
+    dockerfile: *dockerfile_carp_meshalyzer
+  #! make an automatic switch for detecting macos?
+  carp_meshalyzer_macos:
+    via: carp_meshalyzer
+    mods:
+      # this uses a gui on macos machines via socat
+      macos_gui: True
+      compose:
+        services:
+          deploy:
+            environment:
+              - DISPLAY=docker.for.mac.host.internal:0
