@@ -5,6 +5,7 @@
 screen_maker = """#!/bin/bash
 
 # note that set -x is too verbose
+export SCREEN_CONF_TMP=screen-%(screen_name)s.tmp
 export SCREEN_LOG=%(screen_log)s
 #! is this too recursive?
 export BOOTSTRAP_SCRIPT=$(mktemp)
@@ -14,19 +15,25 @@ cat <<'EOF_OUT'> $BOOTSTRAP_SCRIPT
 #!/bin/bash
 # run in a screen with specific log file
 # typically: TMPDIR="./" tmp_screen_rc=$(mktemp)
+export tmp_screen_rc=$SCREEN_CONF_TMP
 echo "[STATUS] temporary screenrc at $tmp_screen_rc"
+
+# the bootstrap script writes a conf to set screen logfile
+cat <<EOF> $tmp_screen_rc
+logfile ${SCREEN_LOG:-log-screen}
+EOF
 
 # ensure that the script screens itself
 if [ -z "$STY" ]; then 
 echo "[STATUS] executing in a screen"
-exec screen -dmS %(screen_name)s -L -Logfile $SCREEN_LOG /bin/bash "$0"
+exec screen -dmS %(screen_name)s -L -c $tmp_screen_rc /bin/bash "$0"
 fi
 set -e
 
 # clean up the temporary files inside the screened execution
 # this must happen before lines with possible errors
 # the $tmp_screen_rc serves as a signal that the screen is running
-trap "{ rm -f $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT ERR
+trap "{ rm -f $SCREEN_CONF_TMP $BOOTSTRAP_SCRIPT $CLEANUP_FILES; }" EXIT ERR
 
 echo "[STATUS] running the following script:"
 sed -e 's/^/| /' $BOOTSTRAP_SCRIPT
