@@ -1,0 +1,13 @@
+# environment for elements of scientific computing (esc) database tutorial
+name: esc03
+dependencies:
+  - python=3.7
+  - mongodb
+  - pymongo
+  - conda-forge::mongo-tools
+  - conda-forge::sqlite
+  - sqlalchemy
+  - nb_conda_kernels
+  - jupyter
+  - jupyterlab
+  - pip
