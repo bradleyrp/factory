@@ -1,5 +1,4 @@
 image_name: &image_name factory:centos7_user
-command: docker-compose run --service-ports deploy
 site: !spots root
 compose:
   version: '3'
