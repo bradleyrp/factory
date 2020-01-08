@@ -46,7 +46,7 @@ def bash_newliner(line_decode,log=None):
 	return line_here
 
 def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
-	announce=False,v=False,local=False,scroll_log=True):
+	announce=False,v=False,local=False,scroll_log=True,permit_fail=False):
 	"""
 	Run a bash command.
 	Development note: tee functionality would be useful however you cannot use pipes with subprocess here.
@@ -165,13 +165,15 @@ def bash(command,log=None,cwd=None,inpipe=None,scroll=True,tag=None,
 	if proc.returncode: 
 		if log: raise Exception('bash error, see %s'%log)
 		else: 
-			if stdout:
+			if stdout and v:
 				print('error','stdout:')
 				print(stdout.decode('utf-8').strip('\n'))
-			if stderr:
+			if stderr and v:
 				print('error','stderr:')
 				print(stderr.decode('utf-8').strip('\n'))
-			raise Exception('bash error with returncode %d and stdout/stderr printed above'%proc.returncode)
+			if not permit_fail:
+				raise Exception(('bash error with returncode %d and '
+					'stdout/stderr printed above')%proc.returncode)
 	if scroll==True: 
 		proc.stdout.close()
 		if not merge_stdout_stderr: proc.stderr.close()
