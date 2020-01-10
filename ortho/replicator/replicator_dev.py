@@ -13,6 +13,7 @@ from ..handler import Handler
 from ..requires import requires_program,is_terminal_command
 from ..requires import requires_python_check
 from ..misc import path_resolver
+from ..data import delveset,catalog
 from .templates import screen_maker
 
 def mount_macos(dmg,mount):
@@ -58,6 +59,11 @@ class Volume(Handler):
 
 	def docker(self,docker):
 		"""Use a docker volume."""
+		#! if you are a user (not root) you cannot write to these volumes
+		#! this is probably why I was using -u 0 elsewhere
+		#! using folders for now
+		raise Exception('users cannot touch these volumes. development.')
+		outside = '/home/user/outside'
 		volumes = bash('docker volume ls -q',scroll=False,v=True)
 		avail = volumes['stdout'].split()
 		if docker not in avail:
@@ -65,21 +71,22 @@ class Volume(Handler):
 			out = bash('docker volume create %s'%docker,scroll=False,v=True)
 		else: print('status found docker volume %s'%docker)
 		#! hardcoded link to the outside should be configurable
-		args_out = ('-v %s:%%s'%docker)%'/home/user/outside'
-		return dict(name=docker,docker_args=args_out)
+		args_out = ('-v %s:%%s'%docker)%outside
+		compose_volumes = {docker:outside,'workdir':outside}
+		return dict(name=docker,docker_args=args_out,
+			compose_volumes=compose_volumes)
 
-	def _local(self,path):
-		path = path_resolver(path)
-		args_out = '-v %s:%s -w %s'%(path,path,path)
-		return dict(docker_args=args_out)
-
-	def local(self,local):
+	def local(self,local,spot=None,darwin_ok=False):
 		"""Add the current directory to the volume."""
 		path = local
-		self._check_darwin()
+		if not darwin_ok: self._check_darwin()
 		path = path_resolver(path)
-		args_out = '-v %s:%s -w %s'%(path,path,path)
-		return dict(docker_args=args_out)
+		spot = spot if spot else path
+		args_out = '-v %s:%s -w %s'%(path,spot,spot)
+		volumes = [(path,spot)]
+		workdir = spot
+		compose_volumes = dict(volumes=volumes,workdir=workdir)
+		return dict(docker_args=args_out,compose_volumes=compose_volumes)
 
 	def local_fs(self,path,fs):
 		# in this use case we mount an extra path as well as the pwd
@@ -87,8 +94,11 @@ class Volume(Handler):
 		if fs!='dmg': self._check_darwin()
 		path = path_resolver(path)
 		pwd = path_resolver(os.getcwd())
+		volumes = [(path,path),(pwd,pwd)]
+		workdir = pwd
+		compose_volumes = dict(volumes=volumes,workdir=workdir)
 		args_out = '-v %s:%s -v %s:%s -w %s'%(path,path,pwd,pwd,pwd)
-		return dict(docker_args=args_out)
+		return dict(docker_args=args_out,compose_volumes=compose_volumes)
 
 class DockerFileMaker(Handler):
 	#! this replicates ortho.replicator.replicator.DockerFileMaker
@@ -234,11 +244,34 @@ def spec_import_hook(loader,node):
 		raise Exception('cannot find %s in %s'%(this['what'],this['from']))
 	return imported[this['what']]
 
+def merge_spec(loader,node):
+	"""
+	Merge two inputs to a spec file. Developed for dockerfiles, which can
+	use an external source via import_spec and add local recipes.
+	"""
+	requires_python_check('yaml')
+	import yaml
+	this = loader.construct_mapping(node,deep=True)
+	paths,values = [],[]
+	# since we have no order we do a full merge without collision
+	for key in this.keys():
+		for path,value in catalog(this[key]):
+			#! very slow probably
+			if path in paths:
+				raise Excpetion('collision at: %s'%str(path))
+			paths.append(path)
+			values.append(value)
+	outgoing = {}
+	for path,value in zip(paths,values):
+		delveset(outgoing,*path,value=value)
+	return outgoing
+
 # package hooks
 yaml_hooks_recipes_default = {
 	'!spots':constructor_site_hook,
 	'!select':subselect_hook,
-	'!import_spec':spec_import_hook,}
+	'!import_spec':spec_import_hook,
+	'!merge_spec':merge_spec}
 
 class RecipeRead(Handler):
 	"""Interpret the reproducibility recipes."""
@@ -331,7 +364,7 @@ class ReplicateCore(Handler):
 
 	def _docker_compose(self,image,dockerfile,compose,
 		compose_cmd=None,mode='build',visit=False,
-		cleanup=True,dockerfiles_index=None):
+		cleanup=True,dockerfiles_index=None,compose_volumes=None):
 		"""
 		Run the standard docker-compose loop.
 		Note that ReplicateCore._docker can be used to run docker with a 
@@ -357,6 +390,24 @@ class ReplicateCore(Handler):
 		# build the Dockerfile
 		dockerfile_obj = DockerFileMaker(dockerfiles_index=dockerfiles_index,
 			**dockerfile)
+		# add extra volumes
+		if compose_volumes:
+			# ensure only one container
+			services = compose.get('services',{})
+			if len(services.keys())!=1:
+				raise Exception('cannot attach volumes for multiple containers')
+			service_name = list(services.keys())[0]
+			compose_service = compose['services'][service_name]
+			extra_vols = compose_volumes.get('volumes',[])
+			if extra_vols and not compose_service.get('volumes',[]):
+				compose_service['volumes'] = []
+			for i,j in extra_vols:
+				item = '%s:%s'%(i,j)
+				if item in compose_service['volumes']:
+					raise Exception('collision: %s'%item)
+				compose_service['volumes'].append(item)
+			workdir = compose_volumes.get('workdir',None)
+			if workdir: compose_service['working_dir'] = workdir
 		# run compose from the temporary location
 		try:
 			print('status compose from %s'%dn)
@@ -408,8 +459,11 @@ class ReplicateCore(Handler):
 		if not mode: raise Exception('docker function requires a mode')
 
 		# step 1: assemble the volume
-		self.spot = Volume(**volume).solve
-		docker_args = self.spot['docker_args']
+		if volume: self.spot = Volume(**volume).solve
+		else: self.spot = {}
+		docker_args = self.spot.get('docker_args','')
+		# prepare alternate entries for compose
+		compose_vols = self.spot.get('compose_volumes',{})
 
 		# step 2: locate the container
 		self.container = DockerContainer(name=image).solve
@@ -418,7 +472,8 @@ class ReplicateCore(Handler):
 		if (not self.container or rebuild) and mode=='visit':
 			if rebuild:
 				raise Exception('dev: need to modify compose to force build')
-			self.container = self._docker_compose(image=image,**compose_bundle)
+			self.container = self._docker_compose(
+				image=image,compose_volumes=compose_vols,**compose_bundle)
 		# we can run a command directly in the docker-compose folder
 		elif mode=='compose':
 
@@ -459,7 +514,9 @@ class ReplicateCore(Handler):
 			# note that the container may exist at this point but either way
 			#   we still need to run compose with the right command
 			spot = self._docker_compose(image=image,mode='compose',visit=visit,
-				compose_cmd=compose_cmd,cleanup=visit,**compose_bundle)
+				compose_cmd=compose_cmd,cleanup=visit,
+				compose_volumes=compose_vols,**compose_bundle)
+			#! need a feature to connect to compose!
 			if visit:
 				print('status no link to compose folder because visit')
 			else:
