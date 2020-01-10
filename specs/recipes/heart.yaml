@@ -1,68 +1,118 @@
-dockerfiles: 
-  #! fix this to use same import_spec as webdev.yaml and merge dockerfiles key
-  bionic: |
-    FROM ubuntu:bionic
-  ubuntu_build: |
-    # section: basic requirements
-    ENV DEBIAN_FRONTEND noninteractive
-    RUN apt-get -y clean
-    RUN apt-get -y update
-    RUN apt-get install -y --no-install-recommends apt-utils
-    RUN apt-get install -y build-essential
-    RUN apt-get install -y git
-    RUN apt-get install -y make
-    RUN apt-get install -y wget
-    RUN apt-get install -y curl
-    RUN apt-get install -y vim
-    RUN apt-get install -y jq
-    RUN apt-get install -y libssl-dev
-    RUN apt-get install -y screen
-  carp_meshalyzer_reqs: |
-    # section: install carp and meshalyzer
-    RUN apt-get -y update --fix-missing
-    RUN apt-get install -y fltk1.3-dev
-    RUN apt-get install -y libpng-dev
-    RUN apt-get install -y libglew-dev 
-    RUN apt-get install -y freeglut3-dev
-  carp_meshalyzer: |
-    RUN cd /tmp && \
-        mkdir -p ./build-carp && \
-        mkdir /usr/local/carp-1.1 && \
-        cd ./build-carp && \
-        wget https://carp.medunigraz.at/carpentry/cme.linux.tar.gz && \
-        tar xvf cme.linux.tar.gz && \
-        cd cme-1.1-linux && \
-        echo "/usr/local/carp-1.1\ny\ny\ny\n" \
-        | ./install_linux.sh
-    RUN ln -s /usr/local/carp-1.1/meshalyzer/src/meshalyzer /usr/bin/meshalyzer
-    # SHELL ["/bin/bash", "-c", "source /usr/local/carp-1.1/config.sh"]
-    RUN echo "source /usr/local/carp-1.1/config.sh" >> /etc/bash.bashrc
-  #! try: /usr/local/carp-1.1/meshalyzer/src/meshalyzer
+dockerfiles: !merge_spec
+  a:
+    b: 1
+  external: !import_spec 
+    from: ./dockerfiles.yaml
+    what: dockerfiles
+  local:
+    carp_meshalyzer_reqs: |
+      # section: install carp and meshalyzer
+      RUN apt-get -y update --fix-missing
+      RUN apt-get install -y fltk1.3-dev
+      RUN apt-get install -y libpng-dev
+      RUN apt-get install -y libglew-dev 
+      RUN apt-get install -y freeglut3-dev
+    carp_meshalyzer: |
+      RUN cd /tmp && \
+          mkdir -p ./build-carp && \
+          mkdir /usr/local/carp-1.1 && \
+          cd ./build-carp && \
+          wget https://carp.medunigraz.at/carpentry/cme.linux.tar.gz && \
+          tar xvf cme.linux.tar.gz && \
+          cd cme-1.1-linux && \
+          echo "/usr/local/carp-1.1\ny\ny\ny\n" \
+          | ./install_linux.sh
+      RUN ln -s /usr/local/carp-1.1/meshalyzer/src/meshalyzer /usr/bin/meshalyzer
+      # SHELL ["/bin/bash", "-c", "source /usr/local/carp-1.1/config.sh"]
+      RUN echo "source /usr/local/carp-1.1/config.sh" >> /etc/bash.bashrc
+    emacs26: |
+      RUN apt-get install -y software-properties-common
+      RUN add-apt-repository -y ppa:kelleyk/emacs
+      RUN apt-get install -y emacs26
+    jdk-13: |
+      RUN apt-get install -y software-properties-common
+      RUN add-apt-repository -y ppa:linuxuprising/java
+      RUN echo debconf shared/accepted-oracle-license-v1-2 select true | debconf-set-selections
+      RUN echo debconf shared/accepted-oracle-license-v1-2 seen true | debconf-set-selections
+      RUN apt-get install -y openjdk-13-jdk
+    clojure: | # https://github.com/Quantisan/docker-clojure/blob/be736864bf3e6d35c1bc6b13fd2add4a319fb92b/target/openjdk-13-buster/lein/Dockerfile
+      ENV LEIN_VERSION=2.9.1
+      ENV LEIN_INSTALL=/usr/local/bin/
+      WORKDIR /tmp
+      RUN \
+      mkdir -p $LEIN_INSTALL && \
+      wget -q https://raw.githubusercontent.com/technomancy/leiningen/$LEIN_VERSION/bin/lein-pkg && \
+      echo "Comparing lein-pkg checksum ..." && \
+      sha1sum lein-pkg && \
+      echo "93be2c23ab4ff2fc4fcf531d7510ca4069b8d24a *lein-pkg" | sha1sum -c - && \
+      mv lein-pkg $LEIN_INSTALL/lein && \
+      chmod 0755 $LEIN_INSTALL/lein && \
+      wget -q https://github.com/technomancy/leiningen/releases/download/$LEIN_VERSION/leiningen-$LEIN_VERSION-standalone.zip && \
+      wget -q https://github.com/technomancy/leiningen/releases/download/$LEIN_VERSION/leiningen-$LEIN_VERSION-standalone.zip.asc && \
+      gpg --batch --keyserver pool.sks-keyservers.net --recv-key 2B72BF956E23DE5E830D50F6002AF007D1A7CC18 && \
+      echo "Verifying Jar file signature ..." && \
+      gpg --verify leiningen-$LEIN_VERSION-standalone.zip.asc && \
+      rm leiningen-$LEIN_VERSION-standalone.zip.asc && \
+      mkdir -p /usr/share/java && \
+      mv leiningen-$LEIN_VERSION-standalone.zip /usr/share/java/leiningen-$LEIN_VERSION-standalone.jar
+      ENV PATH=$PATH:$LEIN_INSTALL
+      ENV LEIN_ROOT 1
+      # Install clojure 1.10.1 so users don't have to download it every time
+      RUN echo '(defproject dummy "" :dependencies [[org.clojure/clojure "1.10.1"]])' > project.clj \
+        && lein deps && rm project.clj
+
 dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
   series:
     - bionic
     - ubuntu_build
     - carp_meshalyzer_reqs
     - carp_meshalyzer
+    - emacs26
+    - jdk-13
+    - clojure
+    - user_sudo_ubuntu
+
+# SETTINGS
+macos_docker_display: &macos_docker_display >-
+  DISPLAY=docker.for.mac.host.internal:0
+dg: &directed-graph-code >-
+  /Users/rpb/worker/heart/dev/directed-graph-rotor-analysis
+dg-ex01: &dg-ex01 
+  "/Users/rpb/worker/heart/hearts-data/\
+  2019.12.11-directed-graph-input-example-e01"
+
+# usage: make docker specs/recipes/heart.yaml name=carp_macos
 select: !select
-  carp_meshalyzer:
+
+  carp:
     image_name: &image_name_ubuntu heartland:carp_meshalyzer
     command: docker-compose run --service-ports deploy
     # visit runs command (`docker-compose run`) with a tty
     visit: True
-    site: !spots root
+    #! using volumes instead of: site: local, spot, darwin_ok
     compose:
-      version: '3'
+      version: '3.7'
       services:
         deploy:
+          container_name: carp
           entrypoint: ['/bin/bash','-l']
           build: .
           image: *image_name_ubuntu
-          volumes: []
+          volumes: 
+          - source: *directed-graph-code
+            target: /home/user/code
+            type: bind
+          - source: *dg-ex01
+            target: /home/user/source
+            type: bind
+          ports:
+            - 9011:9011
+            - 9012:9012
     dockerfile: *dockerfile_carp_meshalyzer
-  #! make an automatic switch for detecting macos?
-  carp_meshalyzer_macos:
-    via: carp_meshalyzer
+
+  carp_macos:
+    #! make an automatic switch for detecting macos?
+    via: carp
     mods:
       # this uses a gui on macos machines via socat
       macos_gui: True
@@ -70,4 +120,4 @@ select: !select
         services:
           deploy:
             environment:
-              - DISPLAY=docker.for.mac.host.internal:0
+              - *macos_docker_display
