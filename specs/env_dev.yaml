@@ -25,6 +25,8 @@ dependencies:
   # mesh and imaging
   - conda-forge::scikit-image
   - anaconda::vtk 
+  # geometry
+  - conda-forge::cgal
   # vim for checking plugins
   - vim
   - conda-forge::ncurses
