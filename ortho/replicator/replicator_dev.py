@@ -119,8 +119,10 @@ class DockerFileMaker(Handler):
 			#! no substitution feature yet
 			dockerfile.append(item_lookup)
 		self.dockerfile = '\n'.join(dockerfile)
-		print('status dockerfile follows')
-		print('\n'.join(['| '+i for i in self.dockerfile.splitlines()]))
+		#! print this only when building?
+		if 0:
+			print('status dockerfile follows')
+			print('\n'.join(['| '+i for i in self.dockerfile.splitlines()]))
 
 class DockerContainer(Handler):
 	_internals = {'name':'real_name','meta':'meta'}
