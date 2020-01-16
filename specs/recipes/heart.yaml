@@ -60,6 +60,11 @@ dockerfiles: !merge_spec
       # Install clojure 1.10.1 so users don't have to download it every time
       RUN echo '(defproject dummy "" :dependencies [[org.clojure/clojure "1.10.1"]])' > project.clj \
         && lein deps && rm project.clj
+    godot: |
+      RUN apt-get install -y unzip
+      RUN apt-get install -y mesa-utils libgl1-mesa-glx
+      WORKDIR /tmp
+      RUN wget https://downloads.tuxfamily.org/godotengine/3.1.2/Godot_v3.1.2-stable_x11.64.zip
 
 dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
   series:
@@ -70,6 +75,7 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - emacs26
     - jdk-13
     - clojure
+    - godot
     - user_sudo_ubuntu
 
 # SETTINGS
@@ -78,6 +84,9 @@ macos_docker_display: &macos_docker_display >-
 dg: &directed-graph-code >-
   /Users/rpb/worker/heart/dev/directed-graph-rotor-analysis
 dg-ex01: &dg-ex01 
+  "/Users/rpb/worker/heart/hearts-data/\
+  2019.12.11-directed-graph-input-example-e01"
+dg-ex02: &dg-ex02 
   "/Users/rpb/worker/heart/hearts-data/\
   2019.12.11-directed-graph-input-example-e01"
 
@@ -121,3 +130,17 @@ select: !select
           deploy:
             environment:
               - *macos_docker_display
+  dg_ex02:
+    via: carp
+    mods:
+      compose:
+        services:
+          deploy:
+            volumes: 
+            - source: *directed-graph-code
+              target: /home/user/code
+              type: bind
+            - source: *dg-ex02
+              target: /home/user/source
+              type: bind
+
