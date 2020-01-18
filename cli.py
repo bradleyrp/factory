@@ -133,11 +133,6 @@ class Interface(Parser):
         self.cache['settings'] = settings
         return settings
 
-    def conda(self,file):
-        """Update or install a conda environment."""
-        #? consider adding this to `make do` via yaml tag
-        Conda(file=file).solve
-
     def update_conda(self):
         """
         Update the conda version that supports the environments.
@@ -290,7 +285,8 @@ class Interface(Parser):
             # +++ assume if it exists it was installed correctly
             if os.path.isdir(spot):
                 raise Exception('already exists: %s'%spot)
-            bash('python -m venv %s'%spot)
+            python_name = os.environ.get('python','python')
+            bash('%s -m venv %s'%(python_name,spot))
             if not file:
                 # default venv packages
                 packages = ['pyyaml']
