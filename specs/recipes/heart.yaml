@@ -49,9 +49,6 @@ dockerfiles: !merge_spec
       chmod 0755 $LEIN_INSTALL/lein && \
       wget -q https://github.com/technomancy/leiningen/releases/download/$LEIN_VERSION/leiningen-$LEIN_VERSION-standalone.zip && \
       wget -q https://github.com/technomancy/leiningen/releases/download/$LEIN_VERSION/leiningen-$LEIN_VERSION-standalone.zip.asc && \
-      gpg --batch --keyserver pool.sks-keyservers.net --recv-key 2B72BF956E23DE5E830D50F6002AF007D1A7CC18 && \
-      echo "Verifying Jar file signature ..." && \
-      gpg --verify leiningen-$LEIN_VERSION-standalone.zip.asc && \
       rm leiningen-$LEIN_VERSION-standalone.zip.asc && \
       mkdir -p /usr/share/java && \
       mv leiningen-$LEIN_VERSION-standalone.zip /usr/share/java/leiningen-$LEIN_VERSION-standalone.jar
@@ -81,16 +78,15 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
 # SETTINGS
 macos_docker_display: &macos_docker_display >-
   DISPLAY=docker.for.mac.host.internal:0
-dg: &directed-graph-code >-
-  /Users/rpb/worker/heart/dev/directed-graph-rotor-analysis
-vertigo: &vertigo >-
-  /Users/rpb/worker/heart/dev/vertigo
+hearts_data: &hearts_data "/home/rpb/work/hearts-data/"  
+# hearts_data: &hearts_data "/Users/rpb/worker/heart/hearts-data/"  
+hearts_code: &directed-graph-code >-
+  /home/rpb/work/hearts-code/directed-graph-rotor-analysis
+# hearts_code: &directed-graph-code >-
+#   "/Users/rpb/worker/heart/dev/directed-graph-rotor-analysis"
 dg-ex01: &dg-ex01 
-  "/Users/rpb/worker/heart/hearts-data/\
-  2019.12.11-directed-graph-input-example-e01"
-vertigo-ex02: &vertigo-ex02
-  "/Users/rpb/worker/heart/hearts-data/\
-  2019.12.11-directed-graph-input-example-e01"
+  !!python/object/apply:os.path.join [*hearts_data,
+  "2019.12.11-directed-graph-input-example-e01"]
 dg-ex02: &dg-ex02 
   "/Users/rpb/worker/heart/hearts-data/\
   2019.12.11-directed-graph-input-example-e01"
@@ -128,9 +124,19 @@ select: !select
           - source: /Users/rpb/worker/heart/2020.01.17-fiber-flip/WedgeModel_ScrambledLons_edit
             target: /home/user/data-fiber-flip
             type: bind
+          #! linux host
+          - /tmp/.X11-unix:/tmp/.X11-unix
           ports:
             - 9011:9011
             - 9012:9012
+          #! linux host
+          environment:
+            - DISPLAY=$DISPLAY
+          network_mode: "host"
+          devices:
+            - /dev/dri 
+            - /dev/snd
+            - /dev/nvidia0
     dockerfile: *dockerfile_carp_meshalyzer
 
   carp_macos:
