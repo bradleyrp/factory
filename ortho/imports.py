@@ -87,7 +87,7 @@ def import_strict(fn,dn,verbose=False):
 	if verbose: print('note','successfully imported')
 	return mod
 
-def importer(source,verbose=1,distribute=None,strict=False):
+def importer(source,verbose=False,distribute=None,strict=False):
 	"""
 	Route import requests according to type.
 	We always return the module dictionary because the fallback remote_import_script must run exec.
