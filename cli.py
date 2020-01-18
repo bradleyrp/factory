@@ -8,6 +8,8 @@ Note that this CLI interface uses the script-connect makefile (not the
 ortho-connect makefile) and the Parser. This is the preferred CLI method.
 """
 
+# the envs function below skips our overloaded print_function somehow
+from __future__ import print_function
 import os,sys,re,shutil,json,glob
 
 import ortho
@@ -227,7 +229,8 @@ class Interface(Parser):
             if shortname in toc: raise Exception('collision: %s'%shortname)
             toc[shortname] = dict(kind=detail['kind'],spot=env)
         if not name:
-            print('status available environments: %s'%list(toc.keys()))
+			# casting strings below to avoid prefix for unicode in python 2
+            print('status available environments: %s'%str(list(str(i) for i in toc.keys())))
             return
         else:
             if name not in toc: 

@@ -2,9 +2,13 @@
 
 import os,copy,re
 import ortho
-import yaml
 import multiprocessing
-from lib.yaml_mods import YAMLObjectInit
+# several functions below use yaml 
+#! we typically use the requirement function to load yaml in each function
+try:
+	import yaml
+	from lib.yaml_mods import YAMLObjectInit
+except: pass
 from ortho import Handler
 from ortho import CacheChange
 from ortho import path_resolver
