@@ -83,7 +83,12 @@ macos_docker_display: &macos_docker_display >-
   DISPLAY=docker.for.mac.host.internal:0
 dg: &directed-graph-code >-
   /Users/rpb/worker/heart/dev/directed-graph-rotor-analysis
+vertigo: &vertigo >-
+  /Users/rpb/worker/heart/dev/vertigo
 dg-ex01: &dg-ex01 
+  "/Users/rpb/worker/heart/hearts-data/\
+  2019.12.11-directed-graph-input-example-e01"
+vertigo-ex02: &vertigo-ex02
   "/Users/rpb/worker/heart/hearts-data/\
   2019.12.11-directed-graph-input-example-e01"
 dg-ex02: &dg-ex02 
@@ -109,10 +114,19 @@ select: !select
           image: *image_name_ubuntu
           volumes: 
           - source: *directed-graph-code
-            target: /home/user/code
+            target: /home/user/dg
             type: bind
           - source: *dg-ex01
-            target: /home/user/source
+            target: /home/user/data-dg
+            type: bind
+          - source: *vertigo
+            target: /home/user/vertigo
+            type: bind
+          # - source: *vertigo-ex01
+          #   target: /home/user/data-vertigo
+          #   type: bind
+          - source: /Users/rpb/worker/heart/2020.01.17-fiber-flip/WedgeModel_ScrambledLons_edit
+            target: /home/user/data-fiber-flip
             type: bind
           ports:
             - 9011:9011
