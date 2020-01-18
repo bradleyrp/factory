@@ -101,7 +101,7 @@ class SpackEnvItem(Handler):
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
 			command=command,fetch=fetch)
-	def make_env(self,name,specs,via=None):
+	def make_env(self,name,specs,mods=None,via=None):
 		"""
 		Pass this item along to SpackEnvMaker
 		"""
@@ -117,6 +117,9 @@ class SpackEnvItem(Handler):
 			for route,val in catalog(env):
 				delveset(instruct,*route,value=val)
 		else: raise Exception('unclear env format')
+		if mods:
+			for route,val in catalog(mods):
+				delveset(instruct,*route,value=val)
 		print('status building spack environment at "%s"'%spot)
 		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct)
 	def find_compiler(self,find):
