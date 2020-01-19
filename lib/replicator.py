@@ -129,7 +129,7 @@ class ReplicateWrap(Handler):
 			nickname=nickname,rebuild=rebuild,unlink=unlink,
 			**outgoing)
 
-def docker(recipe,*args,name=None,unlink=False,rebuild=False,**kwargs):
+def docker(recipe,name=None,unlink=False,rebuild=False,*args,**kwargs):
 	"""
 	Run anything in a docker using `ReplicatorCore`.
 	make docker spot=./here script specs/demo_script.yaml delay
