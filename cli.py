@@ -8,6 +8,8 @@ Note that this CLI interface uses the script-connect makefile (not the
 ortho-connect makefile) and the Parser. This is the preferred CLI method.
 """
 
+# the envs function below skips our overloaded print_function somehow
+from __future__ import print_function
 import os,sys,re,shutil,json,glob
 
 import ortho
@@ -131,11 +133,6 @@ class Interface(Parser):
         self.cache['settings'] = settings
         return settings
 
-    def conda(self,file):
-        """Update or install a conda environment."""
-        #? consider adding this to `make do` via yaml tag
-        Conda(file=file).solve
-
     def update_conda(self):
         """
         Update the conda version that supports the environments.
@@ -227,7 +224,8 @@ class Interface(Parser):
             if shortname in toc: raise Exception('collision: %s'%shortname)
             toc[shortname] = dict(kind=detail['kind'],spot=env)
         if not name:
-            print('status available environments: %s'%list(toc.keys()))
+			# casting strings below to avoid prefix for unicode in python 2
+            print('status available environments: %s'%str(list(str(i) for i in toc.keys())))
             return
         else:
             if name not in toc: 
@@ -287,7 +285,8 @@ class Interface(Parser):
             # +++ assume if it exists it was installed correctly
             if os.path.isdir(spot):
                 raise Exception('already exists: %s'%spot)
-            bash('python -m venv %s'%spot)
+            python_name = os.environ.get('python','python')
+            bash('%s -m venv %s'%(python_name,spot))
             if not file:
                 # default venv packages
                 packages = ['pyyaml']

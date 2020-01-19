@@ -49,9 +49,6 @@ dockerfiles: !merge_spec
       chmod 0755 $LEIN_INSTALL/lein && \
       wget -q https://github.com/technomancy/leiningen/releases/download/$LEIN_VERSION/leiningen-$LEIN_VERSION-standalone.zip && \
       wget -q https://github.com/technomancy/leiningen/releases/download/$LEIN_VERSION/leiningen-$LEIN_VERSION-standalone.zip.asc && \
-      gpg --batch --keyserver pool.sks-keyservers.net --recv-key 2B72BF956E23DE5E830D50F6002AF007D1A7CC18 && \
-      echo "Verifying Jar file signature ..." && \
-      gpg --verify leiningen-$LEIN_VERSION-standalone.zip.asc && \
       rm leiningen-$LEIN_VERSION-standalone.zip.asc && \
       mkdir -p /usr/share/java && \
       mv leiningen-$LEIN_VERSION-standalone.zip /usr/share/java/leiningen-$LEIN_VERSION-standalone.jar
@@ -60,6 +57,11 @@ dockerfiles: !merge_spec
       # Install clojure 1.10.1 so users don't have to download it every time
       RUN echo '(defproject dummy "" :dependencies [[org.clojure/clojure "1.10.1"]])' > project.clj \
         && lein deps && rm project.clj
+    godot: |
+      RUN apt-get install -y unzip
+      RUN apt-get install -y mesa-utils libgl1-mesa-glx
+      WORKDIR /tmp
+      RUN wget https://downloads.tuxfamily.org/godotengine/3.1.2/Godot_v3.1.2-stable_x11.64.zip
 
 dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
   series:
@@ -70,14 +72,22 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - emacs26
     - jdk-13
     - clojure
+    - godot
     - user_sudo_ubuntu
 
 # SETTINGS
 macos_docker_display: &macos_docker_display >-
   DISPLAY=docker.for.mac.host.internal:0
-dg: &directed-graph-code >-
-  /Users/rpb/worker/heart/dev/directed-graph-rotor-analysis
+hearts_data: &hearts_data "/home/rpb/work/hearts-data/"  
+# hearts_data: &hearts_data "/Users/rpb/worker/heart/hearts-data/"  
+hearts_code: &directed-graph-code >-
+  /home/rpb/work/hearts-code/directed-graph-rotor-analysis
+# hearts_code: &directed-graph-code >-
+#   "/Users/rpb/worker/heart/dev/directed-graph-rotor-analysis"
 dg-ex01: &dg-ex01 
+  !!python/object/apply:os.path.join [*hearts_data,
+  "2019.12.11-directed-graph-input-example-e01"]
+dg-ex02: &dg-ex02 
   "/Users/rpb/worker/heart/hearts-data/\
   2019.12.11-directed-graph-input-example-e01"
 
@@ -100,14 +110,33 @@ select: !select
           image: *image_name_ubuntu
           volumes: 
           - source: *directed-graph-code
-            target: /home/user/code
+            target: /home/user/dg
             type: bind
           - source: *dg-ex01
-            target: /home/user/source
+            target: /home/user/data-dg
             type: bind
+          - source: *vertigo
+            target: /home/user/vertigo
+            type: bind
+          # - source: *vertigo-ex01
+          #   target: /home/user/data-vertigo
+          #   type: bind
+          - source: /Users/rpb/worker/heart/2020.01.17-fiber-flip/WedgeModel_ScrambledLons_edit
+            target: /home/user/data-fiber-flip
+            type: bind
+          #! linux host
+          - /tmp/.X11-unix:/tmp/.X11-unix
           ports:
             - 9011:9011
             - 9012:9012
+          #! linux host
+          environment:
+            - DISPLAY=$DISPLAY
+          network_mode: "host"
+          devices:
+            - /dev/dri 
+            - /dev/snd
+            - /dev/nvidia0
     dockerfile: *dockerfile_carp_meshalyzer
 
   carp_macos:
@@ -121,3 +150,17 @@ select: !select
           deploy:
             environment:
               - *macos_docker_display
+  dg_ex02:
+    via: carp
+    mods:
+      compose:
+        services:
+          deploy:
+            volumes: 
+            - source: *directed-graph-code
+              target: /home/user/code
+              type: bind
+            - source: *dg-ex02
+              target: /home/user/source
+              type: bind
+

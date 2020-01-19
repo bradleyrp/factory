@@ -101,6 +101,7 @@ def importer(source,verbose=False,distribute=None,strict=False):
 	- import a local module with import_module
 	- import a remote module by manipulating and resetting the path
 	"""
+	python_version = sys.version_info
 	if not distribute: distribute = {}
 	# include __file__ which is otherwise absent when we import this way
 	distribute['__file__'] = source 
@@ -118,21 +119,26 @@ def importer(source,verbose=False,distribute=None,strict=False):
 			# note that we choose a relative import with the dot in python 3 because
 			#   otherwise you could end up with a name collision with a standard module
 			#   and then get the standard module instead. tested with 2 and 3
-			mod = importlib.import_module('%s%s'%(
-				'.' if sys.version_info>=(3,0) else '',fn),package=dn)
+			target = '%s%s'%('.' if (python_version>=(3,0) or False) else '',fn)
+			if verbose: print('status import target: %s'%target)
+			mod = importlib.import_module(target,package=dn)
 			if verbose: print('note','successfully imported')
 		# try import if path is in subdirectory
 		# note that we have to use the fn_alt below if we don't want to perturb paths
 		except Exception as e1:
+			if verbose: print('warning got exception: %s'%e1)
 			rel_dn = os.path.relpath(dn,os.getcwd())
 			# if the path is a subdirectory we try the import with dots
 			if os.path.relpath(dn,os.getcwd())[:2]!='..':
-				fn_alt = '%s.%s'%(re.sub(os.path.sep,'.',rel_dn),fn)
+				# strip a leading dot indicating pwd anyway
+				fn_alt = ('%s.%s'%(re.sub(os.path.sep,'.',rel_dn),fn)).lstrip('.')
+				# edge case in which python 3.4.9 struggles with the following
+				#   typically with a "cannot perform relative import" in e1, e2
+				local_pack = None if (python_version>=(3,0) and python_version<(3,5)) else '.'
 				if verbose: 
 					# do not use tracebacker here, only in final failure below
-					print('note','previous exception was: %s'%e1)
-					print('note','importing (local) from %s'%(fn_alt))
-				mod = importlib.import_module(fn_alt,package='./')
+					print('note importing (local, package=%s) from %s'%(local_pack,fn_alt))
+				mod = importlib.import_module(fn_alt,package=local_pack)
 			else: 
 				# you can use tracebacker here on a temporary basis for 
 				#   debugging, however do not commit it because it is a false
@@ -146,7 +152,7 @@ def importer(source,verbose=False,distribute=None,strict=False):
 	except Exception as e2: 
 		if verbose: 
 			# do not use tracebacker here, only in final failure below
-			print('warning','standard import failed for "%s" at "%s"'%(fn,dn))
+			print('warning standard import failed for "%s" at "%s"'%(fn,dn))
 			print('exception',e2)
 			tracebacker(e2)
 		# import the script remotely if import_module fails above
