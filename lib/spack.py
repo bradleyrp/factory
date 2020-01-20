@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+#! manually pick up the overloaded print
+from __future__ import print_function
 import os,copy,re
 import ortho
 import multiprocessing
@@ -122,12 +124,28 @@ class SpackEnvItem(Handler):
 				delveset(instruct,*route,value=val)
 		print('status building spack environment at "%s"'%spot)
 		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct)
-	def find_compiler(self,find):
+	def find_compilers(self,find_compilers):
+		"""Generic function to find any compilers, for example the system compiler."""
+		print('status find_compilers to find any compilers')
+		if find_compilers!=None: raise Exception('boostrap must be null')
+		self._run_via_spack(command="spack compiler find --scope site")
+	def _env_chdir(self,name):
+		if name:
+			spack_envs_dn = self.meta['spack_envs_dn']
+			spot = os.path.join(spack_envs_dn,name)
+			if not os.path.isdir(spot):
+				raise Exception('cannot find env at: %s'%spot)
+			chdir_cmd = "cd %s && "%spot
+		else: chdir_cmd = ""
+		return chdir_cmd
+	def find_compiler(self,find,name=None):
 		"""
 		Find a compiler, possibly also installed by spack.
 		"""
+		print('status find_compiler: %s'%find)
+		chdir_cmd = self._env_chdir(name)
 		# the find argument should be a spec that already exists
-		self._run_via_spack(command=
+		self._run_via_spack(command=chdir_cmd+\
 			"PATH=$(spack location -i %s)/bin:$PATH && "
 			"spack compiler find --scope site"%find)
 	def check_compiler(self,check_compiler):
@@ -141,21 +159,55 @@ class SpackEnvItem(Handler):
 		assume the default gcc is 6 and try to build gcc 6 against gcc 6 even 
 		though it is already built against the background 4.
 		"""
-		result = self._run_via_spack(command="spack compilers",fetch=True)
+		result = self._run_via_spack(command="spack compilers --scope site",fetch=True)
 		stdout = result['stdout']
 		if not re.match(r'^\w+@[\d\.]+',check_compiler):
 			raise Exception('unusual spack spec: %s'%check_compiler)
 		if not re.search(check_compiler,stdout):
 			raise Exception('failed compiler check: %s'%check_compiler)
-	#! the bootstrap and find_compilers recipes must take null arguments
-	#!   this is unavoidable in the YAML format
+	#! the bootstrap and find_compilers and others must take null arguments
+	#!   this is unavoidable in the YAML list format when using Handler
 	def bootstrap(self,bootstrap):
 		"""Bootstrap installs modules."""
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
-	def find_compilers(self,find_compilers):
-		if find_compilers!=None: raise Exception('boostrap must be null')
-		self._run_via_spack(command="spack compiler find --scope site")
+	def lmod_refresh(self,lmod_refresh,name=None):
+		"""
+		Find a compiler, possibly also installed by spack.
+		"""
+		if lmod_refresh: raise Exception('lmod_refresh must be null')
+		print('status rebuilding Lmod tree')
+		chdir_cmd = self._env_chdir(name)
+		self._run_via_spack(command=chdir_cmd+\
+			# always delete and rebuild the entire tree
+			"spack module lmod refresh --delete-tree -y")
+	def lmod_hide_nested(self,lmod_hide_nested):
+		"""
+		Remove nested Lmod paths from spack.
+		Ported via script-hide-nested-lmod.py
+		e.g. removes m1/linux-centos7-x86_64/gcc/7.4.0/openmpi/3.1.4-4dhlcnc/hdf5/1.10.5.lua
+		"""
+		print('status cleaning nested modules')
+		# hardcoded 7-character hashes
+		regex_nested_hashed = '.+-[0-9a-z]{7}$'
+		spot = os.path.realpath(lmod_hide_nested)
+		if not os.path.isdir(spot):
+			raise Exception('cannot find %s'%spot)
+		result = {}
+		for root,dns,fns in os.walk(spot):
+			path = root.split(os.path.sep)
+			if len(path)>=2 and re.match(regex_nested_hashed,path[-2]):
+				base = os.path.sep.join(path[:-3])
+				if base not in result: result[base] = []
+				result[base].extend([os.path.sep.join(path[-3:]+[
+					re.match('^(.+)\.lua$',f).group(1)]) for f in fns])
+		for key,val in result.items():
+			fn = os.path.join(key,'.modulerc')
+			print('writing %s'%fn)
+			with open(fn,'w') as fp:
+				fp.write('#%Module\n')
+				for item in val:
+					fp.write('hide-version %s\n'%item)
 
 def spack_env_maker(what):
 	"""
