@@ -32,6 +32,15 @@ bc-config: &bc-config
     build_stage:
       - "$TMPDIR/$USER/spack-stage"
     misc_cache: /software/apps/spack/a02/cache_misc
+  packages:
+    slurm:
+      paths:
+        slurm@17.11.12: /software/apps/slurm/17.11.12.1.marcc
+      buildable: false
+      version: []
+      providers: {}
+      modules: {}
+      compiler: []
   modules:
     enable: 
       - lmod
@@ -100,8 +109,18 @@ bc-gcc-7-base:
         # include gcc for lmod
         - gcc@7.4.0 %gcc@4.8.5
         - gsl %gcc@7.4.0
+        - cuda@9.2.88 %gcc@7.4.0
     # specs must match mods modules for lmod refresh
     - lmod_refresh: null
       name: *env_gcc_7_base
     - lmod_hide_nested: *module-spot
 
+bc-gcc-7-openmpi-3:
+  notes: Blue Crab openmpi 3 built on gcc 7.
+  envs:
+    - check_compiler: gcc@7.4.0
+    - name: &env_gcc_7_openmpi_3 env_gcc_7_openmpi_3
+      via: template_basic
+      mods: *bc-config
+      specs:
+        - openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs +legacylaunchers+pmi schedulers=slurm ^cuda@9.2.88

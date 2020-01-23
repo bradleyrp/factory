@@ -2,7 +2,7 @@
 
 #! manually pick up the overloaded print
 from __future__ import print_function
-import os,copy,re
+import os,copy,re,sys
 import ortho
 import multiprocessing
 # several functions below use yaml 
@@ -87,13 +87,15 @@ class SpackEnvMaker(Handler):
 		result = ortho.bash('source %s && %s'%
 			(starter,command),cwd=env_spot,scroll=not fetch)
 		return result
-	def std(self,spack,where,spack_spot):
+	def std(self,spack,where,spack_spot,live=True):
 		os.makedirs(where,exist_ok=True)
 		with open(os.path.join(where,'spack.yaml'),'w') as fp:
 			yaml.dump({'spack':spack},fp)
 		cpu_count_opt = min(multiprocessing.cpu_count(),6)
+		if not live: command = 'spack install -j %d'%cpu_count_opt
+		else: command = 'spack concretize -f'
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-			command='spack install -j %d'%cpu_count_opt)
+			command=command)
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
@@ -242,7 +244,8 @@ class SpackSeq(Handler):
 			where=self.meta.get('spot_envs'))
 		self.meta['spack_dn'] = spack_dn
 		self.meta['spack_envs_dn'] = spack_envs_dn
-		for env in envs: SpackEnvItem(meta=self.meta,**env)
+		for env in envs: 
+			SpackEnvItem(meta=self.meta,**env)
 
 class SpackSeqSub(Handler):
 	_internals = {'name':'basename','meta':'meta'}
@@ -278,7 +281,10 @@ def spack_tree(what,name):
 			and sends the subtree keyed by name to SpackSeq
 			which use Handler to install packages with spack
 		clean:
-			rm -rf config.json local && python -c "import ortho;ortho.conf['replicator_recipes'] = 'specs/recipes/*.yaml';ortho.write_config(ortho.conf)" && make use specs/cli_spack.yaml
+			rm -rf config.json local && \
+			python -c "import ortho;ortho.conf['replicator_recipes'] = 
+			'specs/recipes/*.yaml';ortho.write_config(ortho.conf)" 
+			&& make use specs/cli_spack.yaml
 		test:
 			make spack_tree specs/spack_tree.yaml gromacs_gcc6
 	"""
@@ -291,3 +297,92 @@ def spack_tree(what,name):
 		os.path.join(tree['spot'],'spack'))
 	# register the spack location
 	return CacheChange(spack=spack_spot)
+
+spack_hpc_singularity_deploy_script = """
+export TMPDIR=%(tmpdir)s
+cd %(factory_site)s
+# assume the min environment is available with yaml
+source env.sh min
+make spack %(spec)s %(target)s
+"""
+
+def spack_hpc_deploy(spec,name=None,live=False,
+	tmpdir=None,factory_site=None,mounts=None,image=None):
+	"""Special functions for cluster deployment."""
+	factory_site = os.getcwd() if not factory_site else factory_site
+	#! do not call this from the CLI. remove from cli_spack.yaml
+	# check if we are in a slurm job
+	if not os.environ.get('SLURM_JOBID',None):
+		raise Exception('this command must run inside slurm')
+	# build a temporary script which we can run inside the singularity container
+	# ideally the user only runs one instance so the script is a token
+	script_token = 'container-spack-hpc.sh'
+	if os.path.isfile(script_token):
+		raise Exception('cannot execute when %s exists'%script_token)
+	# ask user for the name
+	if not name:
+		with open(spec) as fp:
+			text = yaml.load(fp,Loader=yaml.Loader)
+		print('status available targets:')
+		#! very clusmy
+		opts_num = dict(list(zip(*(zip(enumerate(text.keys())))))[0]) 
+		print('\n'.join(['  {:3d}: {:s}'.format(ii+1,i) for ii,i in enumerate(text.keys())]))
+		asker = (input if sys.version_info>(3,0) else raw_input)
+		select = asker('select a target: ')
+		if select.isdigit() and int(select)-1 in opts_num:
+			name = opts_num[int(select)-1]
+		elif select.isdigit():
+			raise Exception('invalid number %d'%int(select))
+		elif select not in text:
+			raise Exception('invalid selection "%s"'%select)
+	# settings
+	detail = {
+		'spec':spec,
+		'target':name,
+		'factory_site':factory_site,
+		'tmpdir':tmpdir}
+	if any(not i for i in detail.values()):
+		raise Exception('empty value in detail: %s'%str(detail))
+	# prepare the script
+	script_text = spack_hpc_singularity_deploy_script.strip()%detail
+	print('status script for singularity follows')
+	print(script_text)
+	# prepare the mounts
+	mounts_out = []
+	for item in mounts:
+		this = {}
+		if item.keys()=={'host'}:
+			this['host'] = this['local'] = item['host']
+		elif item.keys()=={'host','local'}:
+			this = item
+		else: raise Exception('invalid: %s'%str(this))
+		mounts_out.append((this['host'],this['local']))
+	mounts_out.append((detail['tmpdir'],detail['tmpdir']))
+	mounts = ['%s:%s'%(i,j) for i,j in mounts_out]
+	print('status mounts follow')
+	print('\n'.join(mounts))
+	#! check existence of host directories and image or let singularity?
+	cmd = (
+		"ml singularity && SINGULARITY_BINDPATH= "+
+		"singularity "+("shell " if live else "run ")+ 
+		" ".join(['-B %s'%i for i in mounts])+
+		" "+image+" ")
+	if live:
+		cmd += (' -c "cd %s && '%detail['factory_site']+
+			'/bin/bash %s && /bin/bash -norc"'%script_token)
+	else: cmd += "/bin/bash"
+	print('status running: %s'%cmd)
+	# execution loop
+	try:
+		with open(script_token,'w') as fp:
+			fp.write(script_text)
+		#! security hole
+		os.system(cmd)
+	# failure and cleanup
+	except:
+		print('error received error during spack_hpc_deploy')
+		print('error cleaning up token/script at %s'%script_token)
+		os.remove(script_token)
+		print('error done cleaning')
+		raise
+	print('status exiting')
