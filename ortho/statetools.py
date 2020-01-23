@@ -425,12 +425,17 @@ class Parser:
 			func = self._get_function(name)
 			inspected = introspect_function(func,check_varargs=True)
 			# if we find the star then it has variable arguments
-			if inspected.get('*') or inspected.get('**'):
+			# previously anything without '*' or '**' was not a free 
+			#   function, however this prevents the use of explicit kwargs
+			#   in the `make` interface so we divert all specials to the
+			#   free function handler here and skip the standard via else
+			if True or (inspected.get('*') or inspected.get('**')):
 				detail = {}
 				if hasattr(func, '__doc__'):
 					detail['help'] = func.__doc__
 				sub = self.subparsers.add_parser(name,**detail)
 				self.free_functions.append(name)
+			# standard method
 			else: self._function_to_subcommand(name)
 		# divert free functions here (note sys.argv[0]=='cli.py')
 		if len(sys.argv)>1 and sys.argv[1] in self.free_functions:
