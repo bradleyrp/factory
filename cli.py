@@ -123,6 +123,7 @@ class Interface(Parser):
         #! previously: `raise exception` but this caused repeats
 
     def _get_settings(self):
+        requires_python_check('yaml')
         import yaml
         with open(cc_user) as fp:
             raw = yaml.load(fp, Loader=yaml.SafeLoader)
