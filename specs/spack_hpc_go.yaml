@@ -1,0 +1,13 @@
+spot: !!python/object/apply:lib.spack.spack_hpc_deploy
+  kwds:
+    spec: specs/spack_hpc.yaml
+    tmpdir: /exec/rbradley/stage
+    name: bc-gcc-7-openmpi-3 # null to ask for use select in interact
+    live: true 
+    mounts: 
+      - host: /exec/rbradley/buildsite/testzone/software/apps/spack
+        local: /software/apps/spack
+      - host: /exec/rbradley/buildsite/factory
+      - host: /software/apps/slurm/17.11.12.1.marcc
+      - host: /software/centos7 # added for openmpi special build
+    image: /exec/rbradley/buildsite/mimic/mimic.simg

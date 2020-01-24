@@ -23,9 +23,9 @@ template_basic:
   specs: []
   view: false
 
-# configuration for Blue Crab deployment
-bc-config: &bc-config
-  config:
+bc-config: &bc-config-build
+  # config for building
+  config: &bc-config
     install_tree: /software/apps/spack/a02
     module_roots: 
       lmod: &module-spot /software/apps/spack/m02
@@ -41,6 +41,10 @@ bc-config: &bc-config
       providers: {}
       modules: {}
       compiler: []
+
+bc-config-modules: &bc-config-std
+  # config with modules
+  config: *bc-config
   modules:
     enable: 
       - lmod
@@ -52,6 +56,7 @@ bc-config: &bc-config
         filter:
           environment_blacklist: []
         load: []
+        #! hdf5 and netcdf are pending
         suffixes:
           hdf5+cxx: serial
           netcdf+parallel-netcdf: parallel
@@ -77,7 +82,7 @@ bc-test-v01:
     - name: test_init_v01
       via: template_basic
       #! needs retested after updates below
-      mods: *bc-config
+      mods: *bc-config-build-openmpi
       specs:
         - zlib%gcc@4.8.5
         - cmake%gcc@4.8.5
@@ -92,7 +97,7 @@ bc-gcc-7:
       via: template_basic
       # build gcc without lmod refresh
       # lmod refresh occurs after we build packages below
-      mods: *bc-config
+      mods: *bc-config-build
       specs:
         - gcc@7.4.0 %gcc@4.8.5
     - find: gcc@7.4.0 
@@ -104,6 +109,32 @@ bc-gcc-7-base:
     - check_compiler: gcc@7.4.0
     - name: &env_gcc_7_base env_gcc_7_base
       via: template_basic
+      mods: *bc-config-build
+      specs:
+        # include gcc for lmod
+        - gcc@7.4.0 %gcc@4.8.5
+        - gsl %gcc@7.4.0
+        - cuda@9.2.88 %gcc@7.4.0
+
+bc-gcc-7-openmpi-3:
+  notes: Blue Crab openmpi 3 built on gcc 7.
+  envs:
+    - check_compiler: gcc@7.4.0
+    - name: &env_gcc_7_openmpi_3 env_gcc_7_openmpi_3
+      via: template_basic
+      mods: *bc-config-build
+      specs:
+        - openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs 
+          +legacylaunchers+pmi schedulers=slurm ^cuda@9.2.88
+
+bc-std:
+  notes: |
+    Standard module tree on the new "stack" including gcc/openmpi.
+    This is the first point at which we can deploy lmod.
+  envs:
+    - check_compiler: gcc@7.4.0
+    - name: &env_std env_std
+      via: template_basic
       mods: *bc-config
       specs:
         # include gcc for lmod
@@ -114,13 +145,3 @@ bc-gcc-7-base:
     - lmod_refresh: null
       name: *env_gcc_7_base
     - lmod_hide_nested: *module-spot
-
-bc-gcc-7-openmpi-3:
-  notes: Blue Crab openmpi 3 built on gcc 7.
-  envs:
-    - check_compiler: gcc@7.4.0
-    - name: &env_gcc_7_openmpi_3 env_gcc_7_openmpi_3
-      via: template_basic
-      mods: *bc-config
-      specs:
-        - openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs +legacylaunchers+pmi schedulers=slurm ^cuda@9.2.88
