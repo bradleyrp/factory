@@ -1,9 +1,22 @@
+NOTES: |
+  STEP 1: getting started
+    To use this code, copy this yaml file and customize for your account.
+    Build a virtualenv with yaml:
+      python=python3 make venv create file=specs/env_venv.txt  
+    Next, get a copy of the image file below.
+    Then create a tmpdir on a fast filesystem.
+    To try it out, set live to true below and use "bc-test-v01" as the name.
+    Execute in an interactive session with:
+      rm -f container-spack-hpc.sh && make do specs/spack_hpc_go.yaml
+    This puts you inside a container and runs concretize.
+    More detail coming soon.
+
 spot: !!python/object/apply:lib.spack.spack_hpc_deploy
   kwds:
     spec: specs/spack_hpc.yaml
     tmpdir: /exec/rbradley/stage
-    name: bc-gcc-7-openmpi-3 # null to ask for use select in interact
-    live: true 
+    name: bc-std # null to ask for use select in interact
+    live: true
     mounts: 
       - host: /exec/rbradley/buildsite/testzone/software/apps/spack
         local: /software/apps/spack
