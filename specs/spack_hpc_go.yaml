@@ -1,26 +1,60 @@
-NOTES: |
-  STEP 1: getting started
-    To use this code, copy this yaml file and customize for your account.
-    Build a virtualenv with yaml:
-      python=python3 make venv create file=specs/env_venv.txt  
-    Next, get a copy of the image file below.
-    Then create a tmpdir on a fast filesystem.
-    To try it out, set live to true below and use "bc-test-v01" as the name.
-    Execute in an interactive session with:
-      rm -f container-spack-hpc.sh && make do specs/spack_hpc_go.yaml
-    This puts you inside a container and runs concretize.
-    More detail coming soon.
+docs: |
+  GUIDE 1: QUICKSTART
+    Primary workflow:
+      0. Clone the factory.
+      1. Customize a copy of `spack_hpc_go.yaml` (below) for your account. 
+           - Specify the factory location.
+           - Choose a temporary directory on a fast filesystem.
+           - Obtain a copy of the Singularity image matched to our base image.
+           - Create a "decoy" testing space.
+           - Create a copy of "the spec" at `specs/spack_hpc.yaml` for customization.
+      2. Install a clean venv with only yaml.
+           python=python3 make venv create file=specs/env_venv.txt
+      3. Run the configure-test loop below, repeating as needed.
+      4. Run the build loop when the concretize looks good.
+      5. Push to production.
+    Loop: configure-test
+      0. Start an interact session
+      1. In the factory location, run `source env.sh min`
+      2. Edit your custom `spack_hpc_go_X.yaml` with a target `name` and `live: true`.
+      3. Execute with: `rm -f container-spack-hpc.sh && make do specs/spack_hpc_go_X.yaml`
+      4. If you have set `live: true` this deposits you in the decoy env.
+           - You will be inside the container at `factory/local/spack`.
+           - The program will run `spack -f concretize` inside an env.
+           - The env folders are inside your pwd and correspond to the `name` you selected.
+      5. You can repeat this loop in two ways:
+           - Edit env `spack.yaml`, concretize in the container, and repeat until success.
+           - Edit `specs/spack_hpc.yaml` and run the `make do` command above until success.
+      6. When the environment looks good, make sure any local changes to env `spack.yaml`
+           have been propagated back to `specs/spack_hpc.yaml`. I recommend running `make do`
+           with the finalized `specs/spack_hpc.yaml` before continuing to the build loop.
+    Example:
+      After setting up the primary workflow, I recommend starting with `name: bc-prelim`.
+    Loop: build
+      Details coming soon!
 
 spot: !!python/object/apply:lib.spack.spack_hpc_deploy
   kwds:
+    # this is "the spec" and contains ALL of the spack information
+    # you should create custom copies of both specs/spack_hpc.yaml 
+    #   and specs/spack_hpc_go.yaml and make sure all paths match
     spec: specs/spack_hpc.yaml
+    # make a custom temporary directory for staging spack builds
     tmpdir: /exec/rbradley/stage
+    # select a name which must be a root-level key in the spec (above)
+    # this name typically corresponds to a spack environment
+    # the root-level key in the spec file has a special syntax
     name: bc-std # null to ask for use select in interact
+    # make sure you use an interact session and set live for the configure-test loop
     live: true
     mounts: 
+      # create a custom decoy location where spack will build new packages
+      # singularity maps the decoy location to the production location in the container
       - host: /exec/rbradley/buildsite/testzone/software/apps/spack
         local: /software/apps/spack
+      # make sure the path below matches the factory location
       - host: /exec/rbradley/buildsite/factory
       - host: /software/apps/slurm/17.11.12.1.marcc
       - host: /software/centos7 # added for openmpi special build
+    # obtain a copy of the singularity image matched to the base image
     image: /exec/rbradley/buildsite/mimic/mimic.simg

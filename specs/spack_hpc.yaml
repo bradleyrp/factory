@@ -86,7 +86,9 @@ bc-config-modules: &bc-config-std
 
 openmpi-3_1_4: &openmpi-3_1_4 "openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88"
 
-bc-test-v01:
+### ENVIRONMENTS
+
+bc-prelim:
   notes: |
     Initial test before running a compiler build.
     #! needs retested
