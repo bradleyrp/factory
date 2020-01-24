@@ -16,6 +16,7 @@ from ortho import CacheChange
 from ortho import path_resolver
 from ortho import catalog
 from ortho import delveset
+from ortho import requires_python_check
 
 #! note hardcoded default below needs a way to define the defaults with a dict
 #!   merge on the incoming tree but this depends on its structure
@@ -87,11 +88,13 @@ class SpackEnvMaker(Handler):
 		result = ortho.bash('source %s && %s'%
 			(starter,command),cwd=env_spot,scroll=not fetch)
 		return result
-	def std(self,spack,where,spack_spot,live=True):
+	def std(self,spack,where,spack_spot):
 		os.makedirs(where,exist_ok=True)
 		with open(os.path.join(where,'spack.yaml'),'w') as fp:
 			yaml.dump({'spack':spack},fp)
 		cpu_count_opt = min(multiprocessing.cpu_count(),6)
+		# flags from CLI passed via meta
+		live = self.meta.get('live',False)
 		if not live: command = 'spack install -j %d'%cpu_count_opt
 		else: command = 'spack concretize -f'
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
@@ -125,7 +128,9 @@ class SpackEnvItem(Handler):
 			for route,val in catalog(mods):
 				delveset(instruct,*route,value=val)
 		print('status building spack environment at "%s"'%spot)
-		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct)
+		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct,
+			# pass through meta for flags e.g. "live" to visit the env
+			meta=self.meta)
 	def find_compilers(self,find_compilers):
 		"""Generic function to find any compilers, for example the system compiler."""
 		print('status find_compilers to find any compilers')
@@ -228,7 +233,7 @@ class SpackEnvSeqItem(Handler):
 	Convert an item
 	"""
 	def via(via,**kwargs):
-		import ipdb;ipdb.set_trace()
+		import pdb;pdb.set_trace()
 
 class SpackSeq(Handler):
 	def seq_envs(self,envs,notes=None):
@@ -245,11 +250,13 @@ class SpackSeq(Handler):
 		self.meta['spack_dn'] = spack_dn
 		self.meta['spack_envs_dn'] = spack_envs_dn
 		for env in envs: 
+			#! should we allow live only in certain cases?
+			# pass along the live flag via meta from CLI
 			SpackEnvItem(meta=self.meta,**env)
 
 class SpackSeqSub(Handler):
 	_internals = {'name':'basename','meta':'meta'}
-	def subselect(self,name,tree):
+	def subselect(self,name,tree,live=False):
 		"""
 		One file and one choice (the name selects 
 		part of the tree to run). 
@@ -259,10 +266,12 @@ class SpackSeqSub(Handler):
 		# builtin defaults from a dictionary above
 		self.tree = copy.deepcopy(spack_tree_defaults)
 		self.tree.update(**tree)
+		# pass through the live flag from the CLI
+		self.tree['live'] = live
 		self.deploy = SpackSeq(meta=self.tree,**tree[name])
 		return self
 
-def spack_tree(what,name):
+def spack_tree(what,name,live=False):
 	"""
 	Install a sequence of spack environments.
 	"""
@@ -288,10 +297,12 @@ def spack_tree(what,name):
 		test:
 			make spack_tree specs/spack_tree.yaml gromacs_gcc6
 	"""
+	requires_python_check('yaml')
+	import yaml
 	print('status installing spack seq from %s with name %s'%(what,name))
 	with open(what) as fp: 
-		tree = yaml.load(fp,Loader=yaml.SafeLoader)
-	spack = SpackSeqSub(name=name,tree=tree).solve
+		tree = yaml.load(fp,Loader=yaml.Loader)
+	spack = SpackSeqSub(name=name,tree=tree,live=live).solve
 	# assume no changes to the tree, it has a spot, and the spot is parent
 	spack_spot = ortho.path_resolver(
 		os.path.join(tree['spot'],'spack'))
@@ -303,7 +314,7 @@ export TMPDIR=%(tmpdir)s
 cd %(factory_site)s
 # assume the min environment is available with yaml
 source env.sh min
-make spack %(spec)s %(target)s
+./fac spack %(spec)s %(target)s %(flags)s
 """
 
 def spack_hpc_deploy(spec,name=None,live=False,
@@ -340,7 +351,8 @@ def spack_hpc_deploy(spec,name=None,live=False,
 		'spec':spec,
 		'target':name,
 		'factory_site':factory_site,
-		'tmpdir':tmpdir}
+		'tmpdir':tmpdir,
+		'flags':' live' if live else ' '}
 	if any(not i for i in detail.values()):
 		raise Exception('empty value in detail: %s'%str(detail))
 	# prepare the script
@@ -366,11 +378,14 @@ def spack_hpc_deploy(spec,name=None,live=False,
 		"ml singularity && SINGULARITY_BINDPATH= "+
 		"singularity "+("shell " if live else "run ")+ 
 		" ".join(['-B %s'%i for i in mounts])+
-		" "+image+" ")
+		" "+image+" "+'-c "cd %s && '%detail['factory_site'])
 	if live:
-		cmd += (' -c "cd %s && '%detail['factory_site']+
-			'/bin/bash %s && /bin/bash -norc"'%script_token)
-	else: cmd += "/bin/bash"
+		#! assume spack location and go there if lie
+		#! we need to cd right into the env ideally
+		postscript = (" source env.sh spack && cd local/spack/ && "+
+			"export TMPDIR=%s &&"%detail['tmpdir'])
+		cmd += ('/bin/bash %s &&%s /bin/bash"'%(script_token,postscript))
+	else: cmd += '/bin/bash %s"'%script_token
 	print('status running: %s'%cmd)
 	# execution loop
 	try:
