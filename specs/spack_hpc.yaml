@@ -42,6 +42,9 @@ bc-config: &bc-config-build
       modules: {}
       compiler: []
 
+# standard whitelist follows for modulefiles
+whitelist-std: &whitelist-std ['gcc', 'openmpi /cr5qwwt']
+
 bc-config-modules: &bc-config-std
   # config with modules
   config: *bc-config
@@ -72,8 +75,7 @@ bc-config-modules: &bc-config-std
       - compiler
       - mpi
       verbose: false
-      whitelist:
-      - gcc
+      whitelist: *whitelist-std
       openmpi@3.4.1:
         environment:
           set:
@@ -84,9 +86,14 @@ bc-config-modules: &bc-config-std
         load: []
         conflict: []
 
-openmpi-3_1_4: &openmpi-3_1_4 "openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88"
+openmpi-3_1_4: &openmpi-3_1_4 >-
+    openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs 
+    +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88
+    arch=linux-centos7-haswell
 
-bc-test-v01:
+### ENVIRONMENTS
+
+bc-prelim:
   notes: |
     Initial test before running a compiler build.
     #! needs retested
@@ -98,8 +105,8 @@ bc-test-v01:
       #! needs retested after updates below
       mods: *bc-config-build
       specs:
-        - zlib%gcc@4.8.5
-        - cmake%gcc@4.8.5
+        - zlib%gcc@4.8.5 arch=linux-centos7-haswell
+        - cmake%gcc@4.8.5 arch=linux-centos7-haswell
 
 bc-gcc-7:
   notes: Compile gcc 7 for Blue Crab.
@@ -113,7 +120,7 @@ bc-gcc-7:
       # lmod refresh occurs after we build packages below
       mods: *bc-config-build
       specs:
-        - gcc@7.4.0 %gcc@4.8.5
+        - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
     - find: gcc@7.4.0 
       name: *env_gcc_7
 
@@ -126,9 +133,9 @@ bc-gcc-7-base:
       mods: *bc-config-build
       specs:
         # include gcc for lmod
-        - gcc@7.4.0 %gcc@4.8.5
-        - gsl %gcc@7.4.0
-        - cuda@9.2.88 %gcc@7.4.0
+        - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
+        - gsl %gcc@7.4.0 arch=linux-centos7-haswell
+        - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
 
 bc-gcc-7-openmpi-3:
   notes: Blue Crab openmpi 3 built on gcc 7.
@@ -151,11 +158,12 @@ bc-std:
       mods: *bc-config-std
       specs:
         # include gcc for lmod
-        - gcc@7.4.0 %gcc@4.8.5
-        - gsl %gcc@7.4.0
-        - cuda@9.2.88 %gcc@7.4.0
+        # note that these specs must be added to whitelist-std
+        - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
+        - gsl %gcc@7.4.0 arch=linux-centos7-haswell
+        - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
         - *openmpi-3_1_4 
     # specs must match mods modules for lmod refresh
     - lmod_refresh: null
-      name: *env_gcc_7_base
+      name: *env_std
     - lmod_hide_nested: *module-spot
