@@ -46,7 +46,7 @@ spot: !!python/object/apply:lib.spack.spack_hpc_deploy
     # the root-level key in the spec file has a special syntax
     name: bc-std # null to ask for use select in interact
     # make sure you use an interact session and set live for the configure-test loop
-    live: true
+    live: false
     mounts: 
       # create a custom decoy location where spack will build new packages
       # singularity maps the decoy location to the production location in the container
