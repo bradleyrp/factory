@@ -1,6 +1,4 @@
 dockerfiles: !merge_spec
-  a:
-    b: 1
   external: !import_spec 
     from: ./dockerfiles.yaml
     what: dockerfiles
@@ -25,6 +23,10 @@ dockerfiles: !merge_spec
       RUN ln -s /usr/local/carp-1.1/meshalyzer/src/meshalyzer /usr/bin/meshalyzer
       # SHELL ["/bin/bash", "-c", "source /usr/local/carp-1.1/config.sh"]
       RUN echo "source /usr/local/carp-1.1/config.sh" >> /etc/bash.bashrc
+    carp_license: |
+      USER root
+      RUN chown user:users /usr/local/carp-1.1/license.bin
+      USER user
     emacs26: |
       RUN apt-get install -y software-properties-common
       RUN add-apt-repository -y ppa:kelleyk/emacs
@@ -62,6 +64,25 @@ dockerfiles: !merge_spec
       RUN apt-get install -y mesa-utils libgl1-mesa-glx
       WORKDIR /tmp
       RUN wget https://downloads.tuxfamily.org/godotengine/3.1.2/Godot_v3.1.2-stable_x11.64.zip
+    ubuntu_mkl: |
+      RUN apt-get install -y cpio
+      RUN cd /tmp && \
+        wget -q http://registrationcenter-download.intel.com/akdlm/irc_nas/tec/15275/l_mkl_2019.3.199.tgz && \
+        tar -xzf l_mkl_2019.3.199.tgz && \
+        cd l_mkl_2019.3.199 && \
+        sed -i 's/ACCEPT_EULA=decline/ACCEPT_EULA=accept/g' silent.cfg && \
+        sed -i 's/ARCH_SELECTED=ALL/ARCH_SELECTED=INTEL64/g' silent.cfg && \
+        sed -i 's/COMPONENTS=DEFAULTS/COMPONENTS=;intel-comp-l-all-vars__noarch;intel-comp-nomcu-vars__noarch;intel-openmp__x86_64;intel-tbb-libs__x86_64;intel-mkl-common__noarch;intel-mkl-installer-license__noarch;intel-mkl-core__x86_64;intel-mkl-core-rt__x86_64;intel-mkl-doc__noarch;intel-mkl-doc-ps__noarch;intel-mkl-gnu__x86_64;intel-mkl-gnu-rt__x86_64;intel-mkl-common-ps__noarch;intel-mkl-core-ps__x86_64;intel-mkl-common-c__noarch;intel-mkl-core-c__x86_64;intel-mkl-common-c-ps__noarch;intel-mkl-tbb__x86_64;intel-mkl-tbb-rt__x86_64;intel-mkl-gnu-c__x86_64;intel-mkl-common-f__noarch;intel-mkl-core-f__x86_64;intel-mkl-gnu-f-rt__x86_64;intel-mkl-gnu-f__x86_64;intel-mkl-f95-common__noarch;intel-mkl-f__x86_64;intel-mkl-psxe__noarch;intel-psxe-common__noarch;intel-psxe-common-doc__noarch;intel-compxe-pset/g' silent.cfg && \
+        ./install.sh -s silent.cfg && \
+        cd .. && rm -rf * && \
+        rm -rf /opt/intel/.*.log /opt/intel/compilers_and_libraries_2019.3.199/licensing && \
+        echo "/opt/intel/mkl/lib/intel64" >> /etc/ld.so.conf.d/intel.conf && \
+        ldconfig && \
+        echo "source /opt/intel/mkl/bin/mklvars.sh intel64" >> /etc/bash.bashrc
+    vertigo_lein_user: |
+      WORKDIR /tmp
+      RUN mkdir vertigo_lein_user && cd vertigo_lein_user && echo '(defproject vertigo "0.1.0-SNAPSHOT" :plugins [[lein-git-deps "0.0.1-SNAPSHOT"] [lein-with-env-vars "0.2.0"] [cider/cider-nrepl "0.23.0"]] :git-dependencies [["https://github.com/bmillare/dj3.git"]] :dependencies [[org.clojure/clojure "1.10.0"] [org.bmillare/dj.core "0.2.0"] [com.cemerick/pomegranate "1.1.0"] [org.bmillare/dj.treefn "0.2.0"] [uncomplicate/neanderthal "LATEST"] [nrepl "0.6.0"] [clojure-complete "0.2.5"]])' > project.clj && cat project.clj && lein install
+      WORKDIR /home/user
 
 dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
   series:
@@ -73,7 +94,10 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - jdk-13
     - clojure
     - godot
+    - ubuntu_mkl
     - user_sudo_ubuntu
+    - carp_license
+    - vertigo_lein_user
 
 # SETTINGS
 macos_docker_display: &macos_docker_display >-
@@ -84,6 +108,7 @@ hearts_code: &directed-graph-code >-
   /home/rpb/work/hearts-code/directed-graph-rotor-analysis
 # hearts_code: &directed-graph-code >-
 #   "/Users/rpb/worker/heart/dev/directed-graph-rotor-analysis"
+vertigo: &vertigo /Users/rpb/worker/heart/dev/vertigo
 dg-ex01: &dg-ex01 
   !!python/object/apply:os.path.join [*hearts_data,
   "2019.12.11-directed-graph-input-example-e01"]
@@ -96,7 +121,8 @@ select: !select
 
   carp:
     image_name: &image_name_ubuntu heartland:carp_meshalyzer
-    command: docker-compose run --service-ports deploy
+    command: docker-compose up deploy
+    #! previously: command: docker-compose run --service-ports deploy
     # visit runs command (`docker-compose run`) with a tty
     visit: True
     #! using volumes instead of: site: local, spot, darwin_ok
@@ -132,7 +158,7 @@ select: !select
           #! linux host
           environment:
             - DISPLAY=$DISPLAY
-          network_mode: "host"
+          #! never if you want ports on host: network_mode: "host"
           devices:
             - /dev/dri 
             - /dev/snd
@@ -164,3 +190,30 @@ select: !select
               target: /home/user/source
               type: bind
 
+  vertigo_v02:
+    via: carp_macos
+    mods:
+      #! this is still visiting! no link to compose folder because visit
+      command: docker-compose up -d deploy
+      compose:
+        services:
+          deploy:
+            devices: []
+            volumes: 
+            - source: /Users/rpb/worker/heart/2020.01.22-vertigo-redeploy
+              target: /home/user/spot
+              type: bind
+            ports:
+            - 9011:9011
+            - 9012:9012
+            - 9020:9020
+            #! automate the installation that occurs on lein repl?
+            entrypoint: '/bin/bash -c "cd /home/user/spot/vertigo && source /usr/local/carp-1.1/config.sh && lein repl :headless :host 0.0.0.0 :port 9020"'
+  vertigo_v02_visit:
+    notes: |
+      This is a canonical visit recipe, piggybacking off of another recipe.
+    via: vertigo_v02
+    mods:
+      visit: true
+      compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
+      command: docker-compose run --service-ports deploy
