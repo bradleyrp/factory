@@ -328,8 +328,7 @@ def spack_hpc_deploy(spec,name=None,live=False,
 	# build a temporary script which we can run inside the singularity container
 	# ideally the user only runs one instance so the script is a token
 	script_token = 'container-spack-hpc.sh'
-	#! allow overwrites for now since token functionality is not useful
-	if False and os.path.isfile(script_token):
+	if os.path.isfile(script_token):
 		raise Exception('cannot execute when %s exists'%script_token)
 	# ask user for the name
 	if not name:
@@ -401,4 +400,6 @@ def spack_hpc_deploy(spec,name=None,live=False,
 		os.remove(script_token)
 		print('error done cleaning')
 		raise
+	print('status done and removing %s'%script_token)
+	os.remove(script_token)
 	print('status exiting')
