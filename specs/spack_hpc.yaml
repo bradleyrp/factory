@@ -136,6 +136,8 @@ bc-gcc-7-base:
         - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
         - gsl %gcc@7.4.0 arch=linux-centos7-haswell
         - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
+        - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
+        - python@3.7 +optimizations +uuid %gcc@7.4.0 arch=linux-centos7-haswell
 
 bc-gcc-7-openmpi-3:
   notes: Blue Crab openmpi 3 built on gcc 7.
@@ -162,6 +164,8 @@ bc-std:
         - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
         - gsl %gcc@7.4.0 arch=linux-centos7-haswell
         - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
+        - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
+        #! perform a pythonic list cat with the base
         - *openmpi-3_1_4 
     # specs must match mods modules for lmod refresh
     - lmod_refresh: null

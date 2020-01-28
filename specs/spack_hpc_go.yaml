@@ -33,7 +33,8 @@ docs: |
     Loop: build
       Details coming soon!
 
-spot: !!python/object/apply:lib.spack.spack_hpc_deploy
+spot: !!python/object/apply:lib.spack.spack_hpc_singularity
+#spot: !testflag
   kwds:
     # this is "the spec" and contains ALL of the spack information
     # you should create custom copies of both specs/spack_hpc.yaml 
@@ -44,9 +45,9 @@ spot: !!python/object/apply:lib.spack.spack_hpc_deploy
     # select a name which must be a root-level key in the spec (above)
     # this name typically corresponds to a spack environment
     # the root-level key in the spec file has a special syntax
-    name: bc-std # null to ask for use select in interact
+    name: bc-gcc-7-base #bc-std # null to ask for use select in interact
     # make sure you use an interact session and set live for the configure-test loop
-    live: false
+    live: true 
     mounts: 
       # create a custom decoy location where spack will build new packages
       # singularity maps the decoy location to the production location in the container
