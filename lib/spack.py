@@ -207,7 +207,7 @@ class SpackEnvItem(Handler):
 				base = os.path.sep.join(path[:-3])
 				if base not in result: result[base] = []
 				result[base].extend([os.path.sep.join(path[-3:]+[
-					re.match('^(.+)\.lua$',f).group(1)]) for f in fns])
+					re.match(r'^(.+)\.lua$',f).group(1)]) for f in fns])
 		for key,val in result.items():
 			fn = os.path.join(key,'.modulerc')
 			print('writing %s'%fn)
