@@ -1,3 +1,51 @@
+note: |
+  https://github.com/spack/spack/issues/7448
+  https://stackoverflow.com/questions/37055420/python-how-can-i-tell-if-my-python-has-ssl
+    python -c "import ssl; print(ssl.OPENSSL_VERSION)"
+  https://spack.readthedocs.io/en/latest/mirrors.html
+    adding a mirror really adds a line in ~/.spack/mirrors.yaml
+      and this is not mapped in singularity so my activity outside was invisible
+    actually no it does mount the home directory
+
+        ==> openssl@1.0.2k : externally installed in /usr
+        ==> openssl@1.0.2k : already registered in DB
+        ==> sqlite is already installed in /software/apps/spack/a02/linux-centos7-haswell/gcc-7.4.0/sqlite-3.30.1-4mhcwk26zdrp3bkbxjsylduk7uzvfmz4
+        ==> Installing python
+        ==> Searching for binary cache of python
+        ==> Finding buildcaches in /exec/rbradley/buildsite/factory/local/spack/var/spack/cache/build_cache
+        ==> No binary for python found: installing from source
+        ==> Warning: Expected user 3284 to own /exec/rbradley, but it is owned by 0
+        curl: (37) Couldn't open file /exec/rbradley/buildsite/factory/local/spack/var/spack/cache/python/python-3.7.tgz
+        curl: (22) The requested URL returned error: 404 Not Found
+        ==> Fetching file:///exec/rbradley/buildsite/factory/local/spack/var/spack/cache/python/python-3.7.tgz
+        ==> Failed to fetch file from URL: file:///exec/rbradley/buildsite/factory/local/spack/var/spack/cache/python/python-3.7.tgz
+            Curl failed with error 37
+        ==> Fetching from file:///exec/rbradley/buildsite/factory/local/spack/var/spack/cache/python/python-3.7.tgz failed.
+
+    this is a major.minor.revision issue
+    started over from scratch for better notes
+    recap the method
+        spack mirror remove main
+        # manually deleted the mirror
+        # go to the env location
+        # spack mirror add --scope site tmp ./mirror-tmp
+        # above appears to do nothing
+        # spack mirror rm --scope site tmp
+        # this appears to be sufficient, but check ~/.spack to be sure
+        spack mirror create python@3.7.6
+            ==> Adding package python@3.7.6 to mirror
+            ==> Successfully updated mirror in file:///exec/rbradley/buildsite/factory/local/spack/var/spack/cache
+        # clean up ~/.spack/cache but there should be no config in user site
+        # attempt install inside singularity after setting cache
+        # got really weird errors saying it was using icc for some reason
+        rm -rf /exec/rbradley/buildsite/factory/local/spack/var/spack/cache/python/
+        # ml gcc before making the cache after removing it above
+        ml purge
+        spack mirror create python@3.7.6
+        spack clean
+        # in the env in singularity now
+        spack install -j 6
+
 
 # Install programs with spack.
 # To use: `make use specs/cli_spack.yaml`
@@ -41,9 +89,13 @@ bc-config: &bc-config-build
       providers: {}
       modules: {}
       compiler: []
+    openssl:
+      paths: {openssl@1.0.2k: /usr}
+      buildable: false
 
 # standard whitelist follows for modulefiles
-whitelist-std: &whitelist-std ['gcc', 'openmpi /cr5qwwt']
+#whitelist-std: &whitelist-std ['gcc', 'openmpi /cr5qwwt']
+whitelist-std: &whitelist-std ['gcc', 'openmpi', 'python']
 
 bc-config-modules: &bc-config-std
   # config with modules
@@ -137,7 +189,8 @@ bc-gcc-7-base:
         - gsl %gcc@7.4.0 arch=linux-centos7-haswell
         - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
         - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
-        - python@3.7 +optimizations +uuid %gcc@7.4.0 arch=linux-centos7-haswell
+        - python@3.7.6 %gcc@7.4.0 +optimizations +uuid arch=linux-centos7-haswell
+        - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
 
 bc-gcc-7-openmpi-3:
   notes: Blue Crab openmpi 3 built on gcc 7.
@@ -166,6 +219,8 @@ bc-std:
         - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
         - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
         #! perform a pythonic list cat with the base
+        - python@3.7.6 %gcc@7.4.0 +optimizations +uuid arch=linux-centos7-haswell
+        - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
         - *openmpi-3_1_4 
     # specs must match mods modules for lmod refresh
     - lmod_refresh: null

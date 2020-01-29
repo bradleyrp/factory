@@ -34,7 +34,6 @@ docs: |
       Details coming soon!
 
 spot: !!python/object/apply:lib.spack.spack_hpc_singularity
-#spot: !testflag
   kwds:
     # this is "the spec" and contains ALL of the spack information
     # you should create custom copies of both specs/spack_hpc.yaml 
@@ -57,5 +56,10 @@ spot: !!python/object/apply:lib.spack.spack_hpc_singularity
       - host: /exec/rbradley/buildsite/factory
       - host: /software/apps/slurm/17.11.12.1.marcc
       - host: /software/centos7 # added for openmpi special build
+      # openssl
+      - host: /usr/bin/openssl
+        local: /usr/bin/openssl
+      - host: /etc/ssl
+        local: /etc/ssl
     # obtain a copy of the singularity image matched to the base image
     image: /exec/rbradley/buildsite/mimic/mimic.simg
