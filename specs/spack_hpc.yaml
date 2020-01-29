@@ -57,13 +57,17 @@ gcc-7-base: &gcc-7-base
   - gsl %gcc@7.4.0 arch=linux-centos7-haswell
   - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
   - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
+  #! segfaults cool my dude - cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
+  - cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
   - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid arch=linux-centos7-haswell
   - !chain
     - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
     - *python3-gcc-7
 
 # standard whitelist follows for lmod modulefiles
-whitelist-std: &whitelist-std ['gcc', 'openmpi', 'python']
+#! todo: automatically generate the whitelist for target packages e.g. py-pip for python
+#! todo: automatically load some dependencies with python e.g. py-pip
+whitelist-std: &whitelist-std ['gcc', 'openmpi', 'python', 'py-pip', 'py-setuptools']
 
 ### modulefile configuration
   
@@ -177,3 +181,4 @@ bc-std:
     - lmod_refresh: null
       name: *env_std
     - lmod_hide_nested: *module-spot
+
