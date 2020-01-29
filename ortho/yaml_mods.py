@@ -70,7 +70,6 @@ def yaml_tag_merge_list(self,node):
     """
     Flatten a list in YAML. Note that this a much-requested and highly useful
     non-native YAML feature. 
-    #! consider moving to a more central location
     """
     data = []
     # adapted from: https://stackoverflow.com/a/29620234
@@ -80,3 +79,13 @@ def yaml_tag_merge_list(self,node):
 
 # generic !merge_lists tag is highly useful
 yaml.add_constructor('!merge_lists',yaml_tag_merge_list)
+
+def yaml_strcat(self,node):
+    """
+	Concatenate strings.
+	Originally developed to concatenate spack specs and avoid redundancy.	
+    """
+    return ' '.join(self.construct_sequence(node))
+
+# generic !merge_lists tag is highly useful
+yaml.add_constructor('!strcat',yaml_strcat)
