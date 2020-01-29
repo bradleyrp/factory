@@ -1,7 +1,7 @@
-
 # Install programs with spack.
 # To use: `make use specs/cli_spack.yaml`
 # To run: `make spack_tree specs/spack_tree.yaml gromacs_gcc6`
+#! DEPRECATED. see readme in spack_hpc_go.yaml
 
 # spack clone parent (for this file)
 spot: ./local
@@ -41,10 +41,36 @@ bc-config: &bc-config-build
       providers: {}
       modules: {}
       compiler: []
+    openssl:
+      paths: {openssl@1.0.2k: /usr}
+      buildable: false
 
-# standard whitelist follows for modulefiles
-whitelist-std: &whitelist-std ['gcc', 'openmpi /cr5qwwt']
+openmpi-3_1_4: &openmpi-3_1_4 >-
+    openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs 
+    +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88
+    arch=linux-centos7-haswell
 
+# base modules for gcc 7 must be cumulative for lmod
+gcc-7-base: &gcc-7-base
+  # include gcc for lmod
+  - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
+  - gsl %gcc@7.4.0 arch=linux-centos7-haswell
+  - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
+  - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
+  #! segfaults cool my dude - cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
+  - cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
+  - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid arch=linux-centos7-haswell
+  - !chain
+    - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
+    - *python3-gcc-7
+
+# standard whitelist follows for lmod modulefiles
+#! todo: automatically generate the whitelist for target packages e.g. py-pip for python
+#! todo: automatically load some dependencies with python e.g. py-pip
+whitelist-std: &whitelist-std ['gcc', 'openmpi', 'python', 'py-pip', 'py-setuptools']
+
+### modulefile configuration
+  
 bc-config-modules: &bc-config-std
   # config with modules
   config: *bc-config
@@ -86,11 +112,6 @@ bc-config-modules: &bc-config-std
         load: []
         conflict: []
 
-openmpi-3_1_4: &openmpi-3_1_4 >-
-    openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs 
-    +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88
-    arch=linux-centos7-haswell
-
 ### ENVIRONMENTS
 
 bc-prelim:
@@ -131,11 +152,8 @@ bc-gcc-7-base:
     - name: &env_gcc_7_base env_gcc_7_base
       via: template_basic
       mods: *bc-config-build
-      specs:
-        # include gcc for lmod
-        - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
-        - gsl %gcc@7.4.0 arch=linux-centos7-haswell
-        - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
+      specs: !merge_lists
+        - *gcc-7-base
 
 bc-gcc-7-openmpi-3:
   notes: Blue Crab openmpi 3 built on gcc 7.
@@ -156,14 +174,11 @@ bc-std:
     - name: &env_std env_std
       via: template_basic
       mods: *bc-config-std
-      specs:
-        # include gcc for lmod
-        # note that these specs must be added to whitelist-std
-        - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
-        - gsl %gcc@7.4.0 arch=linux-centos7-haswell
-        - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
-        - *openmpi-3_1_4 
+      specs: !merge_lists
+        - *gcc-7-base
+        - - *openmpi-3_1_4 
     # specs must match mods modules for lmod refresh
     - lmod_refresh: null
       name: *env_std
     - lmod_hide_nested: *module-spot
+

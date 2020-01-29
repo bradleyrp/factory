@@ -10,7 +10,15 @@ import multiprocessing
 try:
 	import yaml
 	from lib.yaml_mods import YAMLObjectInit
-except: pass
+	# loading yaml_mods adds extra tags and constructors
+	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_lists
+	#! the following is failing!
+	# yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
+	#! why are these not automatic
+except Exception as e: 
+	#! yaml error here if you raise
+	#! hence this is loaded twice. consider fixing? or explicate
+	pass
 from ortho import Handler
 from ortho import CacheChange
 from ortho import path_resolver
@@ -207,7 +215,7 @@ class SpackEnvItem(Handler):
 				base = os.path.sep.join(path[:-3])
 				if base not in result: result[base] = []
 				result[base].extend([os.path.sep.join(path[-3:]+[
-					re.match('^(.+)\.lua$',f).group(1)]) for f in fns])
+					re.match(r'^(.+)\.lua$',f).group(1)]) for f in fns])
 		for key,val in result.items():
 			fn = os.path.join(key,'.modulerc')
 			print('writing %s'%fn)
@@ -317,7 +325,7 @@ source env.sh min
 ./fac spack %(spec)s %(target)s %(flags)s
 """
 
-def spack_hpc_deploy(spec,name=None,live=False,
+def spack_hpc_singularity(spec,name=None,live=False,
 	tmpdir=None,factory_site=None,mounts=None,image=None):
 	"""Special functions for cluster deployment."""
 	factory_site = os.getcwd() if not factory_site else factory_site
@@ -378,14 +386,14 @@ def spack_hpc_deploy(spec,name=None,live=False,
 		"ml singularity && SINGULARITY_BINDPATH= "+
 		"singularity "+("shell " if live else "run ")+ 
 		" ".join(['-B %s'%i for i in mounts])+
-		" "+image+" "+'-c "cd %s && '%detail['factory_site'])
+		" "+image+" "+"-c 'cd %s && "%detail['factory_site'])
 	if live:
 		#! assume spack location and go there if lie
 		#! we need to cd right into the env ideally
 		postscript = (" source env.sh spack && cd local/spack/ && "+
 			"export TMPDIR=%s &&"%detail['tmpdir'])
-		cmd += ('/bin/bash %s &&%s /bin/bash"'%(script_token,postscript))
-	else: cmd += '/bin/bash %s"'%script_token
+		cmd += ("/bin/bash %s &&%s /bin/bash'"%(script_token,postscript))
+	else: cmd += "/bin/bash %s'"%script_token
 	print('status running: %s'%cmd)
 	# execution loop
 	try:
@@ -400,4 +408,37 @@ def spack_hpc_deploy(spec,name=None,live=False,
 		os.remove(script_token)
 		print('error done cleaning')
 		raise
+	print('status done and removing %s'%script_token)
+	os.remove(script_token)
 	print('status exiting')
+
+def spack_hpc_deploy(deploy,name=None,live=False,spec=None):
+	"""
+	Run spack-via-singularity directly from a terminal.
+	Install via: `make use specs/cli_spack.yaml`
+	Usage: `make spack_hpc specs/spack_hpc_go.yaml <name>`
+	Note that the `live` and `spec` flags can override the defaults.
+	"""
+	if spec: raise Exception('dev')
+	# note that we cannot edit the deploy yaml in place so we read without tags
+	#   then manipulate, then pass the result to `spack_hpc_singularity`.
+	with open(deploy) as fp: text = fp.read()
+	# use the correct python tag to subert the call to the function
+	# the following trick therefore accomplishes the override
+	target_tag = 'tag:yaml.org,2002:python/object/apply:lib.spack.spack_hpc_singularity'
+	# use safe loader otherwise reading the deploy yaml triggers the tag
+	from ortho.yaml_mods import YAMLTagFilter,select_yaml_tag_filter
+	tree = yaml.load(text,Loader=YAMLTagFilter(target_tag))
+	deliver = select_yaml_tag_filter(tree,target_tag)
+	# the deliver tree would normally go right to spack_hpc_singularity via `make do`
+	#   so we pick off kwds and send it there after modifications
+	if deliver.keys()!={'kwds'}:
+		raise Exception('invalid %s in %s with keys: %s'%(
+			target_tag,deploy,str(deliver.keys())))
+	kwargs = deliver['kwds']
+	# modify keys
+	kwargs['live'] = live
+	if name: kwargs['name'] = name
+	if spec: kwargs['spec'] = spec
+	spack_hpc_singularity(**kwargs)	
+

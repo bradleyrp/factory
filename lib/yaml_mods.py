@@ -36,6 +36,7 @@ if 0:
             print('HI')
 
     #! trying to do --- !select to part out the yaml file with make do specs/tests_multi.yaml
+    #! this needs completed and then merged with the "ask" method and moved to ortho
 
     def constructor(loader, node) :
         raise Exception('fdsfa')
