@@ -10,7 +10,15 @@ import multiprocessing
 try:
 	import yaml
 	from lib.yaml_mods import YAMLObjectInit
-except: pass
+	# loading yaml_mods adds extra tags and constructors
+	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_lists
+	#! the following is failing!
+	# yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
+	#! why are these not automatic
+except Exception as e: 
+	#! yaml error here if you raise
+	#! hence this is loaded twice. consider fixing? or explicate
+	pass
 from ortho import Handler
 from ortho import CacheChange
 from ortho import path_resolver

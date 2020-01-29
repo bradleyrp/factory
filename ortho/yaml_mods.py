@@ -80,12 +80,21 @@ def yaml_tag_merge_list(self,node):
 # generic !merge_lists tag is highly useful
 yaml.add_constructor('!merge_lists',yaml_tag_merge_list)
 
-def yaml_strcat(self,node):
+def yaml_tag_strcat(self,node):
     """
 	Concatenate strings.
 	Originally developed to concatenate spack specs and avoid redundancy.	
     """
-    return ' '.join(self.construct_sequence(node))
+    return " ".join(self.construct_sequence(node))
 
 # generic !merge_lists tag is highly useful
-yaml.add_constructor('!strcat',yaml_strcat)
+yaml.add_constructor('!strcat',yaml_tag_strcat)
+
+def yaml_tag_strcat_custom(joiner):
+	"""Custom string concatenation in yaml."""
+	def yaml_tag_strcat(self,node):
+		return joiner.join(self.construct_sequence(node))
+	return yaml_tag_strcat
+
+#! difficulty outsourcing this to lib.spack
+yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
