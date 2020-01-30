@@ -66,7 +66,7 @@ gcc-7-base: &gcc-7-base
     - *python3-gcc-7
   - !chain
     - >-
-      py-tensorflow@2.1.0 %gcc@7.4.0 arch=linux-centos7-haswell
+      py-tensorflow@2.0.0 %gcc@7.4.0 arch=linux-centos7-haswell
       +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs
     #! tf 2.1.0 on rhel is pending bazel issue https://github.com/spack/spack/issues/14234
     #! tensorrt is disabled because it was asking for some extra flag
