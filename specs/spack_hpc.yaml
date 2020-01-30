@@ -56,12 +56,23 @@ gcc-7-base: &gcc-7-base
   - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
   - gsl %gcc@7.4.0 arch=linux-centos7-haswell
   - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
-  - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
-  #! segfaults cool my dude - cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
-  - cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
+  - &cuda-10-2 cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
+  #! segfaults: - &cuda-10-1 cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
+  - &cuda-10-0 cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
+  - &cudnn-7-5-1 cudnn@7.5.1.10-10.0-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
   - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid arch=linux-centos7-haswell
   - !chain
     - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
+    - *python3-gcc-7
+  - !chain
+    - >-
+      py-tensorflow@2.1.0 %gcc@7.4.0 arch=linux-centos7-haswell
+      +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs
+    #! tf 2.1.0 on rhel is pending bazel issue https://github.com/spack/spack/issues/14234
+    #! tensorrt is disabled because it was asking for some extra flag
+    #! extreme difficulty getting this to work
+    - *cuda-10-0
+    - *cudnn-7-5-1
     - *python3-gcc-7
 
 # standard whitelist follows for lmod modulefiles
