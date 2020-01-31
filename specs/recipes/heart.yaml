@@ -98,6 +98,13 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - user_sudo_ubuntu
     - carp_license
     - vertigo_lein_user
+dockerfile_heart_min: &dockerfile_heart_min
+  series:
+    - bionic
+    - ubuntu_build
+    - jdk-13
+    - clojure
+    - jdk-13
 
 # SETTINGS
 macos_docker_display: &macos_docker_display >-
