@@ -113,7 +113,6 @@ class SpackLmodHooks(Handler):
 		"""Write a custom lua file into the tree."""
 		with open(os.path.join(moduleroot,modulefile),'w') as fp:
 			fp.write(contents)
-		import pdb;pdb.set_trace()	
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
