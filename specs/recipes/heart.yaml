@@ -99,7 +99,7 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - carp_license
     - vertigo_lein_user
 
-# SETTINGS
+# SETTINGS DEPRECATED!
 macos_docker_display: &macos_docker_display >-
   DISPLAY=docker.for.mac.host.internal:0
 hearts_data: &hearts_data "/home/rpb/work/hearts-data/"  
@@ -189,8 +189,11 @@ select: !select
             - source: *dg-ex02
               target: /home/user/source
               type: bind
+  
+  ### VERTIGO PIPELINE
 
   vertigo_v02:
+    # macbook deployment
     via: carp_macos
     mods:
       #! this is still visiting! no link to compose folder because visit
@@ -207,9 +210,13 @@ select: !select
             - 9011:9011
             - 9012:9012
             - 9020:9020
-            #! automate the installation that occurs on lein repl?
-            entrypoint: '/bin/bash -c "cd /home/user/spot/vertigo && source /usr/local/carp-1.1/config.sh && lein repl :headless :host 0.0.0.0 :port 9020"'
+            entrypoint:
+              '/bin/bash -c "cd /home/user/spot/vertigo && 
+              source /usr/local/carp-1.1/config.sh && 
+              lein repl :headless :host 0.0.0.0 :port 9020"'
+
   vertigo_v02_visit:
+    # visit deployment for vertigo_v02
     notes: |
       This is a canonical visit recipe, piggybacking off of another recipe.
     via: vertigo_v02
@@ -217,3 +224,38 @@ select: !select
       visit: true
       compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
       command: docker-compose run --service-ports deploy
+
+  # heartland deployment
+  vertigo_v03:
+    via: vertigo_v02
+    mods: 
+      compose:
+        services:
+          deploy:
+            volumes: 
+            - source: /home/rpb/work/hearts-data/2020.01.25-vertigo-v03
+              target: /home/user/spot/data
+              type: bind
+            - source: /home/rpb/work/hearts-code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+  # heartland visit
+  vertigo_v03_visit:
+    via: carp
+    mods: 
+      visit: true
+      compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            volumes: 
+            - source: /home/rpb/work/hearts-data/2020.01.25-vertigo-v03
+              target: /home/user/spot/data
+              type: bind
+            - source: /home/rpb/work/hearts-code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+            ports: []
