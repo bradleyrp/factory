@@ -62,10 +62,16 @@ gcc-7-base: &gcc-7-base
   #! tf 2.1 with cuda 10.2 with cudnn requires a higher version than 7.5.1
   - &cudnn-7-5-1 cudnn@7.5.1.10-10.0-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
   - &cudnn-7-6-5 cudnn@7.6.5.32-10.2-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
-  - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid arch=linux-centos7-haswell
+  # note that we added ~libxml2 to the python3-gcc-7 spec to resolve collision /c2ullvq
+  - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid ~libxml2 arch=linux-centos7-haswell
   - !chain
     - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
     - *python3-gcc-7
+  - !chain
+    - r@3.6.1 %gcc@7.4.0 arch=linux-centos7-haswell
+    - *python3-gcc-7
+
+penalty_box:
   - !chain
     - >-
       py-tensorflow@2.1.0 %gcc@7.4.0 arch=linux-centos7-haswell
