@@ -203,4 +203,10 @@ bc-std:
     - lmod_refresh: null
       name: *env_std
     - lmod_hide_nested: *module-spot
-
+    - lmod_hooks:
+      - moduleroot: *module-spot
+        modulefile: linux-centos7-x86_64/Core/original.lua
+        contents: >-
+          execute{cmd="ml purge &&
+          export MODULEPATH=/software/lmod/modulefiles/compiler_and_base:/software/lmod/modulefiles/apps && ml restore",
+          modeA={"load"}}
