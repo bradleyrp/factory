@@ -239,3 +239,23 @@ select: !select
             - source: /home/rpb/work/hearts-code/vertigo
               target: /home/user/spot/vertigo
               type: bind
+  # heartland visit
+  vertigo_v03_visit:
+    via: carp
+    mods: 
+      visit: true
+      compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            volumes: 
+            - source: /home/rpb/work/hearts-data/2020.01.25-vertigo-v03
+              target: /home/user/spot/data
+              type: bind
+            - source: /home/rpb/work/hearts-code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+            ports: []
