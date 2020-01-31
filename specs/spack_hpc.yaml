@@ -1,7 +1,7 @@
 # Install programs with spack.
 # To use: `make use specs/cli_spack.yaml`
 # To run: `make spack_tree specs/spack_tree.yaml gromacs_gcc6`
-#! DEPRECATED. see readme in spack_hpc_go.yaml
+# To deploy on HPC, see spack_hpc_go.yaml for instructions.
 
 # spack clone parent (for this file)
 spot: ./local
@@ -56,13 +56,35 @@ gcc-7-base: &gcc-7-base
   - gcc@7.4.0 %gcc@4.8.5 arch=linux-centos7-haswell
   - gsl %gcc@7.4.0 arch=linux-centos7-haswell
   - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
-  - cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
-  #! segfaults cool my dude - cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
-  - cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
+  - &cuda-10-2 cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
+  #! segfaults: - &cuda-10-1 cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
+  - &cuda-10-0 cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
+  #! tf 2.1 with cuda 10.2 with cudnn requires a higher version than 7.5.1
+  - &cudnn-7-5-1 cudnn@7.5.1.10-10.0-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
+  - &cudnn-7-6-5 cudnn@7.6.5.32-10.2-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
   - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid arch=linux-centos7-haswell
   - !chain
     - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
     - *python3-gcc-7
+  - !chain
+    - >-
+      py-tensorflow@2.1.0 %gcc@7.4.0 arch=linux-centos7-haswell
+      +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs
+    #! tf 2.1.0 on rhel is pending bazel issue https://github.com/spack/spack/issues/14234
+    #! tensorrt is disabled because it was asking for some extra flag
+    #! extreme difficulty getting this to work
+    - *cuda-10-2
+    - *cudnn-7-6-5
+    - *python3-gcc-7
+
+deploy_history: |
+  2020.01.29
+    develop specs for py-tensorflow (tf), cuda, cudnn
+    segfaults on cuda 10.1
+    fail on tf 2.0.0 with cuda 10.0 and cudnn 7.5.1 due to bazel/jdk issue 
+      https://github.com/spack/spack/issues/14234
+  2020.01.30
+    fail on tf 2.1.0 with cuda 10.2 and cudnn 7.6.5 (cudnn pinned to cuda) due to bazel/jdk
 
 # standard whitelist follows for lmod modulefiles
 #! todo: automatically generate the whitelist for target packages e.g. py-pip for python
@@ -181,4 +203,10 @@ bc-std:
     - lmod_refresh: null
       name: *env_std
     - lmod_hide_nested: *module-spot
-
+    - lmod_hooks:
+      - moduleroot: *module-spot
+        modulefile: linux-centos7-x86_64/Core/original.lua
+        contents: >-
+          execute{cmd="ml purge &&
+          export MODULEPATH=/software/lmod/modulefiles/compiler_and_base:/software/lmod/modulefiles/apps && ml restore",
+          modeA={"load"}}

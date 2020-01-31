@@ -108,6 +108,12 @@ class SpackEnvMaker(Handler):
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 			command=command)
 
+class SpackLmodHooks(Handler):
+	def write_lua_file(self,modulefile,contents,moduleroot):
+		"""Write a custom lua file into the tree."""
+		with open(os.path.join(moduleroot,modulefile),'w') as fp:
+			fp.write(contents)
+
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
 	def _run_via_spack(self,command,fetch=False):
@@ -186,7 +192,7 @@ class SpackEnvItem(Handler):
 		"""Bootstrap installs modules."""
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
-	def lmod_refresh(self,lmod_refresh,name=None):
+	def lmod_refresh(self,lmod_refresh,name=None,spack_lmod_hook=None):
 		"""
 		Find a compiler, possibly also installed by spack.
 		"""
@@ -196,6 +202,9 @@ class SpackEnvItem(Handler):
 		self._run_via_spack(command=chdir_cmd+\
 			# always delete and rebuild the entire tree
 			"spack module lmod refresh --delete-tree -y")
+	def lmod_hooks(self,lmod_hooks):
+		"""Look over lmod hook objects."""
+		for item in lmod_hooks: SpackLmodHooks(**item).solve
 	def lmod_hide_nested(self,lmod_hide_nested):
 		"""
 		Remove nested Lmod paths from spack.

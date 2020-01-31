@@ -8,7 +8,7 @@
 usage () { 
 	echo "[USAGE] salloc <opts> $0 <name> (live)" 
 	echo "[NOTE] the following are example commands you might use"
-	echo "salloc --qos=gpuv100 -w gpudev002 --res image_tests "\
+	echo "salloc --qos=gpuv100 -w gpudev002 --res image_tests"\
 		"-c 12 --gres=gpu:1 srun --pty /bin/bash"\
 		"-c 'source specs/script-bc.sh bc-std live'"
 	echo "sbatch specs/script-bc.sh bc-std"
