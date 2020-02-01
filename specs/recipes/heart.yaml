@@ -37,6 +37,12 @@ dockerfiles: !merge_spec
       RUN echo debconf shared/accepted-oracle-license-v1-2 select true | debconf-set-selections
       RUN echo debconf shared/accepted-oracle-license-v1-2 seen true | debconf-set-selections
       RUN apt-get install -y openjdk-13-jdk
+    jdk-11: |
+      RUN apt-get install -y software-properties-common
+      RUN add-apt-repository -y ppa:linuxuprising/java
+      RUN echo debconf shared/accepted-oracle-license-v1-2 select true | debconf-set-selections
+      RUN echo debconf shared/accepted-oracle-license-v1-2 seen true | debconf-set-selections
+      RUN apt-get install -y openjdk-11-jdk
     clojure: | # https://github.com/Quantisan/docker-clojure/blob/be736864bf3e6d35c1bc6b13fd2add4a319fb92b/target/openjdk-13-buster/lein/Dockerfile
       ENV LEIN_VERSION=2.9.1
       ENV LEIN_INSTALL=/usr/local/bin/
@@ -98,13 +104,21 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - user_sudo_ubuntu
     - carp_license
     - vertigo_lein_user
+
 dockerfile_heart_min: &dockerfile_heart_min
   series:
     - bionic
     - ubuntu_build
     - jdk-13
     - clojure
-    - jdk-13
+    - user_sudo_ubuntu
+
+dockerfile_heart_min_8: &dockerfile_heart_min_8
+  series:
+    - bionic
+    - ubuntu_build
+    - jdk-11
+    - user_sudo_ubuntu
 
 # SETTINGS DEPRECATED!
 macos_docker_display: &macos_docker_display >-
@@ -123,12 +137,16 @@ dg-ex02: &dg-ex02
   "/Users/rpb/worker/heart/hearts-data/\
   2019.12.11-directed-graph-input-example-e01"
 
+#! make this a yaml tag
+factory-root: &factory-root "/Users/rpb/worker/dev/factory"
+
 # usage: make docker specs/recipes/heart.yaml name=carp_macos
 select: !select
 
   carp:
     image_name: &image_name_ubuntu heartland:carp_meshalyzer
     command: docker-compose up deploy
+    dockerfile: *dockerfile_carp_meshalyzer
     #! previously: command: docker-compose run --service-ports deploy
     # visit runs command (`docker-compose run`) with a tty
     visit: True
@@ -170,7 +188,6 @@ select: !select
             - /dev/dri 
             - /dev/snd
             - /dev/nvidia0
-    dockerfile: *dockerfile_carp_meshalyzer
 
   carp_macos:
     #! make an automatic switch for detecting macos?
@@ -266,3 +283,21 @@ select: !select
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
             ports: []
+
+  min:
+    # a minimal testing environment
+    image_name: &image_name_min heartland:basic
+    command: docker-compose run --service-ports deploy
+    dockerfile: *dockerfile_heart_min_8
+    visit: True
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *image_name_min
+          volumes: 
+          - source: *factory-root
+            target: /home/user/extern
+            type: bind
