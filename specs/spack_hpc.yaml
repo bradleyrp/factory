@@ -3,6 +3,19 @@
 # To run: `make spack_tree specs/spack_tree.yaml gromacs_gcc6`
 # To deploy on HPC, see spack_hpc_go.yaml for instructions.
 
+blue-crab-ompi-notes: |
+  Installing openmpi on bluecrab requires a special method.
+  We build directly in production for access to slurm.
+  Then rsync back to the testzone and concretize to confirm.
+
+python-3-download-error: 
+  Download errors with python for some reason (persistent).
+  You must create a mirror and then add python to it.
+    spack mirror create python@3.7.6
+  Check for mirrors.yaml and beware polluting the user site.
+  The mirror should reside in the spack tree and can be cleared later.
+  This is the same procedure you would use for an air-gapped cluster.
+
 # spack clone parent (for this file)
 spot: ./local
 # spack environments (for this file)
