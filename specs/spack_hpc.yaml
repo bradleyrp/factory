@@ -18,6 +18,9 @@ caveats:
     Check for mirrors.yaml and beware polluting the user site.
     The mirror should reside in the spack tree and can be cleared later.
     This is the same procedure you would use for an air-gapped cluster.
+issues: # open issues requiring attention
+  cooperative_dev: Make the `spack_hpc_go.yaml` file configurable.
+  bluecrab_customizations: Push bluecrab branch from spack somewhere safe.
 
 # SETTINGS: spack source and environments locations 
 spot: ./local/spack # config.json, spack
@@ -68,10 +71,27 @@ bc-config: &bc-config-build
 ### SOFTWARE SPECIFICATION
 ###
 
-openmpi-3_1_4: &openmpi-3_1_4 >-
-    openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs 
-    +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88
-    arch=linux-centos7-haswell
+openmpi-3_1_4: &openmpi-3-1-4 >-
+  openmpi@3.1.4 %gcc@7.4.0 arch=linux-centos7-haswell
+  +cuda +cxx_exceptions fabrics=verbs 
+  +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88
+
+lammps: &lammps >-
+  lammps@20190605 %gcc@7.4.0 arch=linux-centos7-haswell 
+  +asphere +body +class2 +colloid +coreshell
+  +dipole +exceptions +ffmpeg +granular +jpeg +kspace ~latte +lib +manybody
+  +mc +meam +misc +molecule +mpi +mpiio +openmp +peri +png +poems +python +qeq
+  +replica +rigid +shock +snap +srd +user-atc +user-h5md +user-lb
+  +user-misc +user-netcdf +user-omp +user-reaxc +voronoi
+  +user-diffraction 
+
+netcdf-c: &netcdf-c >-
+  netcdf-c@4.7.3 %gcc@7.4.0 ~dap ~hdf4 maxdims=1024 maxvars=8192 +mpi ~parallel-netcdf
+  +pic+shared arch=linux-centos7-haswell
+
+hdf5: &hdf5 >-
+  hdf5@1.10.6 %gcc@7.4.0 ~cxx ~debug ~fortran +hl +mpi +pic +shared +szip ~threadsafe
+  arch=linux-centos7-haswell
 
 # base modules for gcc 7 must be cumulative for lmod
 gcc-7-base: &gcc-7-base
@@ -80,13 +100,13 @@ gcc-7-base: &gcc-7-base
   - gsl %gcc@7.4.0 arch=linux-centos7-haswell
   - cuda@9.2.88 %gcc@7.4.0 arch=linux-centos7-haswell
   - &cuda-10-2 cuda@10.2.89 %gcc@7.4.0 arch=linux-centos7-haswell
-  #! segfaults: - &cuda-10-1 cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
+    #! segfaults: - &cuda-10-1 cuda@10.1.243 %gcc@7.4.0 arch=linux-centos7-haswell
   - &cuda-10-0 cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
-  #! tf 2.1 with cuda 10.2 with cudnn requires a higher version than 7.5.1
   - &cudnn-7-5-1 cudnn@7.5.1.10-10.0-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
   - &cudnn-7-6-5 cudnn@7.6.5.32-10.2-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
-  # note that we added ~libxml2 to the python3-gcc-7 spec to resolve collision /c2ullvq
   - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid ~libxml2 arch=linux-centos7-haswell
+    # note that we added ~libxml2 to the python3-gcc-7 spec to resolve collision 
+    #   which means that /c2ullvq might have been compiled before  this flag was explicit
   - !chain
     - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
     - *python3-gcc-7
@@ -97,12 +117,22 @@ gcc-7-base: &gcc-7-base
     - >-
       py-tensorflow@2.1.0 %gcc@7.4.0 arch=linux-centos7-haswell
       +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs
-    #! tf 2.1.0 on rhel is pending bazel issue https://github.com/spack/spack/issues/14234
-    #! tensorrt is disabled because it was asking for some extra flag
-    #! extreme difficulty getting this to work
+      # tf 2.1.0 was compiled with temporary fixes on spack bluecrab branch 0dbeaf59a
+      # see bazel issue https://github.com/spack/spack/issues/14234
+      # fix was from https://github.com/spack/spack/pull/14681/commits
+      # additional fix to use /dev/shm because bazel needs big temp space
+      # tf 2.1 with cuda 10.2 requires cudnn 7.6
     - *cuda-10-2
     - *cudnn-7-6-5
     - *python3-gcc-7
+
+gcc-7-openmpi-3: &gcc-7-openmpi-3
+  - !chain
+    - *lammps
+    - *openmpi-3-1-4 
+    - *python3-gcc-7
+    - *hdf5
+    - *netcdf-c
 
 deploy_history: |
   2020.01.23
@@ -233,15 +263,28 @@ bc-gcc-7-base:
       specs: !merge_lists
         - *gcc-7-base
 
+bc-gcc-7-openmpi-3-inverse:
+  notes: |
+    Blue Crab openmpi 3 built on gcc 7.
+    Uses the inverse method described in the notes.
+  envs:
+    - check_compiler: gcc@7.4.0
+    - name: &env_gcc_7_openmpi_3_inv env-gcc-7-openmpi-3-inv
+      via: template_basic
+      mods: *bc-config-build
+      specs: 
+        - *openmpi-3-1-4 
+
 bc-gcc-7-openmpi-3:
-  notes: Blue Crab openmpi 3 built on gcc 7.
+  notes: MPI applications built on GCC and OpenMPI. 
   envs:
     - check_compiler: gcc@7.4.0
     - name: &env_gcc_7_openmpi_3 env-gcc-7-openmpi-3
       via: template_basic
       mods: *bc-config-build
-      specs:
-        - *openmpi-3_1_4 
+      specs: !merge_lists
+        - - *openmpi-3-1-4 
+        - *gcc-7-openmpi-3
 
 bc-std:
   notes: |
@@ -254,7 +297,7 @@ bc-std:
       mods: *bc-config-std
       specs: !merge_lists
         - *gcc-7-base
-        - - *openmpi-3_1_4 
+        - - *openmpi-3-1-4 
     # specs must match mods modules for lmod refresh
     - lmod_refresh: null
       name: *env_std
