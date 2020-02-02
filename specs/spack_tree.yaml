@@ -3,10 +3,8 @@
 # To use: `make use specs/cli_spack.yaml`
 # To run: `make spack_tree specs/spack_tree.yaml gromacs_gcc6`
 
-# spack clone parent (for this file)
-spot: ./local
-# spack environments (for this file)
-spot_envs: ./local/envs_spack
+spot: ./local/spack
+spot_envs: ./local/envs-spack
 
 # template for spack.yaml used below
 template_basic: 
@@ -57,6 +55,7 @@ macos_vmd:
   notes: |
     Catalina broke 32-bit binaries so we compile vmd from source.
     Note that it was easier to simply run VMD in a docker container.
+    Currently deprecated because a VMD source compile is painful.
   envs:
     - find_compilers: null
     - bootstrap: null
@@ -67,3 +66,13 @@ macos_vmd:
         - tcl
         - tk
         - opengl@4.5
+
+macos_test:
+  notes: Tested 2020.02.02 after updating the clone and path configs.
+  envs:
+    - find_compilers: null
+    - bootstrap: null
+    - name: env-macos-test
+      via: template_basic
+      specs:
+        - curl
