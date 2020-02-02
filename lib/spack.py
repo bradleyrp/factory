@@ -64,7 +64,7 @@ def spack_clone(where=None):
 	ortho.sync(modules={where:dict(
 		address='https://github.com/spack/spack')})
 	#! should we have a central conf registrar?
-	ortho.conf['spack'] = os.path.join(where,'spack')
+	ortho.conf['spack'] = where
 	# +++ add spack location to the conf
 	ortho.write_config()
 	#! should we confirm the spack clone and commit?
@@ -337,8 +337,7 @@ def spack_tree(what,name,live=False):
 		tree = yaml.load(fp,Loader=yaml.Loader)
 	spack = SpackSeqSub(name=name,tree=tree,live=live).solve
 	# assume no changes to the tree, it has a spot, and the spot is parent
-	spack_spot = ortho.path_resolver(
-		os.path.join(tree['spot'],'spack'))
+	spack_spot = ortho.path_resolver(tree['spot'])
 	# register the spack location
 	return CacheChange(spack=spack_spot)
 
