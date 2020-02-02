@@ -415,9 +415,11 @@ def spack_hpc_singularity(spec,name=None,live=False,
 		" ".join(['-B %s'%i for i in mounts])+
 		" "+image+" "+"-c 'cd %s && "%detail['factory_site'])
 	if live:
-		#! assume spack location and go there if lie
-		#! we need to cd right into the env ideally
-		postscript = (" source env.sh spack && cd local/spack/ && "+
+		# go to the environments folder if we know it
+		spack_envs_dn = ortho.conf.get('spack_envs',None)
+		if spack_envs_dn: envs_cd = 'cd %s && '%os.path.realpath(spack_envs_dn)
+		else: envs_cd = ''
+		postscript = (" source env.sh spack && %s"%envs_cd+
 			"export TMPDIR=%s &&"%detail['tmpdir'])
 		cmd += ("/bin/bash %s &&%s /bin/bash'"%(script_token,postscript))
 	else: cmd += "/bin/bash %s'"%script_token
