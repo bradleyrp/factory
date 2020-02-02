@@ -4,8 +4,9 @@
 #SBATCH --res=image_tests
 #SBATCH -c 12
 #SBATCH --gres=gpu:1
-#SBATCH -t 120
+#SBATCH -t 300
 usage () { 
+	#! make the go file configurable
 	echo "[USAGE] salloc <opts> $0 <name> (live)" 
 	echo "[NOTE] the following are example commands you might use"
 	echo "salloc --qos=gpuv100 -w gpudev002 --res image_tests"\
