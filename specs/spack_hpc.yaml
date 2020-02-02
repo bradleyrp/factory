@@ -1,25 +1,31 @@
-# Install programs with spack.
-# To use: `make use specs/cli_spack.yaml`
-# To run: `make spack_tree specs/spack_tree.yaml gromacs_gcc6`
-# To deploy on HPC, see spack_hpc_go.yaml for instructions.
+# BLUE CRAB SOFTWARE STACK 
+# Build and organize software for this cluster.
 
-blue-crab-ompi-notes: |
-  Installing openmpi on bluecrab requires a special method.
-  We build directly in production for access to slurm.
-  Then rsync back to the testzone and concretize to confirm.
+docs: |
+  To use: `make use specs/cli_spack.yaml`
+  To run: `make spack_tree specs/spack_tree.yaml gromacs_gcc6`
+  To deploy on HPC: see spack_hpc_go.yaml for instructions.
+caveats:
+  blue-crab-ompi-notes: |
+    Installing openmpi on bluecrab requires a special method.
+    We build directly in production for access to slurm.
+    Then rsync back to the testzone and concretize to confirm.
+    This connects openmpi to external slurm.
+  python-3-download-error: 
+    Download errors with python for some reason (persistent).
+    You must create a mirror and then add python to it.
+      spack mirror create python@3.7.6
+    Check for mirrors.yaml and beware polluting the user site.
+    The mirror should reside in the spack tree and can be cleared later.
+    This is the same procedure you would use for an air-gapped cluster.
 
-python-3-download-error: 
-  Download errors with python for some reason (persistent).
-  You must create a mirror and then add python to it.
-    spack mirror create python@3.7.6
-  Check for mirrors.yaml and beware polluting the user site.
-  The mirror should reside in the spack tree and can be cleared later.
-  This is the same procedure you would use for an air-gapped cluster.
+# SETTINGS: spack source and environments locations 
+spot: ./local/spack # config.json, spack
+spot_envs: ./local/envs-spack # config.json, spack_envs
 
-# spack clone parent (for this file)
-spot: ./local
-# spack environments (for this file)
-spot_envs: ./local/envs_spack
+###
+### CONFIGURATION
+###
 
 # template for spack.yaml used below
 template_basic: 
@@ -58,6 +64,10 @@ bc-config: &bc-config-build
       paths: {openssl@1.0.2k: /usr}
       buildable: false
 
+###
+### SOFTWARE SPECIFICATION
+###
+
 openmpi-3_1_4: &openmpi-3_1_4 >-
     openmpi@3.1.4%gcc@7.4.0 +cuda +cxx_exceptions fabrics=verbs 
     +legacylaunchers+pmi schedulers=slurm ^slurm@17.11.12 ^cuda@9.2.88
@@ -83,8 +93,6 @@ gcc-7-base: &gcc-7-base
   - !chain
     - r@3.6.1 %gcc@7.4.0 arch=linux-centos7-haswell
     - *python3-gcc-7
-
-penalty_box:
   - !chain
     - >-
       py-tensorflow@2.1.0 %gcc@7.4.0 arch=linux-centos7-haswell
@@ -97,6 +105,10 @@ penalty_box:
     - *python3-gcc-7
 
 deploy_history: |
+  2020.01.23
+    compiled openmpi in-place at the production location for access to slurm
+    which is external. this was previously required for openmpi 4 but we also
+    use this method for openmpi 3.1.4 to be sure it communications with slurm
   2020.01.29
     develop specs for py-tensorflow (tf), cuda, cudnn
     segfaults on cuda 10.1
@@ -105,13 +117,32 @@ deploy_history: |
   2020.01.30
     fail on tf 2.1.0 with cuda 10.2 and cudnn 7.6.5 (cudnn pinned to cuda) due to bazel/jdk
 
+# modules for a language (python, R) must have deps added systematically
+#   by looking at upstream py-* or r-* deps from a concretize and listing 
+#   them below. they must also get an autoload flag under modules
+#! dev note: this can be done quickly with a regex but we should automate
+
+# py-tensorflow upstream python requirements
+py-tensorflow-whitelist: &py-tensorflow-whitelist [py-tensorflow,
+  py-absl-py, py-setuptools, py-six, py-astor, py-gast, 
+  py-google-pasta, py-grpcio, py-cython, py-keras-applications, 
+  py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf, 
+  py-scipy, py-pybind11, py-termcolor, py-wheel, py-wrapt]
+
 # standard whitelist follows for lmod modulefiles
 #! todo: automatically generate the whitelist for target packages e.g. py-pip for python
 #! todo: automatically load some dependencies with python e.g. py-pip
-whitelist-std: &whitelist-std ['gcc', 'openmpi', 'python', 'py-pip', 'py-setuptools']
+whitelist-std: &whitelist-std !merge_lists
+  #! this is broken!
+  - [gcc, openmpi]
+  # python requires pip and setuptools
+  - [python, py-pip, py-setuptools]
+  - *py-tensorflow-whitelist 
 
-### modulefile configuration
-  
+###
+### MODULES
+###
+
 bc-config-modules: &bc-config-std
   # config with modules
   config: *bc-config
@@ -142,7 +173,7 @@ bc-config-modules: &bc-config-std
       - compiler
       - mpi
       verbose: false
-      whitelist: *whitelist-std
+      # openmpi fork issue
       openmpi@3.4.1:
         environment:
           set:
@@ -152,6 +183,12 @@ bc-config-modules: &bc-config-std
           environment_blacklist: []
         load: []
         conflict: []
+      # whitelist controls what the user sees
+      whitelist: *whitelist-std
+      # modules with complex upstream dependencies are autoloaded
+      py-tensorflow: {autoload: all}
+      python: {autoload: all}
+      r@3.6.1: {autoload: all}
 
 ### ENVIRONMENTS
 
