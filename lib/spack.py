@@ -26,34 +26,43 @@ from ortho import catalog
 from ortho import delveset
 from ortho import requires_python_check
 
-#! note hardcoded default below needs a way to define the defaults with a dict
-#!   merge on the incoming tree but this depends on its structure
+"""
+NOTES on path configuration and order of precedence
 
-# builtin defaults for the spack tree (override in the yaml root)
-#! note that there is no CLI override yet
+The yaml "spec" sent to spack_tree (possibly via spack_hpc_deploy) contains
+two settings for paths: `spot` and `spot_envs`. The `SpackSeq.seq_envs` 
+method sends these keys to `config_or_make` which gets these keys from the
+`config.json`. If they are not there yet or the directories do not yet exist, 
+it builds the targert by either cloning spack to `spot` or making the parent 
+`spot_envs` directory. When it builds, it writes the location to `config.json`
+for next time. This means that after running `spack_tree` if you change the
+spot, the change will be ignored unless you remove it from the `config.json`
+because we do not have a feature that automatically moves things. The 
+`config_or_make` function provides warnings about this. Note that the keys in
+the yaml file (`spot` and `spot_envs`) are different than those in the config
+(`spack` and `spack_envs`) for clarity in the yaml. Defaults are coded in
+this file, but also provided for the yaml when it is loaded. 
+"""
+
+# defaults are redundant in this module and added to the yaml
+# additions to config are noted with `+++` symbols below
 spack_tree_defaults = {
-	'spot':'./local',
-	'spot_envs':'./local/envs_spack',}
-
-#! config mappings see "+++ add" below and consider standardizing this?
-#!   spot in spack tree > spack in the config
-#!   spot_envs in spack tree > spack_envs in the config
+	'spot':'./local/spack',
+	'spot_envs':'./local/envs-spack',}
 
 def spack_clone(where=None):
 	"""
 	Clone a copy of spack for local use.
 	"""
 	# hardcoded default
-	where = where or 'local'
+	where = where or spack_tree_defaults['spot']
 	where = path_resolver(where)
-	os.makedirs(where,exist_ok=True)
-	# the clone target must be called spack
-	if where.split(os.path.sep)[-1]=='spack':
-		raise Exception('invalid path cannot end in "spack": %s'%where)
+	# split the path to control the clone location
+	where_parent = os.path.dirname(where)
+	os.makedirs(where_parent,exist_ok=True)
 	print('status cloning spack at %s'%where)
-	ortho.sync(modules={
-		os.path.join(where,'spack'):
-			dict(address='https://github.com/spack/spack')})
+	ortho.sync(modules={where:dict(
+		address='https://github.com/spack/spack')})
 	#! should we have a central conf registrar?
 	ortho.conf['spack'] = os.path.join(where,'spack')
 	# +++ add spack location to the conf
@@ -65,9 +74,7 @@ def spack_init_envs(where=None):
 	"""
 	Make a directory for spack environments.
 	"""
-	#! this logic is wrong we should get this from the config.json ...!!!
-	# hardcoded default
-	where = where or 'local/envs_spack'
+	where = where or spack_tree_defaults['spot_envs']
 	where = path_resolver(where)
 	if not os.path.isdir(where): 
 		print('status initializing spack environments at %s'%where)
@@ -82,11 +89,27 @@ def config_or_make(config_key,builder,where=None):
 	Check the config for a key otherwise build the target.
 	"""
 	# check the config for the target
-	target = ortho.conf.get('spack',None)
-	#! tell ther user if the target goes missing?
-	if not target or not os.path.isdir(target): 
+	target = ortho.conf.get(config_key,None)
+	# without registered key we build the object
+	if not target:
 		return builder(where=where)
-	else: return target
+	elif not os.path.isdir(target):
+		if os.path.realpath(target)!=os.path.realpath(where):
+			print(('warning registered key "%s" points to a missing '
+				'directory which means that you created something, it '
+				'registered its location, and the location has moved. '
+				'we will build to the new target "%s" but the registered '
+				'target "%s" may remain.')%(config_key,where,target))
+		return builder(where=where)
+	else: 
+		# account for the fact that cloned spack is in a subdir
+		if False and config_key=='spack':
+			# spack clone subdirectory is hardcoded here
+			target = os.path.join(where,'spack')
+		if os.path.realpath(target)!=os.path.realpath(where):
+			print(('warning registered target for "%s" is "%s" which is '
+				'different than the request "%s"')%(config_key,target,where))
+		return target
 
 class SpackEnvMaker(Handler):
 	def blank(self): pass
@@ -244,13 +267,6 @@ def spack_env_maker(what):
 	with open(what) as fp: 
 		instruct = yaml.load(fp,Loader=yaml.SafeLoader)
 	SpackEnvMaker(spack_spot=spack,**instruct).solve
-
-class SpackEnvSeqItem(Handler):
-	"""
-	Convert an item
-	"""
-	def via(via,**kwargs):
-		import pdb;pdb.set_trace()
 
 class SpackSeq(Handler):
 	def seq_envs(self,envs,notes=None):
