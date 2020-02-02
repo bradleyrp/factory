@@ -22,4 +22,5 @@ else flags=""; fi
 #! make this a relative path
 cd /exec/rbradley/buildsite/factory
 source env.sh min
+module purge
 ./fac spack_hpc specs/spack_hpc_go.yaml --name=$1$flags 

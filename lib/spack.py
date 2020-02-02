@@ -332,6 +332,7 @@ cd %(factory_site)s
 # assume the min environment is available with yaml
 source env.sh min
 ./fac spack %(spec)s %(target)s %(flags)s
+echo "[STATUS] you are inside singularity!"
 """
 
 def spack_hpc_singularity(spec,name=None,live=False,
