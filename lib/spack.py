@@ -328,6 +328,7 @@ def spack_tree(what,name,live=False):
 
 spack_hpc_singularity_deploy_script = """
 export TMPDIR=%(tmpdir)s
+export TMP_DIR=%(tmpdir)s
 cd %(factory_site)s
 # assume the min environment is available with yaml
 source env.sh min
