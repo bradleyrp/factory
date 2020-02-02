@@ -199,7 +199,7 @@ bc-prelim:
   envs:
     - check_compiler: gcc@4.8.5
     - bootstrap: null
-    - name: test_init_v01
+    - name: env-prelim
       via: template_basic
       #! needs retested after updates below
       mods: *bc-config-build
@@ -213,7 +213,7 @@ bc-gcc-7:
     - find_compilers: null
     - check_compiler: gcc@4.8.5
     - bootstrap: null
-    - name: &env_gcc_7 env_gcc_7
+    - name: &env_gcc_7 env-gcc-7
       via: template_basic
       # build gcc without lmod refresh
       # lmod refresh occurs after we build packages below
@@ -227,7 +227,7 @@ bc-gcc-7-base:
   notes: Blue Crab base apps built on gcc7.
   envs:
     - check_compiler: gcc@7.4.0
-    - name: &env_gcc_7_base env_gcc_7_base
+    - name: &env_gcc_7_base env-gcc-7-base
       via: template_basic
       mods: *bc-config-build
       specs: !merge_lists
@@ -237,7 +237,7 @@ bc-gcc-7-openmpi-3:
   notes: Blue Crab openmpi 3 built on gcc 7.
   envs:
     - check_compiler: gcc@7.4.0
-    - name: &env_gcc_7_openmpi_3 env_gcc_7_openmpi_3
+    - name: &env_gcc_7_openmpi_3 env-gcc-7-openmpi-3
       via: template_basic
       mods: *bc-config-build
       specs:
@@ -249,7 +249,7 @@ bc-std:
     This is the first point at which we can deploy lmod.
   envs:
     - check_compiler: gcc@7.4.0
-    - name: &env_std env_std
+    - name: &env_std env-std
       via: template_basic
       mods: *bc-config-std
       specs: !merge_lists
@@ -262,7 +262,9 @@ bc-std:
     - lmod_hooks:
       - moduleroot: *module-spot
         modulefile: linux-centos7-x86_64/Core/original.lua
-        contents: >-
-          execute{cmd="ml purge &&
-          export MODULEPATH=/software/lmod/modulefiles/compiler_and_base:/software/lmod/modulefiles/apps && ml restore",
-          modeA={"load"}}
+        contents: !strcat
+          - 'execute{cmd="ml purge && '
+          - "export MODULEPATH="
+          - "/software/lmod/modulefiles/compiler_and_base:"
+          - '/software/lmod/modulefiles/apps && ml restore",'
+          - 'modeA={"load"}}'
