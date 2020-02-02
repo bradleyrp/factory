@@ -71,11 +71,9 @@ def yaml_tag_merge_list(self,node):
     Flatten a list in YAML. Note that this a much-requested and highly useful
     non-native YAML feature. 
     """
-    data = []
-    # adapted from: https://stackoverflow.com/a/29620234
-    yield data
-    for item in self.construct_sequence(node):
-        data.extend(item)
+    # this solution was too complex: https://stackoverflow.com/a/29620234
+    this = [self.construct_sequence(i) for i in node.value]
+    return [i for j in this for i in j]	
 
 # generic !merge_lists tag is highly useful
 yaml.add_constructor('!merge_lists',yaml_tag_merge_list)
