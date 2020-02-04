@@ -351,7 +351,7 @@ source env.sh min
 echo "[STATUS] you are inside singularity!"
 """
 
-def spack_hpc_singularity(spec,name=None,live=False,
+def spack_hpc_decoy(spec,name=None,live=False,
 	tmpdir=None,factory_site=None,mounts=None,image=None,proot=False):
 	"""Special functions for cluster deployment."""
 	factory_site = os.getcwd() if not factory_site else factory_site
@@ -475,3 +475,54 @@ def spack_hpc_deploy(deploy,name=None,live=False,spec=None):
 	if spec: kwargs['spec'] = spec
 	spack_hpc_singularity(**kwargs)	
 
+def spack_hpc_run(spec,decoy=None,live=False,proot=True,singularity=False,**kwargs):
+	"""
+	Prepare a call to SLURM to build software with spack.
+	This script takes the place of a bash script to kickoff new jobs.
+	Usage: 
+	  make spack_hpc_run specs/spack_hpc_run.yaml
+	  make spack_hpc_run spec=specs/spack_hpc_run.yaml name=bc-std
+	  make spack_hpc_run spec=specs/spack_hpc_run.yaml name=bc-std live
+	"""
+	# the name of the environment with yaml
+	env_min_name = 'venv'
+	print('status preparing to use spack')
+	# fold default kwargs into one object
+	kwargs.update(spec=spec,live=live,proot=proot,singularity=singularity)
+	# a yaml tag allows the spec file to request info from the CLI
+	def yaml_tag_flag(self,node):
+		scalar = self.construct_scalar(node)
+		if scalar not in kwargs: 
+			raise Exception('cannot get this flag from the CLI: %s'%scalar)
+		else: return kwargs[scalar]
+	yaml.add_constructor('!flag',yaml_tag_flag)
+	# load the spec
+	with open(spec) as fp: 
+		detail = yaml.load(fp,Loader=yaml.Loader)
+	# contents check
+	if detail.keys()>{'docs','settings'}:
+		raise Exception('run file has invalid format: %s'%str(detail))
+	settings = detail['settings']
+	# prepare the script we will execute in SLURM
+	script = [
+		'cd %s'%os.getcwd(),
+		'source env.sh %s'%env_min_name]
+	if 'sbatch' in settings:
+		script += ['module purge']
+	# call the spack_hpc function with the spec and name file
+	script += ['./fac spack_hpc %s --name=%s'%(kwargs['decoy'],kwargs['name'])]
+	# apply flags
+	if not singularity ^ proot:
+		raise Exception('choose either singularity or proot')
+	else: script[-1] += ' --%s'%('singularity' if singularity else 'proot')
+	# prepare an salloc command
+	if live:
+		cmd = ['salloc']
+		cmd.extend(['%s=%s'%(i,j) 
+			for i,j in settings.get('sbatch',{}).items()])
+		cmd.extend(["srun --pty /bin/bash -c '%s'"%' && '.join(script)])
+	else: raise Exception('dev')
+	cmd_out = ' '.join(cmd)
+	print('status running command: %s'%cmd_out)
+	# using os.system for the PTY
+	os.system(cmd_out)
