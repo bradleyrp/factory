@@ -1,3 +1,11 @@
+
+### HEARTLAND RECIPES
+### These recipes deploy codes for the Trayanova lab.
+### By: Ryan Bradley
+### Circa 2020 January
+
+### DOCKER
+
 dockerfiles: !merge_spec
   external: !import_spec 
     from: ./dockerfiles.yaml
@@ -120,36 +128,28 @@ dockerfile_heart_min_8: &dockerfile_heart_min_8
     - jdk-11
     - user_sudo_ubuntu
 
-# SETTINGS DEPRECATED!
+### SETTINGS
+
+# method for running GUI apps on macos
 macos_docker_display: &macos_docker_display >-
   DISPLAY=docker.for.mac.host.internal:0
-hearts_data: &hearts_data "/home/rpb/work/hearts-data/"  
-# hearts_data: &hearts_data "/Users/rpb/worker/heart/hearts-data/"  
-hearts_code: &directed-graph-code >-
-  /home/rpb/work/hearts-code/directed-graph-rotor-analysis
-# hearts_code: &directed-graph-code >-
-#   "/Users/rpb/worker/heart/dev/directed-graph-rotor-analysis"
-vertigo: &vertigo /Users/rpb/worker/heart/dev/vertigo
-dg-ex01: &dg-ex01 
-  !!python/object/apply:os.path.join [*hearts_data,
-  "2019.12.11-directed-graph-input-example-e01"]
-dg-ex02: &dg-ex02 
-  "/Users/rpb/worker/heart/hearts-data/\
-  2019.12.11-directed-graph-input-example-e01"
+# factory root location on spacegray macbook
+factory-root: &factory-root /Users/rpb/worker/heart/factory
+workdir: &workdir /Users/rpb/worker
+hearts_code: &directed-graph-code
+  !!python/object/apply:os.path.join [*workdir,
+  "hearts-code/directed-graph-rotor-analysis"]
 
-#! make this a yaml tag
-factory-root: &factory-root "/Users/rpb/worker/dev/factory"
-
-# usage: make docker specs/recipes/heart.yaml name=carp_macos
+# RECIPE SELECTION
+# select recipe: `make docker specs/recipes/heart.yaml name=<name>`
 select: !select
 
   carp:
+    #! prevent this from running directly
+    #! confirm linux
     image_name: &image_name_ubuntu heartland:carp_meshalyzer
     command: docker-compose up deploy
     dockerfile: *dockerfile_carp_meshalyzer
-    #! previously: command: docker-compose run --service-ports deploy
-    # visit runs command (`docker-compose run`) with a tty
-    visit: True
     #! using volumes instead of: site: local, spot, darwin_ok
     compose:
       version: '3.7'
@@ -159,31 +159,11 @@ select: !select
           entrypoint: ['/bin/bash','-l']
           build: .
           image: *image_name_ubuntu
-          volumes: 
-          - source: *directed-graph-code
-            target: /home/user/dg
-            type: bind
-          - source: *dg-ex01
-            target: /home/user/data-dg
-            type: bind
-          - source: *vertigo
-            target: /home/user/vertigo
-            type: bind
-          # - source: *vertigo-ex01
-          #   target: /home/user/data-vertigo
-          #   type: bind
-          - source: /Users/rpb/worker/heart/2020.01.17-fiber-flip/WedgeModel_ScrambledLons_edit
-            target: /home/user/data-fiber-flip
-            type: bind
-          #! linux host
-          - /tmp/.X11-unix:/tmp/.X11-unix
           ports:
             - 9011:9011
             - 9012:9012
-          #! linux host
           environment:
             - DISPLAY=$DISPLAY
-          #! never if you want ports on host: network_mode: "host"
           devices:
             - /dev/dri 
             - /dev/snd
@@ -191,6 +171,7 @@ select: !select
 
   carp_macos:
     #! make an automatic switch for detecting macos?
+    #! prevent this from running directly because wrong mounts
     via: carp
     mods:
       # this uses a gui on macos machines via socat
@@ -200,23 +181,24 @@ select: !select
           deploy:
             environment:
               - *macos_docker_display
+
   dg_ex02:
+    #!!! needs tested
     via: carp
     mods:
       compose:
         services:
           deploy:
             volumes: 
-            - source: *directed-graph-code
+            - source: /home/rpb/work/hearts-code/directed-graph-rotor-analysis
               target: /home/user/code
               type: bind
-            - source: *dg-ex02
+            - source: /home/rpb/work/hearts-data/2019.12.11-directed-graph-input-example-e01
               target: /home/user/source
               type: bind
   
-  ### VERTIGO PIPELINE
-
   vertigo_v02:
+    # ok to use
     # macbook deployment
     via: carp_macos
     mods:
@@ -227,6 +209,7 @@ select: !select
           deploy:
             devices: []
             volumes: 
+            # using the redeploy site which is currently deprecated
             - source: /Users/rpb/worker/heart/2020.01.22-vertigo-redeploy
               target: /home/user/spot
               type: bind
@@ -240,7 +223,8 @@ select: !select
               lein repl :headless :host 0.0.0.0 :port 9020"'
 
   vertigo_v02_visit:
-    # visit deployment for vertigo_v02
+    # ok to use
+    # macbook deployment, visit
     notes: |
       This is a canonical visit recipe, piggybacking off of another recipe.
     via: vertigo_v02
@@ -249,8 +233,8 @@ select: !select
       compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
       command: docker-compose run --service-ports deploy
 
-  # heartland deployment
   vertigo_v03:
+    # heartland deployment
     via: vertigo_v02
     mods: 
       compose:
@@ -263,8 +247,9 @@ select: !select
             - source: /home/rpb/work/hearts-code/vertigo
               target: /home/user/spot/vertigo
               type: bind
-  # heartland visit
+
   vertigo_v03_visit:
+    # heartland visit
     via: carp
     mods: 
       visit: true
