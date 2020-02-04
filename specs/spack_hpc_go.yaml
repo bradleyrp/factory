@@ -78,6 +78,10 @@ spot: !!python/object/apply:lib.spack.spack_hpc_singularity
     name: bc-gcc-7-base #bc-std # null to ask for use select in interact
     # make sure you use an interact session and set live for the configure-test loop
     live: true 
+    # use the alternative proot method for builds against openmpi
+    # note that proot only applies to build and not live
+    #! the proot method needs clarified
+    proot: true 
     mounts: 
       # create a custom decoy location where spack will build new packages
       # singularity maps the decoy location to the production location in the container

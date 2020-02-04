@@ -14,6 +14,14 @@ usage () {
 		"-c 'source specs/script-bc.sh bc-std live'"
 	echo "sbatch specs/script-bc.sh bc-std"
 	echo "[NOTE] alternately in srun: make do specs/spack_hpc_go.yaml"  
+	echo "[NOTE] the following commands can be used to release the code" 
+	echo "rsync -arivP --delete "\
+		"/exec/rbradley/buildsite/testzone/software/apps/spack/a02/ "\
+		"/software/apps/spack/a02/"
+	echo "rsync -arivP --delete "\
+		"/exec/rbradley/buildsite/testzone/software/apps/spack/m02/ "\
+		"/software/apps/spack/m02/"
+	echo "[WARNING] talk to Ryan before pushing to production"
 	exit 1
 }
 if [ -z $1 ]; then usage; fi

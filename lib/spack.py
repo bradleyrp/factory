@@ -352,7 +352,7 @@ echo "[STATUS] you are inside singularity!"
 """
 
 def spack_hpc_singularity(spec,name=None,live=False,
-	tmpdir=None,factory_site=None,mounts=None,image=None):
+	tmpdir=None,factory_site=None,mounts=None,image=None,proot=False):
 	"""Special functions for cluster deployment."""
 	factory_site = os.getcwd() if not factory_site else factory_site
 	#! do not call this from the CLI. remove from cli_spack.yaml
@@ -413,6 +413,11 @@ def spack_hpc_singularity(spec,name=None,live=False,
 		"singularity "+("shell " if live else "run ")+ 
 		" ".join(['-B %s'%i for i in mounts])+
 		" "+image+" "+"-c 'cd %s && "%detail['factory_site'])
+	#! testing proot
+	if proot: cmd = (
+		"/software/apps/proot/5.1.0/bin/proot "+
+		" ".join(['-b %s'%i for i in mounts])+" "
+		"/bin/bash -c 'cd %s && "%detail['factory_site'])
 	if live:
 		# go to the environments folder if we know it
 		spack_envs_dn = ortho.conf.get('spack_envs',None)
