@@ -71,6 +71,8 @@ bc-config: &bc-config-build
 ### SOFTWARE SPECIFICATION
 ###
 
+gcc-7: &gcc-7 "%gcc@7.4.0 arch=linux-centos7-haswell"
+
 openmpi-3_1_4: &openmpi-3-1-4 >-
   openmpi@3.1.4 %gcc@7.4.0 arch=linux-centos7-haswell
   +cuda +cxx_exceptions fabrics=verbs 
@@ -104,35 +106,57 @@ gcc-7-base: &gcc-7-base
   - &cuda-10-0 cuda@10.0.130 %gcc@7.4.0 arch=linux-centos7-haswell
   - &cudnn-7-5-1 cudnn@7.5.1.10-10.0-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
   - &cudnn-7-6-5 cudnn@7.6.5.32-10.2-linux-x64 %gcc@7.4.0 arch=linux-centos7-haswell
-  - &python3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid ~libxml2 arch=linux-centos7-haswell
-    # note that we added ~libxml2 to the python3-gcc-7 spec to resolve collision 
+  #! considering +libxml2 for some R packages
+  - &python-3-gcc-7 python@3.7.6 %gcc@7.4.0 +optimizations +uuid +libxml2 arch=linux-centos7-haswell
+    # note that we added ~libxml2 to the python-3-gcc-7 spec to resolve collision 
     #   which means that /c2ullvq might have been compiled before  this flag was explicit
+    #! currently replacing this one with libxml2 for downstream packages e.g. r-rcpp
   - !chain
     - py-pip@19.3 %gcc@7.4.0 arch=linux-centos7-haswell
-    - *python3-gcc-7
+    - *python-3-gcc-7
   - !chain
-    - r@3.6.1 %gcc@7.4.0 arch=linux-centos7-haswell
-    - *python3-gcc-7
+    - &r-3-6-1 r@3.6.1 %gcc@7.4.0 arch=linux-centos7-haswell
+    - *python-3-gcc-7
+  - !strcat [libjpeg, *gcc-7]
+
+gcc-7-base-tf: &gcc-7-base-tf
   - !chain
     - >-
       py-tensorflow@2.1.0 %gcc@7.4.0 arch=linux-centos7-haswell
       +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs
-      # tf 2.1.0 was compiled with temporary fixes on spack bluecrab branch 0dbeaf59a
-      # see bazel issue https://github.com/spack/spack/issues/14234
-      # fix was from https://github.com/spack/spack/pull/14681/commits
-      # additional fix to use /dev/shm because bazel needs big temp space
-      # tf 2.1 with cuda 10.2 requires cudnn 7.6
+    # tf 2.1.0 was compiled with temporary fixes on spack bluecrab branch 0dbeaf59a
+    # see bazel issue https://github.com/spack/spack/issues/14234
+    # fix was from https://github.com/spack/spack/pull/14681/commits
+    # additional fix to use /dev/shm because bazel needs big temp space
+    # tf 2.1 with cuda 10.2 requires cudnn 7.6
     - *cuda-10-2
     - *cudnn-7-6-5
-    - *python3-gcc-7
+    - *python-3-gcc-7
+
+r-apps: &r-apps
+  - !chain
+    - !strcat [r-rcurl, *gcc-7]
+    - *r-3-6-1
+  - !chain
+    - !strcat [r-devtools, *gcc-7]
+    - *r-3-6-1
+  - !chain
+    - !strcat [r-rcpp, *gcc-7]
+    - *r-3-6-1
 
 gcc-7-openmpi-3: &gcc-7-openmpi-3
   - !chain
     - *lammps
     - *openmpi-3-1-4 
-    - *python3-gcc-7
+    - *python-3-gcc-7
     - *hdf5
     - *netcdf-c
+  - !chain 
+    - fftw@2.1.5 %gcc@7.4.0 +mpi arch=linux-centos7-haswell
+    - *openmpi-3-1-4
+  - !chain
+    - gromacs@2019.2 %gcc@7.4.0 +cuda simd=AVX2_256 arch=linux-centos7-haswell
+    - *openmpi-3-1-4 
 
 deploy_history: |
   2020.01.23
@@ -146,6 +170,32 @@ deploy_history: |
       https://github.com/spack/spack/issues/14234
   2020.01.30
     fail on tf 2.1.0 with cuda 10.2 and cudnn 7.6.5 (cudnn pinned to cuda) due to bazel/jdk
+  2020.02.03
+    rebuilding python with libxml2 to ensure one python for downstream r-rcpp
+
+    NOTES
+        after compiling new python
+        audit in the bc-std live in singularity
+        ml python py-pip 
+        python -m pip install --user matplotlib
+        error on openssl
+            WARNING: pip is configured with locations that require TLS/SSL, however the ssl module in Python is not available.  
+        checked spack info and ssl is enabled by default
+        try outside of the container after syncing modules
+        ISSUE: modules cannot easily be tested outside of production and it is difficult to test in the singularity container (e.g. openssl error on pip install)
+        the problem is that we have all new modules for everything
+        hence we need a way to test the modules properly before production
+            note that the finish lines keeps moving further away and this is so laborious
+        proposal:
+            identify the good python and remove all packages dependent on the others 
+            before doing the removal however make sure lmod tree builds in the container and push it to production to test there, since the lmod should include hashes
+        attempt this proposal and test redundant packages in production
+            rsync apps and modules to production without the --delete option
+        which python has openssl?
+            only /5ndfc4
+            tested with: python -c 'import ssl`
+            
+        
 
 # modules for a language (python, R) must have deps added systematically
 #   by looking at upstream py-* or r-* deps from a concretize and listing 
@@ -163,11 +213,12 @@ py-tensorflow-whitelist: &py-tensorflow-whitelist [py-tensorflow,
 #! todo: automatically generate the whitelist for target packages e.g. py-pip for python
 #! todo: automatically load some dependencies with python e.g. py-pip
 whitelist-std: &whitelist-std !merge_lists
-  #! this is broken!
   - [gcc, openmpi]
   # python requires pip and setuptools
   - [python, py-pip, py-setuptools]
   - *py-tensorflow-whitelist 
+  - [lammps, hdf5, netcdf-c, fftw]
+  - [curl, libjpeg]
 
 ###
 ### MODULES
@@ -262,6 +313,17 @@ bc-gcc-7-base:
       mods: *bc-config-build
       specs: !merge_lists
         - *gcc-7-base
+        - *r-apps
+
+bc-singleton:
+  notes: Blue Crab base apps built on gcc7.
+  envs:
+    - check_compiler: gcc@7.4.0
+    - name: &env-singleton env-singleton
+      via: template_basic
+      mods: *bc-config-build
+      specs:
+        - *python-3-gcc-7 
 
 bc-gcc-7-openmpi-3-inverse:
   notes: |
@@ -297,7 +359,9 @@ bc-std:
       mods: *bc-config-std
       specs: !merge_lists
         - *gcc-7-base
+        #- *gcc-7-base-tf
         - - *openmpi-3-1-4 
+        - *gcc-7-openmpi-3
     # specs must match mods modules for lmod refresh
     - lmod_refresh: null
       name: *env_std
@@ -311,3 +375,4 @@ bc-std:
           - "/software/lmod/modulefiles/compiler_and_base:"
           - '/software/lmod/modulefiles/apps && ml restore",'
           - 'modeA={"load"}}'
+
