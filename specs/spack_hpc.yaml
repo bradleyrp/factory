@@ -172,30 +172,8 @@ deploy_history: |
     fail on tf 2.1.0 with cuda 10.2 and cudnn 7.6.5 (cudnn pinned to cuda) due to bazel/jdk
   2020.02.03
     rebuilding python with libxml2 to ensure one python for downstream r-rcpp
-
-    NOTES
-        after compiling new python
-        audit in the bc-std live in singularity
-        ml python py-pip 
-        python -m pip install --user matplotlib
-        error on openssl
-            WARNING: pip is configured with locations that require TLS/SSL, however the ssl module in Python is not available.  
-        checked spack info and ssl is enabled by default
-        try outside of the container after syncing modules
-        ISSUE: modules cannot easily be tested outside of production and it is difficult to test in the singularity container (e.g. openssl error on pip install)
-        the problem is that we have all new modules for everything
-        hence we need a way to test the modules properly before production
-            note that the finish lines keeps moving further away and this is so laborious
-        proposal:
-            identify the good python and remove all packages dependent on the others 
-            before doing the removal however make sure lmod tree builds in the container and push it to production to test there, since the lmod should include hashes
-        attempt this proposal and test redundant packages in production
-            rsync apps and modules to production without the --delete option
-        which python has openssl?
-            only /5ndfc4
-            tested with: python -c 'import ssl`
-            
-        
+  2020.02.04
+    commence total overhaul and restart. see lib.spack.spack_hpc_run     
 
 # modules for a language (python, R) must have deps added systematically
 #   by looking at upstream py-* or r-* deps from a concretize and listing 
