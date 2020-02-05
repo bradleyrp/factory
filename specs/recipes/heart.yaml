@@ -29,7 +29,6 @@ dockerfiles: !merge_spec
           echo "/usr/local/carp-1.1\ny\ny\ny\n" \
           | ./install_linux.sh
       RUN ln -s /usr/local/carp-1.1/meshalyzer/src/meshalyzer /usr/bin/meshalyzer
-      # SHELL ["/bin/bash", "-c", "source /usr/local/carp-1.1/config.sh"]
       RUN echo "source /usr/local/carp-1.1/config.sh" >> /etc/bash.bashrc
     carp_license: |
       USER root
@@ -286,3 +285,48 @@ select: !select
           - source: *factory-root
             target: /home/user/extern
             type: bind
+
+  vertigo_v04_visit:
+    via: carp
+    mods: 
+      visit: true
+      #! compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            volumes: 
+            - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
+              target: /home/user/spot/data
+              type: bind
+            - source: /home/rpb/work/hearts-code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+            ports: []
+
+  vertigo_v04:
+    notes: |
+      Tested on 2020.02.05 on heartland (a desktop) via:
+        `make docker specs/recipes/heart.yaml name=vertigo_v04`
+      Code via: factory@bbfeef, vertigo@f1cf53.
+      This runs in the foreground.
+    via: carp
+    mods: 
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            volumes: 
+            - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
+              target: /home/user/spot/data
+              type: bind
+            - source: /home/rpb/work/hearts-code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+            entrypoint: >-
+              /bin/bash -lic 'cd ~/spot/vertigo &&
+              lein run -- -n block01 runargs docker-v01 expt-v02'
