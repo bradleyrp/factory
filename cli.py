@@ -287,15 +287,16 @@ class Interface(Parser):
             if os.path.isdir(spot):
                 raise Exception('already exists: %s'%spot)
             python_name = os.environ.get('python','python')
-            bash('%s -m venv %s'%(python_name,spot))
+            bash('%s -m venv %s'%(python_name,spot),v=True)
             if not file:
                 # default venv packages
                 packages = ['pyyaml']
                 for pack in packages:
                     bash('source %s/bin/activate && pip install %s'%(
                         spot,pack))
+			# after sourcing we call it python even if it came from python3
             else: bash('source %s/bin/activate && '
-                'pip install -r %s'%(spot,file))
+                '%s -m pip install -r %s'%(spot,'python',file),v=True)
             #!! set_env_cursor(os.path.join(spot))
         else: raise Exception('unclear command: %s'%cmd)
         # register this environment
