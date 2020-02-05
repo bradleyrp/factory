@@ -329,4 +329,4 @@ select: !select
             - /tmp/.X11-unix:/tmp/.X11-unix
             entrypoint: >-
               /bin/bash -lic 'cd ~/spot/vertigo &&
-              lein run -- -n block01 runargs docker-v01 expt-v02'
+              time lein run -- -n block01 runargs docker-v01 expt-v02'
