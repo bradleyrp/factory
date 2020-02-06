@@ -1,0 +1,129 @@
+# BLUE CRAB SOFTWARE STACK 
+# Build and organize software for this cluster.
+# USAGE: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_proot.yaml name=bc-prelim live
+
+# SETTINGS: spack source and environments locations 
+spot:       ./local/spack       # config.json, spack
+spot_envs:  ./local/envs-spack  # config.json, spack_envs
+
+###
+### CONFIGURATION
+###
+
+# spack environments template (spack.yaml)
+template_basic: 
+  concretization: separately
+  mirrors: {}
+  repos: []
+  upstreams: {}
+  modules:
+    enable: []
+  definitions: []
+  packages: {}
+  config: 
+    checksum: false
+  specs: []
+  view: false
+
+# BUILD CONFIGURATION
+# matched to the deploy file
+bc-config: 
+  config: &bc-config
+    install_tree: /software/apps/spack/a02
+    module_roots: 
+      lmod: &module-spot /software/apps/spack/m02
+    build_stage:
+      - "$TMPDIR/$USER/spack-stage"
+    misc_cache: /software/apps/spack/a02/cache_misc
+  packages: &packages
+    slurm:
+      paths:
+        slurm@17.11.12: /software/apps/slurm/17.11.12.1.marcc
+      buildable: false
+      version: []
+      providers: {}
+      modules: {}
+      compiler: []
+    openssl:
+      paths: {openssl@1.0.2k: /usr}
+      buildable: false
+
+bc-config-modules:
+  s01: &mod-stage-01
+    enable: 
+      - lmod
+    lmod:
+      all:
+        conflict: []
+        environment:
+          unset: []
+        filter:
+          environment_blacklist: []
+        load: []
+      blacklist_implicits: false
+      core_compilers:
+      - gcc@4.8.5
+      hash_length: 0
+      naming_scheme: '{name}/{version}/{compiler.name}/{compiler.version}'
+      hierarchy:
+      - compiler
+      verbose: false
+
+mods_config:
+  mods: &mc01
+    config: *bc-config
+    packages: *packages
+    modules: *mod-stage-01
+
+###
+### SOFTWARE SPECIFICATION
+###
+
+arch: &arch "arch=linux-centos7-haswell"
+gcc-7: &gcc-7 !str ["%gcc@7.4.0",*arch]
+python3: &python-3 >-
+  python@3.7.6 %gcc@7.4.0 +bz2 +ctypes +dbm +debug 
+  +libxml2 +lzma +optimizations +pic +pyexpat +pythoncmd 
+  +readline +shared +sqlite3 +ssl +uuid +zlib
+
+###
+### ENVIRONMENTS
+###
+
+bc-prelim: 
+  notes: Initial test before running a compiler build.
+  envs:
+    - find_compilers: null
+    - check_compiler: gcc@4.8.5
+    - bootstrap: null
+    - name: env-prelim
+      via: template_basic
+      mods: *mc01
+      specs:
+        - zlib%gcc@4.8.5 arch=linux-centos7-haswell
+        - cmake%gcc@4.8.5 arch=linux-centos7-haswell
+
+bc-gcc-7-compiler:
+  notes: Compile gcc 7 for Blue Crab.
+  envs:
+    - find_compilers: null
+    - check_compiler: gcc@4.8.5
+    - bootstrap: null
+    - name: &env-gcc-7-compiler env-gcc-7-compiler
+      via: template_basic
+      mods: *mc01
+      specs:
+        - !str [gcc@7.4.0 %gcc@4.8.5, *arch]
+    - find: gcc@7.4.0 
+      name: *env-gcc-7-compiler
+
+bc-singleton:
+  notes: Blue Crab base apps built on gcc7.
+  envs:
+    - check_compiler: gcc@7.4.0
+    - name: &env-singleton env-singleton
+      via: template_basic
+      mods: *mc01
+      specs:
+        - !str [*python-3, *arch]
+

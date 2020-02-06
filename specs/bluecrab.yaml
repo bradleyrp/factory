@@ -1,0 +1,14 @@
+_: !!python/object/apply:lib.generic.menu
+  # usage: menu_name=bc-std make do specs/bluecrab.yaml
+  kwds: 
+    test: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_proot.yaml test
+    build: 
+      cmd: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_proot.yaml name=%(name)s
+      vars: [name]
+    singularity: 
+      cmd: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_singularity.yaml name=%(name)s
+      vars: [name]
+    live: 
+      cmd: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_proot.yaml name=%(name)s live
+      vars: [name]
+

@@ -1,0 +1,35 @@
+settings: !!python/object/apply:lib.spack.spack_hpc_decoy
+  kwds:
+    # this is "the spec" and contains ALL of the spack information
+    # you should create custom copies of both specs/spack_hpc.yaml 
+    #   and specs/spack_hpc_go.yaml and make sure all paths match
+    spec: specs/spack_bluecrab.yaml
+    # make a custom temporary directory for staging spack builds
+    tmpdir: /exec/rbradley/stage
+    # select a name which must be a root-level key in the spec (above)
+    # this name typically corresponds to a spack environment
+    # the root-level key in the spec file has a special syntax
+    name: null
+    # make sure you use an interact session and set live for the configure-test loop
+    live: null 
+    # select either proot or singularity
+    # note that these mutually exclusive options are handled by spack_run
+    decoy_method: singularity 
+    # obtain a copy of the singularity image matched to the base image
+    image: /exec/rbradley/buildsite/mimic/mimic.simg
+    # mounts for both proot or singularity
+    mounts: 
+      # create a custom decoy location where spack will build new packages
+      # singularity maps the decoy location to the production location in the container
+      - host: /exec/rbradley/buildsite/tz2/
+        local: /software/apps/spack
+      # make sure the path below matches the factory location
+      - host: /exec/rbradley/buildsite/factory
+      - host: /software/apps/slurm/17.11.12.1.marcc
+      - host: /software/centos7 # added for openmpi special build
+      # openssl
+      - host: /usr/bin/openssl
+        local: /usr/bin/openssl
+      - host: /etc/ssl
+        local: /etc/ssl
+
