@@ -66,7 +66,7 @@ def select_yaml_tag_filter(tree,target_tag):
 		this.pop('_has_tag')
 		return this
 
-def yaml_tag_merge_list(self,node):
+def yaml_tag_merge_lists(self,node):
 	"""
 	Flatten a list in YAML. Note that this a much-requested and highly useful
 	non-native YAML feature. 
