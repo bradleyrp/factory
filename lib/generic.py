@@ -2,7 +2,7 @@
 
 from lib.yaml_mods import YAMLObjectInit
 from ortho import Handler,requires_python_check
-import copy
+import copy,sys,os
 
 class OrthoSync(YAMLObjectInit):
 	"""Trivial wrapper around ortho sync."""
@@ -74,3 +74,33 @@ def example_yaml_function(*args,**kwargs):
 	print('args = %s and kwargs = %s'%(str(args),str(kwargs)))
 	# the following return value goes back to cli.Interface.do and is unused
 	return 'meaningless'
+
+### interface tools
+
+def menu(**kwargs):
+	"""Ask the user to select a command."""
+	print('status available targets:')
+	#! very clusmy
+	opts_num = dict(sorted(zip(*(zip(enumerate(kwargs.keys())))))[0]) 
+	print('\n'.join(['  {:3d}: {:s}'.format(ii+1,i) for ii,i in enumerate(kwargs.keys())]))
+	asker = (input if sys.version_info>(3,0) else raw_input)
+	select = asker('select a target: ')
+	if select.isdigit() and int(select)-1 in opts_num:
+		name = opts_num[int(select)-1]
+	elif select.isdigit():
+		raise Exception('invalid number %d'%int(select))
+	elif select not in kwargs:
+		raise Exception('invalid selection "%s"'%select)
+	from ortho import bash
+	target = kwargs[name]
+	if isinstance(target,dict):
+		if target.keys()=={'cmd','vars'}:
+			subs = {}
+			for key in target['vars']:
+				key_env = 'menu_%s'%key
+				if key_env in os.environ: subs[key] = os.environ[key_env]
+				else: subs[key] = asker('enter "%s": '%key)
+			cmd_out = target['cmd']%subs
+		else: raise Exception('invalid selection: %s'%str(target))
+	else: cmd_out = target
+	os.system(cmd_out)
