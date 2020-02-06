@@ -338,7 +338,7 @@ class Interface(Parser):
         self.cache.add_env(spot=env_spot_rel,kind='conda',
             file=file,uname=get_uname())
 
-    def activate(self,spot):
+    def activate(self,spot,mismatch=False):
         """
         Activate an environment.
         """
@@ -350,9 +350,10 @@ class Interface(Parser):
         for key in ['sysname','release','machine','nodename']:     
             if env['uname'][key]!=uname[key]:
                 #! test this later
-                raise Exception('refusing to activate because of a mismatch. '
-                    'the environment has %s=%s but uname indicates %s=%s'%
-                    (key,env['uname'][key],key,uname[key]))
+                if not mismatch:
+                    raise Exception('refusing to activate because of a mismatch. '
+                        'the environment has %s=%s but uname indicates %s=%s'%
+                        (key,env['uname'][key],key,uname[key]))
         set_env_cursor(spot)
 
     def config(self):
