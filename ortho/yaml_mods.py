@@ -67,23 +67,23 @@ def select_yaml_tag_filter(tree,target_tag):
 		return this
 
 def yaml_tag_merge_list(self,node):
-    """
-    Flatten a list in YAML. Note that this a much-requested and highly useful
-    non-native YAML feature. 
-    """
-    # this solution was too complex: https://stackoverflow.com/a/29620234
-    this = [self.construct_sequence(i) for i in node.value]
-    return [i for j in this for i in j]	
+	"""
+	Flatten a list in YAML. Note that this a much-requested and highly useful
+	non-native YAML feature. 
+	"""
+	# this solution was too complex: https://stackoverflow.com/a/29620234
+	# later modified this to use deep to resolve children properly
+	return [i for j in self.construct_sequence(node,deep=True) for i in j]
 
 # generic !merge_lists tag is highly useful
 yaml.add_constructor('!merge_lists',yaml_tag_merge_list)
 
 def yaml_tag_strcat(self,node):
-    """
+	"""
 	Concatenate strings.
 	Originally developed to concatenate spack specs and avoid redundancy.	
-    """
-    return " ".join(self.construct_sequence(node))
+	"""
+	return " ".join(self.construct_sequence(node))
 
 # generic !merge_lists tag is highly useful
 yaml.add_constructor('!strcat',yaml_tag_strcat)
