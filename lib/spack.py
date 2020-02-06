@@ -17,7 +17,6 @@ try:
 	# additional shorthand
 	yaml.add_constructor('!str',yaml_tag_strcat_custom(" "))
 except Exception as e: 
-	print(e)
 	#! yaml error here if you raise
 	#! hence this is loaded twice. consider fixing? or explicate
 	pass
@@ -371,7 +370,7 @@ def spack_hpc_decoy(spec,name=None,live=False,
 	if os.path.isfile(script_token):
 		raise Exception('cannot execute when %s exists'%script_token)
 	# ask user for the name
-	#! untested after major changes
+	#! untested after major changes. moved to lib.generic.menu
 	if not name:
 		with open(spec) as fp:
 			text = yaml.load(fp,Loader=yaml.Loader)
@@ -458,13 +457,8 @@ def spack_hpc_decoy(spec,name=None,live=False,
 	os.remove(script_token)
 	print('status exiting')
 
-def spack_hpc_deploy(deploy,name=None,live=False,decoy_method=None,spec=None):
-	"""
-	Run spack in a decoy environment. This can be called from `spack_hpc_run`.
-	We can run this directly via:
-	  ./fac spack_hpc_deploy specs/spack_hpc_deploy.yaml \
-	    --name=bc-std --decoy_method=proot --spec=specs/spack_hpc.yaml --live
-	"""
+def read_deploy(deploy,entire=False):
+	"""Interpret a deploy file without directly executing it."""
 	# note that we cannot edit the deploy yaml in place so we read without tags
 	#   then apply overrides, then pass the result to `spack_hpc_decoy`.
 	with open(deploy) as fp: text = fp.read()
@@ -477,21 +471,39 @@ def spack_hpc_deploy(deploy,name=None,live=False,decoy_method=None,spec=None):
 	deliver = select_yaml_tag_filter(tree,target_tag)
 	# the deliver tree would normally go right to spack_hpc_decoy via `make do`
 	#   so we pick off kwds and send it there after overrides
-	if deliver.keys()!={'kwds'}:
+	if deliver.keys()>{'kwds','test'}:
 		raise Exception('invalid %s in %s with keys: %s'%(
 			target_tag,deploy,str(deliver.keys())))
+	return deliver
+
+def spack_hpc_deploy(deploy,name=None,live=False,spec=None):
+	"""
+	Run spack in a decoy environment. This can be called from `spack_hpc_run`.
+	We can run this directly via:
+	  ./fac spack_hpc_deploy specs/spack_hpc_deploy.yaml \
+	    --name=bc-std --decoy_method=proot --spec=specs/spack_hpc.yaml --live
+	"""
+	deliver = read_deploy(deploy)
 	kwargs = deliver['kwds']
 	# override the deploy file with incoming kwargs
 	kwargs['live'] = live
 	if name: kwargs['name'] = name
 	if spec: kwargs['spec'] = spec
-	if decoy_method: kwargs['decoy_method'] = decoy_method
 	# run the decoy environment
 	print('status calling spack_decoy with: %s'%str(kwargs))
 	spack_hpc_decoy(**kwargs)	
 
+def spack_hpc_test_visit(deploy):
+	"""Test a spack build before production using deploy notes."""
+	deliver = read_deploy(deploy,entire=True)
+	# include the test command with keywords to decoy
+	cmd = deliver.get('test',None)
+	if not cmd: raise Exception('cannot find "test" in %s'%deploy)
+	print('status running: %s'%cmd)
+	os.system(cmd)
+
 def spack_hpc_run(run=None,deploy=None,
-	spec=None,live=False,proot=True,singularity=False,**kwargs):
+	spec=None,live=False,test=False,**kwargs):
 	"""
 	Prepare a call to SLURM to build software with spack.
 	This script takes the place of a bash script to kickoff new jobs.
@@ -505,18 +517,15 @@ def spack_hpc_run(run=None,deploy=None,
 	"""
 	print('status preparing to use spack')
 	# collapse flags at the CLI into a single decoy_method
-	if not singularity ^ proot:
-		raise Exception('choose either singularity or proot')
-	decoy_method = 'singularity' if singularity else 'proot'
 	# fold default kwargs into one object
-	kwargs.update(run=run,spec=spec,deploy=deploy,
-		live=live,decoy_method=decoy_method)
+	kwargs.update(run=run,spec=spec,deploy=deploy,live=live)
 	if not run: raise Exception('we require a run file')
 	# a yaml tag allows the CLI to override the run file 
 	def yaml_tag_flag(self,node):
 		scalar = self.construct_scalar(node)
 		if scalar not in kwargs: 
-			raise Exception('cannot get this flag from the CLI: %s'%scalar)
+			if test and scalar=='name': return "testing"
+			raise Exception('cannot get this flag from the cli: %s'%scalar)
 		else: return kwargs[scalar]
 	yaml.add_constructor('!flag',yaml_tag_flag)
 	# load the run file
@@ -537,10 +546,10 @@ def spack_hpc_run(run=None,deploy=None,
 	if not settings['deploy']: raise Exception('no deploy file')
 	# call the spack_hpc_deploy function with the deploy file and name
 	script += ['./fac spack_hpc_deploy %s --name=%s'%(settings['deploy'],settings['name'])]
-	# apply flags
-	script[-1] += ' --decoy_method=%s'%decoy_method
 	# pass the spec through
 	if spec: script[-1] += ' --spec=%s'%spec
+	if live and test:
+		raise Exception('cannot use live and test at the same time')
 	# prepare an salloc command
 	if live:
 		cmd = ['salloc']
@@ -548,6 +557,10 @@ def spack_hpc_run(run=None,deploy=None,
 		cmd.extend(['%s=%s'%(i,j) 
 			for i,j in settings.get('sbatch',{}).items()])
 		cmd.extend(["srun --pty /bin/bash -c '%s'"%' && '.join(script)])
+	# test the code by visiting 
+	elif test:
+		spack_hpc_test_visit(deploy=deploy)
+		return
 	else: 
 		cmd = ['sbatch']
 		cmd.extend(['%s=%s'%(i,j) 
