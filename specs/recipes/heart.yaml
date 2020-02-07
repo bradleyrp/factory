@@ -94,7 +94,7 @@ dockerfiles: !merge_spec
         echo "source /opt/intel/mkl/bin/mklvars.sh intel64" >> /etc/bash.bashrc
     vertigo_lein_user: |
       WORKDIR /tmp
-      RUN mkdir vertigo_lein_user && cd vertigo_lein_user && echo '(defproject vertigo "0.1.0-SNAPSHOT" :plugins [[lein-git-deps "0.0.1-SNAPSHOT"] [lein-with-env-vars "0.2.0"] [cider/cider-nrepl "0.23.0"]] :git-dependencies [["https://github.com/bmillare/dj3.git"]] :dependencies [[org.clojure/clojure "1.10.0"] [org.bmillare/dj.core "0.2.0"] [com.cemerick/pomegranate "1.1.0"] [org.bmillare/dj.treefn "0.2.0"] [uncomplicate/neanderthal "LATEST"] [nrepl "0.6.0"] [clojure-complete "0.2.5"]])' > project.clj && cat project.clj && lein install
+      RUN mkdir vertigo_lein_user && cd vertigo_lein_user && echo '(defproject vertigo "0.1.0-SNAPSHOT" :plugins [[lein-git-deps "0.0.1-SNAPSHOT"] [lein-with-env-vars "0.2.0"] [cider/cider-nrepl "0.23.0"]] :git-dependencies [["https://github.com/bmillare/dj3.git"]] :dependencies [[org.clojure/clojure "1.10.0"] [org.bmillare/dj.core "0.2.0"] [com.cemerick/pomegranate "1.1.0"] [org.bmillare/dj.treefn "0.2.0"] [uncomplicate/neanderthal "0.26.1"] [nrepl "0.6.0"] [clojure-complete "0.2.5"]])' > project.clj && cat project.clj && lein install
       WORKDIR /home/user
 
 dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
