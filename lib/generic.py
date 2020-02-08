@@ -91,6 +91,7 @@ def menu(**kwargs):
 		raise Exception('invalid number %d'%int(select))
 	elif select not in kwargs:
 		raise Exception('invalid selection "%s"'%select)
+	else: name = select
 	from ortho import bash
 	target = kwargs[name]
 	if isinstance(target,dict):
