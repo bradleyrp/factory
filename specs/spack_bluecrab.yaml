@@ -23,9 +23,10 @@ r36: &r36 !chain
   - r@3.6.1 +memory_profiling
   - *python-3
 
-wl01: &wl01 [gcc, python, r]
-
-r-packages: &r-packages [r-devtools, r-rcpp]
+wl02: &wl02 !merge_lists
+  #! define below because !merge_lists cannot use refs?
+  - &r-packages [r-devtools, r-rcpp]
+  - &wl01 [gcc, python, r]
 
 ###
 ### CONFIGURATION
@@ -102,9 +103,12 @@ bc-config-modules:
         filter:
           environment_blacklist: []
         load: []
+      naming_scheme: '{name}/{version}/{compiler.name}/{compiler.version}'
       blacklist_implicits: true
       core_compilers:
-      - *gcc-7-compiler 
+      - *gcc-back-compiler
+      blacklist: 
+      - *gcc-back
       hash_length: 0
       hierarchy:
       - compiler
@@ -123,8 +127,8 @@ mods_config:
     modules: 
       enable: [lmod]
       lmod: 
-        <<: *mod-stage-02-lmod
-        whitelist: *wl01
+        << : *mod-stage-02-lmod
+        whitelist: *wl02
 
 ###
 ### ENVIRONMENTS
@@ -157,11 +161,11 @@ bc-gcc-7-compiler:
     - find: *gcc-7-compiler 
       name: *env-gcc-7-compiler
 
-bc-singleton:
+bc-stage02:
   notes: Blue Crab base apps built on gcc7.
   envs:
     - check_compiler: *gcc-7-compiler
-    - name: &env-singleton env-singleton
+    - name: &env-stage02 env-stage02
       via: template_basic
       mods: *mc02
       specs: !merge_lists
@@ -172,4 +176,4 @@ bc-singleton:
           base: !strflush [" ^", *r36, *gcc-7]
           loop: *r-packages
     - lmod_refresh: null
-      name: *env-singleton
+      name: *env-stage02

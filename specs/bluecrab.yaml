@@ -8,7 +8,9 @@ _: !!python/object/apply:lib.generic.menu
     singularity: 
       cmd: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_singularity.yaml name=%(name)s
       vars: [name]
-    live: 
+    live_proot: 
       cmd: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_proot.yaml name=%(name)s live
       vars: [name]
-
+    live_singularity: 
+      cmd: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_singularity.yaml name=%(name)s live
+      vars: [name]

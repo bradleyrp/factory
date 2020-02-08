@@ -21,12 +21,12 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
     mounts: 
       # create a custom decoy location where spack will build new packages
       # singularity maps the decoy location to the production location in the container
-      - host: /exec/rbradley/buildsite/tz2/
+      - host: /exec/rbradley/buildsite/tz3/
         local: /software/apps/spack
       # make sure the path below matches the factory location
       - host: /exec/rbradley/buildsite/factory
       - host: /software/apps/slurm/17.11.12.1.marcc
-      - host: /software/centos7 # added for openmpi special build
+      #! nope fam - host: /software/centos7 # added for openmpi special build
       # openssl
       - host: /usr/bin/openssl
         local: /usr/bin/openssl
