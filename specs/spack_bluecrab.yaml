@@ -232,7 +232,7 @@ bc-stage01:
 
 bc-stage02:
   notes: 
-    Build OpenMPI.
+    Build OpenMPI and MPI-dependent applications.
   envs:
     - check_compiler: *gcc-7-compiler
     - name: &env-stage02 env-stage02
@@ -240,7 +240,8 @@ bc-stage02:
       mods: *mc02
       specs: &stage02-specs !merge_lists
         - *stage01-specs
-        # openmpi builds here with cuda which can change for downstreams
+        # openmpi builds here with cuda which can change for downstream
+        # WARNING: build openmpi in proot
         - [!chain [*openmpi-3-1, &cuda9 "cuda@9.2.88"]]
         - !loopcat
           # omit cuda from openmpi here but include it below if needed
@@ -255,7 +256,11 @@ bc-stage02:
       name: *env-stage02
 
 production:
-  notes: Complete spack build for production.
+  notes: |
+    Complete spack build for production.
+    Remember to rsync this to production.
+    This recipe is best for finalizing modules.
+    We recommend adding software in the stages above.
   envs:
     - check_compiler: *gcc-7-compiler
     - name: &env-production env-production
