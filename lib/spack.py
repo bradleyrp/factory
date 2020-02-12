@@ -2,7 +2,7 @@
 
 #! manually pick up the overloaded print
 from __future__ import print_function
-import os,copy,re,sys
+import os,copy,re,sys,glob
 import ortho
 import multiprocessing
 # several functions below use yaml 
@@ -33,6 +33,7 @@ from ortho import path_resolver
 from ortho import catalog
 from ortho import delveset
 from ortho import requires_python_check
+from ortho import bash
 
 """
 NOTES on path configuration and order of precedence
@@ -144,6 +145,9 @@ class SpackLmodHooks(Handler):
 		"""Write a custom lua file into the tree."""
 		with open(os.path.join(moduleroot,modulefile),'w') as fp:
 			fp.write(contents)
+	def mkdir(self,mkdir):
+		print('status creating: %s'%mkdir)
+		os.makedirs(mkdir,exist_ok=True)	
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
@@ -244,7 +248,7 @@ class SpackEnvItem(Handler):
 		"""
 		print('status cleaning nested modules')
 		# hardcoded 7-character hashes
-		regex_nested_hashed = '.+-[0-9a-z]{7}$'
+		regex_nested_hashed = '(.+)-[0-9a-z]{7}$'
 		spot = os.path.realpath(lmod_hide_nested)
 		if not os.path.isdir(spot):
 			raise Exception('cannot find %s'%spot)
@@ -263,6 +267,58 @@ class SpackEnvItem(Handler):
 				fp.write('#%Module\n')
 				for item in val:
 					fp.write('hide-version %s\n'%item)
+	def lmod_remove_nested_hashes(self,lmod_remove_nested_hashes):
+		"""
+		Incompatible with `lmod_hide_nested_hashes`. 
+		Make the openmpi modules more transparent.
+		DEPRECATED. This prevents the use of a default module. 
+		  This method likely deviates too far from the usual Lmod scheme.
+		Options: remove all of the nested openmpi or not. 
+		You cannot keep the nesting and remove the hashes while using defaults.
+    	via: lmod_remove_nested_hashes: *module-spot
+		"""
+		#! repeated from above
+		# hardcoded 7-character hashes
+		regex_nested_hashed = '(.+)-[0-9a-z]{7}$'
+		spot = os.path.realpath(lmod_remove_nested_hashes)
+		if not os.path.isdir(spot):
+			raise Exception('cannot find %s'%spot)
+		result = {}
+		for root,dns,fns in os.walk(spot):
+			path = root.split(os.path.sep)
+			if len(path)>=2 and re.match(regex_nested_hashed,path[-2]):
+				base = os.path.sep.join(path[:-3])
+				if base not in result: result[base] = []
+				result[base].extend([os.path.sep.join(path[-3:]+[
+					re.match(r'^(.+)\.lua$',f).group(1)]) for f in fns])
+		for key,vals in result.items():
+			root = list(set([os.path.sep.join(
+				val.split(os.path.sep)[:2]) for val in vals]))
+			if len(root)!=1: raise Exception('inconsistent roots')
+			target = vals[0].split(os.path.sep)[:2]
+			hashed_name = target[1]
+			simple_name = re.match(regex_nested_hashed,hashed_name).group(1)
+			dest = os.path.join(key,target[0],simple_name)
+			target_dn = os.path.join(key,os.path.sep.join(target))
+			bash('mv %s %s'%(target_dn,dest),scroll=False,v=True)
+			# replace the hash in the modulefile
+			fns_hashed = glob.glob(dest+'.lua')
+			if len(fns_hashed)!=1:
+				raise Exception('failed to replace hashes')
+			target = fns_hashed[0]
+			print('status replacing "%s" with "%s" in: %s'%(
+				hashed_name,simple_name,target))
+			with open(target) as fp: text = fp.read()
+			text = re.sub(hashed_name,simple_name,text)
+			with open(target,'w') as fp: fp.write(text)
+	def lmod_defaults(self,lmod_defaults):
+		"""Create links for lmod defaults."""
+		for fn in lmod_defaults:
+			if not os.path.isfile(fn):
+				raise Exception('cannot find %s'%fn)	
+			dirname = os.path.dirname(fn)
+			bash('ln -s %s %s'%(os.path.basename(fn),'default'),
+				cwd=dirname,scroll=False,v=True)
 
 def spack_env_maker(what):
 	"""
