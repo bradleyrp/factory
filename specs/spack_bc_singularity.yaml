@@ -6,6 +6,8 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
     spec: specs/spack_bluecrab.yaml
     # make a custom temporary directory for staging spack builds
     tmpdir: /exec/rbradley/stage
+    #! using /dev/shm due to clock skew on cmake
+    #! tmpdir: /dev/shm/
     # select a name which must be a root-level key in the spec (above)
     # this name typically corresponds to a spack environment
     # the root-level key in the spec file has a special syntax
@@ -19,6 +21,7 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
     image: /exec/rbradley/buildsite/mimic/mimic.simg
     # mounts for both proot or singularity
     mounts: 
+      # NOTE do not try building openmpi here. use proot. do not add /software/centos7 here!
       # create a custom decoy location where spack will build new packages
       # singularity maps the decoy location to the production location in the container
       - host: /exec/rbradley/buildsite/tz3/
@@ -26,10 +29,11 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
       # make sure the path below matches the factory location
       - host: /exec/rbradley/buildsite/factory
       - host: /software/apps/slurm/17.11.12.1.marcc
-      #! nope fam - host: /software/centos7 # added for openmpi special build
       # openssl
       - host: /usr/bin/openssl
         local: /usr/bin/openssl
       - host: /etc/ssl
         local: /etc/ssl
+      # useful for connecting to original modules
+      - host: /software/lmod/modulefiles
 
