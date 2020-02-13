@@ -14,3 +14,6 @@ _: !!python/object/apply:lib.generic.menu
     live: 
       cmd: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_singularity.yaml name=%(name)s live
       vars: [name]
+    go:
+      cmd: rsync -arivP --delete /exec/rbradley/buildsite/tz3/a02/ /software/apps/spack/a02/ && rsync -arivP --delete /exec/rbradley/buildsite/tz3/m02/ /software/apps/spack/m02/
+      vars: []

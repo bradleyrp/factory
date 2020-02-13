@@ -45,7 +45,10 @@ wl02: &wl02 !merge_lists
     r-stringi, r-stringr, r-glue, r-xml2, r-testthat, r-evaluate, 
     r-praise, r-usethis, r-clipr, r-clisymbols, r-fs, r-gh, r-ini, r-whisker, r-yaml]
   # singleton non-MPI packages
-  - &base-singletons [cairo, cmake, fontconfig, freetype, cairo] 
+  - &base-singletons [
+      cmake, fontconfig, freetype] 
+  # python-dependent codes
+  - &python-deps [cairo]
   # MPI-compiled codes
   - [gromacs, lammps]
 
@@ -227,6 +230,11 @@ bc-stage01:
         - !loopcat
           base: *gcc-7
           loop: *base-singletons
+        # python-dependent codes using explicit
+        #! without hash spack might try to build a subtly different one
+        #! - !loopcat
+        #!   base: !strflush [*gcc-7, " ^/ebfaatj"]
+        #!   loop: *python-deps
     - lmod_refresh: null
       name: *env-stage01
 
@@ -254,6 +262,10 @@ bc-stage02:
               - *fftw38
     - lmod_refresh: null
       name: *env-stage02
+
+###
+### PRODUCTION
+### 
 
 production:
   notes: |
