@@ -29,6 +29,11 @@ docs:
       --gres: "gpu:1"
       --partition: gpuv100
       --time: 300
+    gpuk80t: &gpuk80
+      --cpus-per-task: 12
+      --gres: "gpu:2"
+      --partition: debug
+      --time: 120
     # production instructions (sans dry run):
     #   rsync -arivP --delete /exec/rbradley/buildsite/tz3/a02/ /software/apps/spack/a02/ -n  
     #   rsync -arivP --delete /exec/rbradley/buildsite/tz3/m02/ /software/apps/spack/m02/ -n
@@ -43,4 +48,4 @@ settings:
   # name of an environment via env.sh that provides yaml
   env_name: min
   # choose the hardware for the build
-  sbatch: *test
+  sbatch: *gpuk80

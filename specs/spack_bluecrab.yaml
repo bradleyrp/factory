@@ -63,7 +63,7 @@ fftw38: &fftw38 >-
   fftw@3.3.8 +mpi +openmp ~pfft_patches precision=double,float 
 
 lammps: &lammps-v01 >-
-  lammps@20190807 +cuda
+  lammps@20190807 +cuda cuda_arch=35
   +asphere +body +class2 +colloid +compress +coreshell
   +dipole +exceptions +ffmpeg +granular +jpeg +kokkos +kspace ~latte +lib +manybody
   +mc +meam +misc +molecule +mpi +mpiio +openmp +peri +png +poems +python +qeq
@@ -252,13 +252,18 @@ bc-stage01:
         #! - !loopcat
         #!   base: !strflush [*gcc-7, " ^/ebfaatj"]
         #!   loop: *python-deps
-    #! refresh is not needed after we use the production recipe below
-    #! - lmod_refresh: null
-    #!   name: *env-stage01
 
 bc-stage02:
-  notes: 
+  notes: |
     Build OpenMPI and MPI-dependent applications.
+    Note that we removed lmod refresh after making the production recipe.
+    Build strategy: build openmpi and dependencies with proot on debug
+    You must have libibverbs and MPI must work. Singularity is not enough.
+    There is a curl fork bomb when using proot so use mirror.
+    Use spack mirror create openblas to fetch things and then build live in proot.
+    Currently we attach CUDA to MPI to make sure we accomodate cuda-aware MPI apps.
+    Lammps below requires DPYTHON_EXECUTABLE when building in proot.
+    Current MPI build is against spack at [bluecrab e047d7e]
   envs:
     - check_compiler: *gcc-7-compiler
     - name: &env-stage02 env-stage02
@@ -270,27 +275,25 @@ bc-stage02:
         # WARNING: build openmpi in proot
         - [!chain [*openmpi-3-1, &cuda9 "cuda@9.2.88"]]
         - !loopcat
-          # omit cuda from openmpi here but include it below if needed
-          base: !strflush [" ^", *openmpi-3-1]
+          # openmpi carries cuda so we omit it from the loop
+          base: !strflush [" ^", *openmpi-3-1, "^ ", *cuda9]
           loop: 
-            - !chain [!str [*fftw38, *gcc-7], *cuda9]
+            - !str [*fftw38, *gcc-7]
             - !chain
               - !str ["gromacs@2019.2 +cuda simd=AVX2_256", *gcc-7]
-              - *cuda9
               - *fftw38
-            - *netcdf-c-v01
             - *hdf5-v01
             - !chain
+              - *netcdf-c-v01
+              - *hdf5-v01
+            - !chain
+              # note that we had to patch spack to set the right python
+              # when building in proot via: DPYTHON_EXECUTABLE
               - !str [*lammps-v01, *gcc-7]
               - *python-3
               - *hdf5-v01
               - *netcdf-c-v01
-              - *cuda9
               - *fftw38
-    # refresh is not needed after we use the production recipe below
-    #! refresh is not needed after we use the production recipe below
-    #! - lmod_refresh: null
-    #!   name: *env-stage02
 
 ###
 ### PRODUCTION
@@ -335,22 +338,23 @@ production:
       - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
       - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
         modulefile: 2020.02.lua
+        # append paths to avoid slurm interference
         contents: !strflush
-          - 'prepend_path("PATH","/software/apps/marcc/bin")'
+          - 'append_path("PATH","/software/apps/marcc/bin")'
           - "\n"
-          - 'prepend_path("PATH","/software/apps/slurm/current/bin")'
+          - 'append_path("PATH","/software/apps/slurm/current/bin")'
           - "\n"
-          - 'prepend_path("PATH","/software/apps/slurm/current/sbin")'
+          - 'append_path("PATH","/software/apps/slurm/current/sbin")'
           - "\n"
-          - 'prepend_path("MANPATH","/software/apps/slurm/current/share/man")'
+          - 'append_path("MANPATH","/software/apps/slurm/current/share/man")'
           - "\n"
-          - 'prepend_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib")'
+          - 'append_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib")'
           - "\n"
-          - 'prepend_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")'
+          - 'append_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")'
           - "\n"
-          - 'prepend_path("LIBRARY_PATH","/software/apps/slurm/current/lib")'
+          - 'append_path("LIBRARY_PATH","/software/apps/slurm/current/lib")'
           - "\n"
-          - 'prepend_path("LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")'
+          - 'append_path("LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")'
       # the following modulefile connects to the original modules
       # note that this exists outside the test environment
       - mkdir: /software/lmod/modulefiles/apps/stack
