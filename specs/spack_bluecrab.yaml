@@ -33,7 +33,6 @@ wl02: &wl02 !merge_lists
   #! define below because !merge_lists cannot use refs?
   - &r-packages [r-devtools, r-rcpp]
   - &wl01 [gcc, python, r]
-  - [cmake]
   # each target R package must include dependencies in the whitelist
   - &wl-r-devtools [
     r-callr, r-processx, r-ps, r-r6, r-cli, r-assertthat, r-crayon, 
@@ -51,6 +50,8 @@ wl02: &wl02 !merge_lists
   - &python-deps [cairo]
   # MPI-compiled codes
   - [gromacs, lammps]
+  # incidental to MPI-compiled codes
+  - [netcdf-c, hdf5]
 
 openmpi-3-1: &openmpi-3-1 >-
   openmpi@3.1.5 %gcc@7.4.0 arch=linux-centos7-haswell
@@ -60,6 +61,22 @@ openmpi-3-1: &openmpi-3-1 >-
 
 fftw38: &fftw38 >-
   fftw@3.3.8 +mpi +openmp ~pfft_patches precision=double,float 
+
+lammps: &lammps-v01 >-
+  lammps@20190807 +cuda
+  +asphere +body +class2 +colloid +compress +coreshell
+  +dipole +exceptions +ffmpeg +granular +jpeg +kokkos +kspace ~latte +lib +manybody
+  +mc +meam +misc +molecule +mpi +mpiio +openmp +peri +png +poems +python +qeq
+  +reax +replica +rigid +shock +snap +srd +user-atc +user-h5md +user-lb
+  +user-misc +user-netcdf +user-omp +user-reaxc +voronoi
+  +user-diffraction 
+
+netcdf-c: &netcdf-c-v01 >-
+  netcdf-c@4.7.3 %gcc@7.4.0 ~dap ~hdf4 maxdims=1024 maxvars=8192 
+  +mpi ~parallel-netcdf +pic +shared
+
+hdf5: &hdf5-v01 >-
+  hdf5@1.10.6 ~cxx ~debug ~fortran +hl +mpi +pic +shared +szip ~threadsafe
 
 ###
 ### CONFIGURATION
@@ -230,13 +247,14 @@ bc-stage01:
         - !loopcat
           base: *gcc-7
           loop: *base-singletons
-        # python-dependent codes using explicit
-        #! without hash spack might try to build a subtly different one
+        # python-dependent codes using
+        #! the following is temporarily deprecated
         #! - !loopcat
         #!   base: !strflush [*gcc-7, " ^/ebfaatj"]
         #!   loop: *python-deps
-    - lmod_refresh: null
-      name: *env-stage01
+    #! refresh is not needed after we use the production recipe below
+    #! - lmod_refresh: null
+    #!   name: *env-stage01
 
 bc-stage02:
   notes: 
@@ -260,8 +278,19 @@ bc-stage02:
               - !str ["gromacs@2019.2 +cuda simd=AVX2_256", *gcc-7]
               - *cuda9
               - *fftw38
-    - lmod_refresh: null
-      name: *env-stage02
+            - *netcdf-c-v01
+            - *hdf5-v01
+            - !chain
+              - !str [*lammps-v01, *gcc-7]
+              - *python-3
+              - *hdf5-v01
+              - *netcdf-c-v01
+              - *cuda9
+              - *fftw38
+    # refresh is not needed after we use the production recipe below
+    #! refresh is not needed after we use the production recipe below
+    #! - lmod_refresh: null
+    #!   name: *env-stage02
 
 ###
 ### PRODUCTION
@@ -307,6 +336,8 @@ production:
       - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
         modulefile: 2020.02.lua
         contents: !strflush
+          - 'prepend_path("PATH","/software/apps/marcc/bin")'
+          - "\n"
           - 'prepend_path("PATH","/software/apps/slurm/current/bin")'
           - "\n"
           - 'prepend_path("PATH","/software/apps/slurm/current/sbin")'
