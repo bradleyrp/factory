@@ -1,6 +1,7 @@
 _: !!python/object/apply:lib.generic.menu
   # usage: menu_name=bc-std make do specs/bluecrab.yaml
   kwds: 
+    # note that the test sometimes loads an unusual module instead of openmpi but it is fine in production
     test: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_proot.yaml test
     build_proot: 
       cmd: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_proot.yaml name=%(name)s
@@ -14,6 +15,6 @@ _: !!python/object/apply:lib.generic.menu
     live: 
       cmd: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_singularity.yaml name=%(name)s live
       vars: [name]
-    go:
+    production:
       cmd: rsync -arivP --delete /exec/rbradley/buildsite/tz3/a02/ /software/apps/spack/a02/ && rsync -arivP --delete /exec/rbradley/buildsite/tz3/m02/ /software/apps/spack/m02/
       vars: []
