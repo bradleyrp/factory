@@ -52,6 +52,12 @@ wl02: &wl02 !merge_lists
   - [gromacs, lammps]
   # incidental to MPI-compiled codes
   - [netcdf-c, hdf5]
+  # tensorflow
+  #! troubleshooting pkg_resources.DistributionNotFound ...!!!
+  - [python, cuda, cudnn, py-tensorflow, py-absl-py, py-setuptools, py-six, py-astor, 
+    py-gast, py-google-pasta, py-grpcio, py-cython, py-keras-applications, 
+    py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf, py-scipy, 
+    py-pybind11, py-termcolor, py-wheel, py-wrapt, py-pip]
 
 openmpi-3-1: &openmpi-3-1 >-
   openmpi@3.1.5 %gcc@7.4.0 arch=linux-centos7-haswell
@@ -77,6 +83,18 @@ netcdf-c: &netcdf-c-v01 >-
 
 hdf5: &hdf5-v01 >-
   hdf5@1.10.6 ~cxx ~debug ~fortran +hl +mpi +pic +shared +szip ~threadsafe
+
+cudnn-v01: &cudnn-v01 !str [cudnn@7.6.5.32-10.2-linux-x64, *gcc-7]
+cuda-10-2: &cuda-10-2 !str [cuda@10.2.89, *gcc-7]
+mkl-v01: &mkl-v01 !str [intel-mlk@2020.0.166 +shared threads=tbb, *gcc-7]
+scipy-v01: &scipy-v01 !str [py-scipy ^intel-mkl, *gcc-7]
+
+tf-v01: &tf-v01 !chain
+  - !str [py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs, *gcc-7]
+  - *cuda-10-2
+  - *cudnn-v01
+  - *python-3
+#  - *mkl-v01
 
 ###
 ### CONFIGURATION
@@ -177,6 +195,13 @@ bc-config-modules:
         conflict: []
 
 mods_config:
+  notes: |
+    To add a module with python or R dependencies:
+      1. Get the full text of the concretize output.
+      2. Extract all of the py-name or r-name packages.
+      3. Add these to the whitelist above.
+      4. Add `autoload: all` for the target under the whitelist below.
+    Dev note: it would be nice if this was more seamless.
   mods: &mc01
     config: *bc-config
     packages: *packages
@@ -189,6 +214,9 @@ mods_config:
       lmod: 
         << : *mod-stage-02-lmod
         whitelist: *wl02
+        py-tensorflow: {autoload: all}
+        py-scipy: {autoload: all}
+        py-numpy: {autoload: all}
 
 ###
 ### ENVIRONMENTS
@@ -247,11 +275,9 @@ bc-stage01:
         - !loopcat
           base: *gcc-7
           loop: *base-singletons
-        # python-dependent codes using
-        #! the following is temporarily deprecated
-        #! - !loopcat
-        #!   base: !strflush [*gcc-7, " ^/ebfaatj"]
-        #!   loop: *python-deps
+        # tensorflow
+        - - !chain [*scipy-v01, *python-3]
+          - !chain [*tf-v01, *scipy-v01]
 
 bc-stage02:
   notes: |
@@ -294,6 +320,17 @@ bc-stage02:
               - *hdf5-v01
               - *netcdf-c-v01
               - *fftw38
+
+bc-singleton:
+  notes: Singleton stage for quick building and less concretization.
+  envs:
+    - check_compiler: *gcc-7-compiler
+    - name: &env-singleton env-singleton
+      via: template_basic
+      mods: *mc02
+      specs: 
+        - !chain [*scipy-v01, *python-3]
+        - !chain [*tf-v01, *scipy-v01]
 
 ###
 ### PRODUCTION
@@ -338,7 +375,7 @@ production:
           - 'To use original modules run ml original.",modeA={"load"}}'
           - "\n"
           - 'execute{cmd="echo [STATUS] Using the stack/0.4 module. '
-          - 'To use original modules run ml original",modeA={"unload"}}'
+          - 'To use original modules run ml original.",modeA={"unload"}}'
       - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
       - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
         modulefile: 2020.02.lua
