@@ -359,7 +359,7 @@ bc-singleton:
       via: template_basic
       mods: *mc02
       specs: 
-      specs: &stage01-specs !merge_lists
+      specs: !merge_lists
         - [*gcc-7-out]
         # base python
         - [!str [*python-3, *gcc-7]]
