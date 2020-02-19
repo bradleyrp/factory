@@ -364,8 +364,9 @@ bc-singleton:
         # base python
         - [!str [*python-3, *gcc-7]]
         - [!strflush [py-pip, " ^", *python-3, *gcc-7]]
-        #- !chain [*scipy-v01, *python-3]
-        #- !chain [*tf-v01, *scipy-v01]
+        # tensorflow
+        - - !chain [*scipy-v01, *python-3]
+          - *tf-v01
 
 ###
 ### EXTRA MODULEFILES
