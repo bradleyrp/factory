@@ -53,11 +53,17 @@ wl02: &wl02 !merge_lists
   # incidental to MPI-compiled codes
   - [netcdf-c, hdf5]
   # tensorflow
+  - [py-tensorflow@2.1.0 ^cuda@10.1.243]
   #! troubleshooting pkg_resources.DistributionNotFound ...!!!
-  - [python, cuda, cudnn, py-tensorflow, py-absl-py, py-setuptools, py-six, py-astor, 
+  - [python, cuda, cudnn, py-absl-py, py-setuptools, py-six, py-astor, 
     py-gast, py-google-pasta, py-grpcio, py-cython, py-keras-applications, 
     py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf, py-scipy, 
     py-pybind11, py-termcolor, py-wheel, py-wrapt, py-pip]
+  #! previous whitelist for py-tensorflow
+  - [py-absl-py, py-setuptools, py-six, py-astor, py-gast,
+    py-google-pasta, py-grpcio, py-cython, py-keras-applications,
+    py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf,
+    py-scipy, py-pybind11, py-termcolor, py-wheel, py-wrapt]
 
 openmpi-3-1: &openmpi-3-1 >-
   openmpi@3.1.5 %gcc@7.4.0 arch=linux-centos7-haswell
@@ -85,16 +91,31 @@ hdf5: &hdf5-v01 >-
   hdf5@1.10.6 ~cxx ~debug ~fortran +hl +mpi +pic +shared +szip ~threadsafe
 
 cudnn-v01: &cudnn-v01 !str [cudnn@7.6.5.32-10.2-linux-x64, *gcc-7]
+cudnn-v03: &cudnn-v03 !str [cudnn@7.6.4.38-10.1-linux-x64, *gcc-7]
 cuda-10-2: &cuda-10-2 !str [cuda@10.2.89, *gcc-7]
+cuda-10-1: &cuda-10-1 !str [cuda@10.1.243, *gcc-7]
+cuda-10-0: &cuda-10-0 !str [cuda@10.0.130, *gcc-7]
 mkl-v01: &mkl-v01 !str [intel-mlk@2020.0.166 +shared threads=tbb, *gcc-7]
 scipy-v01: &scipy-v01 !str [py-scipy ^intel-mkl, *gcc-7]
+tf-est-v02: &tf-est-v02 !str [py-tensorflow-estimator@2.0.0, *gcc-7]
 
 tf-v01: &tf-v01 !chain
   - !str [py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs, *gcc-7]
   - *cuda-10-2
   - *cudnn-v01
   - *python-3
-#  - *mkl-v01
+
+tf-v02: &tf-v02 !chain
+  - !str [py-tensorflow@2.0.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs, *gcc-7]
+  - *cuda-10-2
+  - *cudnn-v01
+  - *python-3
+
+tf-v03: &tf-v03 !chain
+  - !str [py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs, *gcc-7]
+  - *cuda-10-1
+  - *cudnn-v03
+  - *python-3
 
 ###
 ### CONFIGURATION
@@ -214,7 +235,10 @@ mods_config:
       lmod: 
         << : *mod-stage-02-lmod
         whitelist: *wl02
-        py-tensorflow: {autoload: all}
+        py-tensorflow: 
+          autoload: all
+          suffixes:
+            "^cuda@10.2.89": "cuda-10.2"
         py-scipy: {autoload: all}
         py-numpy: {autoload: all}
 
@@ -265,6 +289,7 @@ bc-stage01:
         - [*gcc-7-out]
         # base python
         - [!str [*python-3, *gcc-7]]
+        - [!strflush [py-pip, " ^", *python-3, *gcc-7]]
         # base R 
         - [!str [*r36, *gcc-7]]
         # large set of R packages
@@ -277,7 +302,12 @@ bc-stage01:
           loop: *base-singletons
         # tensorflow
         - - !chain [*scipy-v01, *python-3]
-          - !chain [*tf-v01, *scipy-v01]
+          - *tf-v01
+        # extra standalone cuda
+        - [*cuda-10-1, *cuda-10-0]
+        # more tensorflow
+        #! - - *tf-v03
+        - [!strflush ['gdb+python', " ^", *python-3, *gcc-7]]
 
 bc-stage02:
   notes: |
@@ -333,7 +363,125 @@ bc-singleton:
         - !chain [*tf-v01, *scipy-v01]
 
 ###
-### PRODUCTION
+### EXTRA MODULEFILES
+### 
+
+# anaconda modulefile
+anaconda-modulefile: &anaconda-modulefile |
+  local name = myModuleName()
+  local version = myModuleVersion()
+  local root = pathJoin(marccRoot(), name, version)
+  help([[ 
+
+  Anaconda environments.
+
+  This module provides the Anaconda package manager which allows
+  users to install and user their own virtual environments from 
+  the "conda" package distribution repositories.
+
+  To prepare a custom environment:
+
+  module load anaconda
+  conda env create -p ./path/to/env
+  conda activate ./path/to/env
+
+  You only create the environment once, but you must activate it whenever
+  you want to use it. You can also deactivate it ("conda deactiate").
+
+  Note that you will use the absolute path to access this environment later.
+  Please put anaconda environments in ~/ or ~/data (because the Lustre 
+  filesystem on  ~/scratch and ~/work is not optimized for executables).
+
+  More documentation is here: https://docs.conda.io/en/latest/
+
+  MARCC provides custom environments to save you time (and disk space).
+  See the available environments
+
+  See available prepared environments with "conda env list".
+  Load these environments with "conda activate <name>". 
+
+  ]])
+  whatis("Sets up environment for "..name.." version "..version)
+  local conda_exe = os.getenv("CONDA_EXE")
+  local myShell = myShellName()
+  if (conda_exe == nil or conda_exe == "") or mode()=="load" then
+    if (myShell == "bash") then
+        cmd = "source " .. pathJoin(root,"/etc/profile.d/conda.sh")
+    else
+        cmd = "source " .. pathJoin(root,"/etc/profile.d/conda.csh")
+    end
+    execute{cmd=cmd, modeA = {"load"}}
+  elseif mode()=="unload" then
+    if (myShell == "bash") then
+      cmd = "conda deactivate || : ; " ..
+        "unset ANACONDA3ROOT; unset PYTHONROOT; unset CONDA_EXE; " ..
+        "unset CONDA_PYTHON_EXE; unset _CE_CONDA; unset _CE_M; " ..
+        "unset __add_sys_prefix_to_path; unset __conda_activate; " ..
+        "unset __conda_reactivate; unset __conda_hashr; unset CONDA_SHLVL; " ..
+        "unset conda"
+    else
+      cmd = "conda deactivate; " ..
+        "unsetenv CONDA_EXE; unsetenv _CONDA_ROOT; unsetenv _CONDA_EXE; " ..
+        "unsetenv CONDA_PYTHON_EXE; unset CONDA_SHLVL; unalias conda"
+    end
+    execute{cmd=cmd, modeA = {"unload"}}
+    -- you must remove conda from the path after deactivating
+    remove_path("PATH",pathJoin(root,"condabin"))
+  end
+
+# marcc module
+marcc-modulefile: &marcc-modulefile |
+  append_path("PATH","/software/apps/marcc/bin")
+  append_path("PATH","/software/apps/slurm/current/bin")
+  append_path("PATH","/software/apps/slurm/current/sbin")
+  append_path("MANPATH","/software/apps/slurm/current/share/man")
+  append_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib")
+  append_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")
+  append_path("LIBRARY_PATH","/software/apps/slurm/current/lib")
+  append_path("LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")
+
+# extensions module for the centos7 repo
+extensions-modulefile: &extensions-modulefile !strflush
+  - '-- extension modulefile for software that requires /software/centos7'
+  - "\n"
+  - '-- append paths so spack can do the heavy lifting'
+  - "\n"
+  - 'append_path("LD_LIBRARY_PATH","/software/centos7/lib64:'
+  - '/software/centos7/lib:'
+  - '/software/centos7/usr/lib64:/software/centos7/usr/lib")'
+  - "\n"
+  - 'append_path("LIBRARY_PATH","/software/centos7/lib64:'
+  - '/software/centos7/lib:/software/centos7/usr/lib64:'
+  - '/software/centos7/usr/lib")'
+
+# matlab modulefile from the original software tree
+matlab-modulefile: &matlab-modulefile |
+  whatis([[ Matlab: adds MATLAB to your environment variables ]])
+  local name  = myModuleName() -- software name
+  local version = myModuleVersion() -- should be of form MAJ.MIN.PATCH
+  local root = pathJoin(marccRoot(), name, version, "bin")
+  prepend_path("PATH", pathJoin(root, " "))
+  setenv("LM_LICENSE_FILE","27000@172.16.0.10")
+  -- fonts and X11 XKB are here
+  setenv("FONTCONFIG_PATH","/software/centos7/etc/fonts/")
+  setenv("XKB_CONFIG_ROOT","/software/centos7/usr/share/X11/xkb/")
+  local function isempty(s)
+    return s == nil or s == ''
+  end
+  -- no proot if using non-interactive job
+  if not isempty(os.getenv("SLURM_PTY_WIN_ROW")) or
+    isempty(os.getenv("SLURM_JOBID")) then
+    local bashStr = "/software/apps/proot/5.1.0/bin/proot -b " ..
+      "/software/centos7/usr/:/usr/ -b $HOME/.matlab/:/tmp/ " ..
+      "/software/apps/matlab/R2019a/bin/matlab -softwareopengl \"$@\"'
+    local cshStr = "/software/apps/proot/5.1.0/bin/proot -b " ..
+      "/software/centos7/usr/:/usr/ -b $HOME/.matlab/:/tmp/ " .. "
+      "/software/apps/matlab/R2019a/bin/matlab -softwareopengl $* "
+    set_shell_function("matlab", bashStr, cshStr)
+  end
+
+###
+### PRODUCTION DEPLOYMENT
 ### 
 
 production:
@@ -358,44 +506,27 @@ production:
       - moduleroot: *module-spot
         modulefile: linux-centos7-x86_64/Core/original.lua
         contents: !strflush
-          - 'execute{cmd="echo [STATUS] Loading the original modules. If you added '
-          - 'stack to your default modules, you cannot go back to original modules '
-          - 'without deleting your lmod cache. && export MODULEPATH='
+          - 'execute{cmd="echo [STATUS] Loading the original modules. '
+          - 'If your default modules includes stack you must clear your cache. '
+          - '&& export MODULEPATH='
           - '/software/lmod/modulefiles/compiler_and_base:'
-          - '/software/lmod/modulefiles/apps && ml restore",modeA={"load"}}'
+          - '/software/lmod/modulefiles/apps && '
+          # return to system defaults. see note below on stack modulefile
+          - 'export LMOD_SYSTEM_DEFAULT_MODULES=MARCC/summer-2018 && '
+          - 'ml restore",modeA={"load"}}'
       - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/stack']
       - moduleroot: *module-spot
         modulefile: linux-centos7-x86_64/Core/stack/0.4.lua
         contents: !strflush 
-          - 'help([[You are currently using the stack/0.4 module. '
+          - 'help([[You are currently using the stack module. '
           - 'This module provides a new set of software managed by Spack. '
           - 'To return to the original modules use ml original.]])'
           - "\n"
-          - 'execute{cmd="echo [STATUS] Using the stack/0.4 module. '
+          - 'execute{cmd="echo [STATUS] Using the stack module. '
           - 'To use original modules run ml original.",modeA={"load"}}'
           - "\n"
-          - 'execute{cmd="echo [STATUS] Using the stack/0.4 module. '
+          - 'execute{cmd="echo [STATUS] Using the stack module. '
           - 'To use original modules run ml original.",modeA={"unload"}}'
-      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
-      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
-        modulefile: 2020.02.lua
-        # append paths to avoid slurm interference
-        contents: !strflush
-          - 'append_path("PATH","/software/apps/marcc/bin")'
-          - "\n"
-          - 'append_path("PATH","/software/apps/slurm/current/bin")'
-          - "\n"
-          - 'append_path("PATH","/software/apps/slurm/current/sbin")'
-          - "\n"
-          - 'append_path("MANPATH","/software/apps/slurm/current/share/man")'
-          - "\n"
-          - 'append_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib")'
-          - "\n"
-          - 'append_path("LD_LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")'
-          - "\n"
-          - 'append_path("LIBRARY_PATH","/software/apps/slurm/current/lib")'
-          - "\n"
-          - 'append_path("LIBRARY_PATH","/software/apps/slurm/current/lib/slurm")'
       # the following modulefile connects to the original modules
       # note that this exists outside the test environment
       - mkdir: /software/lmod/modulefiles/apps/stack
@@ -405,15 +536,38 @@ production:
           - 'help([[The "stack" module loads the new MARCC software modules. '
           - 'These modules are generated by Spack.]])'
           - "\n"
-          - 'execute{cmd="echo [STATUS] Loading the stack/0.4 module. '
+          - 'execute{cmd="echo [STATUS] Loading the stack module. '
           - 'To use original modules run ml original. '
           - '&& export MODULEPATH='
           - '/software/apps/spack/m02/linux-centos7-x86_64/Core && '
+          # setting stack as default prevents conflicts on subshell caused
+          #   by the /etc/profile.d/z00_lmod.sh on blue crab however users
+          #   will still have to reload some of their modules
+          #! dev note: should you have to reload on interact? should you inherit?
+          - 'export LMOD_SYSTEM_DEFAULT_MODULES=stack/0.4 && '
           - 'ml purge && ml stack/0.4 && ml gcc/7.4.0 && ml openmpi",modeA={"load"}}'
           - "\n"
-          - 'execute{cmd="echo [STATUS] Using the stack/0.4 module. '
+          - 'execute{cmd="echo [STATUS] Using the stack module. '
           - 'To use original modules run ml original.",modeA={"unload"}}'
+      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
+      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
+        modulefile: 2020.02.lua
+        # append paths to avoid slurm interference
+        contents: *marcc-modulefile
     - lmod_defaults:
       - !strflush [*module-spot,'/linux-centos7-x86_64/gcc/7.4.0/openmpi/3.1.5.lua']
       - !strflush [*module-spot,'/linux-centos7-x86_64/Core/gcc/7.4.0.lua']
-
+    # external modules from the original module tree
+    - lmod_hooks:
+      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/anaconda']
+      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/anaconda']
+        modulefile: 2019.03.lua
+        contents: *anaconda-modulefile
+      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/extensions']
+      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/extensions']
+        modulefile: 2020.02.lua
+        contents: *extensions-modulefile
+      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/matlab']
+      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/matlab']
+        modulefile: R2019a.lua
+        contents: *matlab-modulefile

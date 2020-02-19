@@ -48,4 +48,4 @@ settings:
   # name of an environment via env.sh that provides yaml
   env_name: min
   # choose the hardware for the build
-  sbatch: *gpuk80
+  sbatch: *test
