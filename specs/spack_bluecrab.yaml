@@ -64,6 +64,8 @@ wl02: &wl02 !merge_lists
     py-google-pasta, py-grpcio, py-cython, py-keras-applications,
     py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf,
     py-scipy, py-pybind11, py-termcolor, py-wheel, py-wrapt]
+  #! attempting to fix tensorflow ...!!!
+  - [intel-mkl, libxml]
 
 openmpi-3-1: &openmpi-3-1 >-
   openmpi@3.1.5 %gcc@7.4.0 arch=linux-centos7-haswell
@@ -196,7 +198,7 @@ bc-config-modules:
         filter:
           environment_blacklist: []
         load: []
-      blacklist_implicits: true
+      blacklist_implicits: false
       core_compilers:
       - *gcc-back-compiler
       blacklist: 
@@ -367,6 +369,9 @@ bc-singleton:
         - [!strflush [py-pip, " ^", *python-3, *gcc-7]]
         # tensorflow
         - - *tf-v01
+    # add this for testing? ...!!!
+    - lmod_refresh: null
+      name: *env-singleton
 
 ###
 ### EXTRA MODULEFILES

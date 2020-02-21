@@ -26,5 +26,5 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
   # usage: make spack_hpc_run run=<runfile> deploy=<deploy> test
   test: >-
     ml proot && proot -b 
-    /exec/rbradley/buildsite/tz3/:/software/apps/spack/ /bin/bash -c 
+    /exec/rbradley/buildsite/tz4/:/software/apps/spack/ /bin/bash -c 
     'MODULEPATH=/software/apps/spack/m02/linux-centos7-x86_64/Core /bin/bash -norc'

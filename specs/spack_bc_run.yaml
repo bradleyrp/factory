@@ -29,7 +29,7 @@ docs:
       --gres: "gpu:1"
       --partition: gpuv100
       --time: 300
-    gpuk80t: &gpuk80
+    gpuk80: &gpuk80
       --cpus-per-task: 12
       --gres: "gpu:2"
       --partition: debug
@@ -48,4 +48,4 @@ settings:
   # name of an environment via env.sh that provides yaml
   env_name: min
   # choose the hardware for the build
-  sbatch: *test
+  sbatch: *gpuk80
