@@ -120,6 +120,14 @@ tf-v03: &tf-v03 !chain
   - *cudnn-v03
   - *python-3
 
+tf-v04: &tf-v04 !chain
+  - !str [py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs, *gcc-7]
+  - *cuda-10-2
+  - *cudnn-v01
+  - *scipy-v01
+  - *python-3
+
+
 ###
 ### CONFIGURATION
 ###
@@ -368,7 +376,7 @@ bc-singleton:
         - [!str [*python-3, *gcc-7]]
         - [!strflush [py-pip, " ^", *python-3, *gcc-7]]
         # tensorflow
-        - - *tf-v01
+        - - *tf-v04
     # add this for testing? ...!!!
     - lmod_refresh: null
       name: *env-singleton
