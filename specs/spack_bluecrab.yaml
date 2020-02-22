@@ -1,16 +1,58 @@
-# BLUE CRAB SOFTWARE STACK 
-# Build and organize software for this cluster.
-# USAGE: make spack_hpc_run run=specs/spack_hpc_run.yaml deploy=specs/spack_bc_proot.yaml name=bc-prelim live
+docs: |
+  SPACK on BLUECRAB: software specification
+  Build and organize software for the *Blue Crab* cluster.
+  USAGE: 
+    make spack_hpc_run run=specs/spack_hpc_run.yaml \
+    deploy=specs/spack_bc_proot.yaml name=bc-prelim live
+  See `specs/bluecrab.yaml` for the easy interface.
 
-# SETTINGS: spack source and environments locations 
-spot:       ./local/spack       # config.json, spack
-spot_envs:  ./local/envs-spack  # config.json, spack_envs
+# settings: spack source and environments locations 
+# config.json stores spot as spack and spot_envs as spack_envs
+spot:       ./local/spack
+spot_envs:  ./local/envs-spack
 
-history: |
-  Build through stage01 in sequence.
-  The stage01 specs can be added one-by-one.
-  Build stage02 openmpi with proot on debug because the build nodes lack verbs.
-  Continue stage02 build with singularity.
+history:
+  general: |
+    Spack on Blue Crab requires a few files for configuration:
+      - this file, for telling spack what to install
+      - bluecrab.yaml uses a menu system to kick off the builds
+      - spack_bc_run.yaml selects hardware
+      - decoy environments in spack_bc_proot.yaml and spack_bc_singularity.yaml
+    The build sequence follows this order:
+      1. Set up a decoy location. 
+      2. Use `specs/bluecrab/yaml` to run the prelim and compile a compiler.
+      3. Use stage01 and the singleton recipe to build packages sequentially.
+      4. Switch to a proot environment to build openmpi and downstream.
+      5. Use the "test" feature in bluecrab.yaml to test.
+      6. Preview the spack concretize result with the "live" feature.
+      7. Push to production after testing with `bluecrab.yaml` rsync command.
+  series5: |
+    # this is the most recent build
+    # set up a new decoy site
+    mkdir -p /exec/rbradley/buildsite/tz4
+    # update with the new decoy site
+    vim specs/spack_bc_singularity.yaml
+    # merge the latest spack packages into our custom branch
+    cd local/spack
+    git checkout develop
+    git pull
+    git checkout bluecrab
+    git merge develop
+    # start the build
+    echo -e "build\n" | menu_name=bc-prelim make do specs/bluecrab.yaml
+    echo -e "build\n" | menu_name=bc-gcc-7-compiler make do specs/bluecrab.yaml
+    # [streamline 890f6b7] spack series five python build
+    menu_name=bc-singleton make do specs/bluecrab.yaml # live
+    # python compiles in 56min on /dev/shm
+    # using /dev/shm for now for a few builds
+    # note that we force py-tensorflow there because bazel cannot use NFS
+    # [streamline 611edcd] building software on bluecrab
+    # added tensorflow to the bc-singleton recipe
+    echo -e "live\n" | menu_name=bc-singleton make do specs/bluecrab.yaml
+    # currently building up singleton with python then py-tensorflow
+    # [streamline 95e44c9] tensorflow build
+    # failures on tensorflow with mysterious excess_args issue
+    # next: attempt proot with /dev/shm from gpudev002
 
 ###
 ### SOFTWARE SPECIFICATION
@@ -30,7 +72,7 @@ r36: &r36 !chain
   - *python-3
 
 wl02: &wl02 !merge_lists
-  #! define below because !merge_lists cannot use refs?
+  #! bug: define this here because !merge_lists cannot use refs
   - &r-packages [r-devtools, r-rcpp]
   - &wl01 [gcc, python, r]
   # each target R package must include dependencies in the whitelist
@@ -42,7 +84,8 @@ wl02: &wl02 !merge_lists
     r-rlang, r-rstudioapi, r-rcmdcheck, r-sessioninfo, r-xopen, 
     r-remotes, r-roxygen2, r-brew, r-commonmark, r-purrr, r-rcpp, 
     r-stringi, r-stringr, r-glue, r-xml2, r-testthat, r-evaluate, 
-    r-praise, r-usethis, r-clipr, r-clisymbols, r-fs, r-gh, r-ini, r-whisker, r-yaml]
+    r-praise, r-usethis, r-clipr, r-clisymbols, r-fs, r-gh, r-ini, 
+    r-whisker, r-yaml]
   # singleton non-MPI packages
   - &base-singletons [
       cmake, fontconfig, freetype] 
@@ -54,7 +97,7 @@ wl02: &wl02 !merge_lists
   - [netcdf-c, hdf5]
   # tensorflow
   - [py-tensorflow@2.1.0 ^cuda@10.1.243]
-  #! troubleshooting pkg_resources.DistributionNotFound ...!!!
+  #! building up the tensorflow requirements
   - [python, cuda, cudnn, py-absl-py, py-setuptools, py-six, py-astor, 
     py-gast, py-google-pasta, py-grpcio, py-cython, py-keras-applications, 
     py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf, py-scipy, 
@@ -64,7 +107,9 @@ wl02: &wl02 !merge_lists
     py-google-pasta, py-grpcio, py-cython, py-keras-applications,
     py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf,
     py-scipy, py-pybind11, py-termcolor, py-wheel, py-wrapt]
-  #! attempting to fix tensorflow ...!!!
+  #! more tensorflow requirements
+  #! bug: whitelist is difficult to properly infer
+  #!   the blacklist_implicits requires us to 
   - [intel-mkl, libxml]
 
 openmpi-3-1: &openmpi-3-1 >-
@@ -79,10 +124,10 @@ fftw38: &fftw38 >-
 lammps: &lammps-v01 >-
   lammps@20190807 +cuda cuda_arch=35
   +asphere +body +class2 +colloid +compress +coreshell
-  +dipole +exceptions +ffmpeg +granular +jpeg +kokkos +kspace ~latte +lib +manybody
-  +mc +meam +misc +molecule +mpi +mpiio +openmp +peri +png +poems +python +qeq
-  +reax +replica +rigid +shock +snap +srd +user-atc +user-h5md +user-lb
-  +user-misc +user-netcdf +user-omp +user-reaxc +voronoi
+  +dipole +exceptions +ffmpeg +granular +jpeg +kokkos +kspace ~latte +lib 
+  +manybody +mc +meam +misc +molecule +mpi +mpiio +openmp +peri +png +poems 
+  +python +qeq +reax +replica +rigid +shock +snap +srd +user-atc +user-h5md 
+  +user-lb +user-misc +user-netcdf +user-omp +user-reaxc +voronoi
   +user-diffraction 
 
 netcdf-c: &netcdf-c-v01 >-
@@ -102,26 +147,34 @@ scipy-v01: &scipy-v01 !str [py-scipy ^intel-mkl, *gcc-7]
 tf-est-v02: &tf-est-v02 !str [py-tensorflow-estimator@2.0.0, *gcc-7]
 
 tf-v01: &tf-v01 !chain
-  - !str [py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs, *gcc-7]
+  - !str 
+    - py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs
+    - *gcc-7
   - *cuda-10-2
   - *cudnn-v01
   - *scipy-v01
   - *python-3
 
 tf-v02: &tf-v02 !chain
-  - !str [py-tensorflow@2.0.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs, *gcc-7]
+  - !str 
+    - py-tensorflow@2.0.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs
+    - *gcc-7
   - *cuda-10-2
   - *cudnn-v01
   - *python-3
 
 tf-v03: &tf-v03 !chain
-  - !str [py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs, *gcc-7]
+  - !str [
+    - py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs
+    - *gcc-7
   - *cuda-10-1
   - *cudnn-v03
   - *python-3
 
 tf-v04: &tf-v04 !chain
-  - !str [py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs, *gcc-7]
+  - !str 
+    - py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs
+    - *gcc-7
   - *cuda-10-2
   - *cudnn-v01
   - *scipy-v01
@@ -170,7 +223,7 @@ bc-config:
       paths: {openssl@1.0.2k: /usr}
       buildable: false
     curl:
-      # r-curl bug ca 2020.02.08
+      # r-curl issue ca 2020.02.08
       version: [7.63.0]
 
 bc-config-modules:
@@ -316,8 +369,7 @@ bc-stage01:
           - *tf-v01
         # extra standalone cuda
         - [*cuda-10-1, *cuda-10-0]
-        # more tensorflow
-        #! - - *tf-v03
+        # gdb with python
         - [!strflush ['gdb+python', " ^", *python-3, *gcc-7]]
 
 bc-stage02:
@@ -327,10 +379,9 @@ bc-stage02:
     Build strategy: build openmpi and dependencies with proot on debug
     You must have libibverbs and MPI must work. Singularity is not enough.
     There is a curl fork bomb when using proot so use mirror.
-    Use spack mirror create openblas to fetch things and then build live in proot.
-    Currently we attach CUDA to MPI to make sure we accomodate cuda-aware MPI apps.
-    Lammps below requires DPYTHON_EXECUTABLE when building in proot.
-    Current MPI build is against spack at [bluecrab e047d7e]
+    Use `spack mirror create openblas` to fetch before building live in proot.
+    Currently we attach CUDA to MPI for CUDA-aware MPI apps.
+    Lammps below requires explicit DPYTHON_EXECUTABLE when building in proot.
   envs:
     - check_compiler: *gcc-7-compiler
     - name: &env-stage02 env-stage02
@@ -363,7 +414,9 @@ bc-stage02:
               - *fftw38
 
 bc-singleton:
-  notes: Singleton stage for quick building and less concretization.
+  notes: |
+    Singleton stage for quick building and less concretization.
+    Use this for testing things before you add them to the stages
   envs:
     - check_compiler: *gcc-7-compiler
     - name: &env-singleton env-singleton
@@ -377,7 +430,7 @@ bc-singleton:
         - [!strflush [py-pip, " ^", *python-3, *gcc-7]]
         # tensorflow
         - - *tf-v04
-    # add this for testing? ...!!!
+    # modules for testing mode
     - lmod_refresh: null
       name: *env-singleton
 
@@ -568,25 +621,35 @@ production:
           - "\n"
           - 'execute{cmd="echo [STATUS] Using the stack module. '
           - 'To use original modules run ml original.",modeA={"unload"}}'
-      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
-      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/marcc']
+      - mkdir: !strflush [*module-spot, 
+        '/linux-centos7-x86_64/Core/marcc']
+      - moduleroot: !strflush [*module-spot, 
+        '/linux-centos7-x86_64/Core/marcc']
         modulefile: 2020.02.lua
         # append paths to avoid slurm interference
         contents: *marcc-modulefile
     - lmod_defaults:
-      - !strflush [*module-spot,'/linux-centos7-x86_64/gcc/7.4.0/openmpi/3.1.5.lua']
+      - !strflush 
+        - *module-spot,
+        - '/linux-centos7-x86_64/gcc/7.4.0/openmpi/3.1.5.lua'
       - !strflush [*module-spot,'/linux-centos7-x86_64/Core/gcc/7.4.0.lua']
     # external modules from the original module tree
     - lmod_hooks:
-      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/anaconda']
-      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/anaconda']
+      - mkdir: !strflush [*module-spot, 
+        '/linux-centos7-x86_64/Core/anaconda']
+      - moduleroot: !strflush [*module-spot,
+        '/linux-centos7-x86_64/Core/anaconda']
         modulefile: 2019.03.lua
         contents: *anaconda-modulefile
-      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/extensions']
-      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/extensions']
+      - mkdir: !strflush [*module-spot,
+        '/linux-centos7-x86_64/Core/extensions']
+      - moduleroot: !strflush [*module-spot,
+        '/linux-centos7-x86_64/Core/extensions']
         modulefile: 2020.02.lua
         contents: *extensions-modulefile
-      - mkdir: !strflush [*module-spot, '/linux-centos7-x86_64/Core/matlab']
-      - moduleroot: !strflush [*module-spot, '/linux-centos7-x86_64/Core/matlab']
+      - mkdir: !strflush [*module-spot, 
+        '/linux-centos7-x86_64/Core/matlab']
+      - moduleroot: !strflush [*module-spot, 
+        '/linux-centos7-x86_64/Core/matlab']
         modulefile: R2019a.lua
         contents: *matlab-modulefile

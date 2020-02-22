@@ -1,22 +1,15 @@
 docs:
-  docs: |  
-    RUN SPACK.
-    This script kicks off a spack build or inspection.
-    This spec is paired with `lib.spack.spack_hpc_run`.
-    This is the run file. We execute spack according to a deploy file set below.
-    We also supply "the spec file" which contains the spack-specific build.
-    We execute a portion of "the spec file" by the name.
-    Usage:
-      make spack_hpc_run specs/spack_hpc_run.yaml
-      make spack_hpc_run specs/spack_hpc_run.yaml \
-        deploy=specs/spack_hpc_deploy.yaml name=bc-std live
-    The settings tagged `!flag` can be set here or at the command line.
-    You can execute a spec directly (first usage option) with hardcoded paths.
-    The "live" flag deposits you inside the decoy environment.
-    The default is the "proot" decoy method, but you can include either a
-      "decoy" or "singularity" keyword in the call.
-    #! we are currently testing to determine the correct decoy environment.
-    #!!! docs need updated. proot is only used for openmpi
+  docs: |
+    SPACK on BLUECRAB: select hardware
+    This script is called by a menu from `bluecrab.yaml` or directly via make.
+    It kicks off a spack build or inspection via `lib.spack.spack_hpc_run`.
+    Usage example:
+        make spack_hpc_run run=specs/spack_bc_run.yaml \
+        deploy=specs/spack_bc_singularity.yaml name=bc-singleton
+    The run flag selects this file which selects hardware.
+    The deploy flag describes the decoy environment in which we run spack.
+    The settings below will request a spec file from the command line.
+    The spec file contains all of the information for the spack environments.
   hardware:
     debug: &debug
       --partition: debug
@@ -34,16 +27,14 @@ docs:
       --gres: "gpu:2"
       --partition: debug
       --time: 120
-    # production instructions (sans dry run):
-    #   rsync -arivP --delete /exec/rbradley/buildsite/tz3/a02/ /software/apps/spack/a02/ -n  
-    #   rsync -arivP --delete /exec/rbradley/buildsite/tz3/m02/ /software/apps/spack/m02/ -n
 
 settings:
+  # set the command line flags
   # the deploy file tells us how to run spack
   deploy: !flag deploy 
-  #get the spec file from CLI otherwise deploy file
+  # get the spec file from CLI otherwise use the deploy file
   spec: !flag spec
-  # the name file provides a selection for the spec file
+  # select a section of the spec file by name
   name: !flag name
   # name of an environment via env.sh that provides yaml
   env_name: min

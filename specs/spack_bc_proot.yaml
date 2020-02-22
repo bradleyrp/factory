@@ -1,3 +1,4 @@
+# SPACK on BLUECRAB: proot decoy environment
 settings: !!python/object/apply:lib.spack.spack_hpc_decoy
   kwds:
     spec: specs/spack_bluecrab.yaml
@@ -5,7 +6,8 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
     decoy_method: proot
     mounts: 
       # create a custom decoy location where spack will build new packages
-      # singularity maps the decoy location to the production location in the container
+      # singularity maps the decoy location to the 
+      #   production location in the container
       - host: /exec/rbradley/buildsite/tz3/
         local: /software/apps/spack
       # make sure the path below matches the factory location
@@ -19,9 +21,8 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
       - host: /etc/libibverbs.d
       # useful for connecting to original modules
       - host: /software/lmod/modulefiles
-  # NOTE: proot is only required for the openmpi build to see verbs and slurm
+  # NOTE: proot is only required for openmpi builds for verbs, slurm
   # NOTE: use singularity for building wherever possible
-  # extraneous keys are ignored by object apply
   # test the environment before production
   # usage: make spack_hpc_run run=<runfile> deploy=<deploy> test
   test: >-

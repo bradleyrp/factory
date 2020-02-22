@@ -1,3 +1,4 @@
+# SPACK on BLUECRAB: singularity decoy environment
 settings: !!python/object/apply:lib.spack.spack_hpc_decoy
   kwds:
     # this is "the spec" and contains ALL of the spack information
@@ -36,4 +37,3 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
         local: /etc/ssl
       # useful for connecting to original modules
       - host: /software/lmod/modulefiles
-

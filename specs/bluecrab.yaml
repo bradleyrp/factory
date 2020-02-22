@@ -1,20 +1,40 @@
+# SPACK on BLUECRAB: command interface
+# usage: menu_name=bc-std make do specs/bluecrab.yaml
+# bluecrab.yaml calls spack_bc_run.yaml which selects hardware
 _: !!python/object/apply:lib.generic.menu
-  # usage: menu_name=bc-std make do specs/bluecrab.yaml
   kwds: 
-    # note that the test sometimes loads an unusual module instead of openmpi but it is fine in production
-    test: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_proot.yaml test
-    build_proot: 
-      cmd: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_proot.yaml name=%(name)s
+    # note that the test sometimes loads an unusual module e.g. netcdf
+    #   instead of openmpi but this is not an issue in production
+    test: >-
+      make spack_hpc_run run=specs/spack_bc_run.yaml 
+      deploy=specs/spack_bc_proot.yaml test
+    build_proot:
+      cmd: >-
+        make spack_hpc_run run=specs/spack_bc_run.yaml 
+        deploy=specs/spack_bc_proot.yaml name=%(name)s
       vars: [name]
     build: 
-      cmd: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_singularity.yaml name=%(name)s
+      cmd: >-
+        make spack_hpc_run run=specs/spack_bc_run.yaml 
+        deploy=specs/spack_bc_singularity.yaml name=%(name)s
       vars: [name]
     live_proot: 
-      cmd: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_proot.yaml name=%(name)s live
+      cmd: >-
+        make spack_hpc_run run=specs/spack_bc_run.yaml 
+        deploy=specs/spack_bc_proot.yaml name=%(name)s live
       vars: [name]
     live: 
-      cmd: make spack_hpc_run run=specs/spack_bc_run.yaml deploy=specs/spack_bc_singularity.yaml name=%(name)s live
+      cmd: >-
+        make spack_hpc_run run=specs/spack_bc_run.yaml 
+        deploy=specs/spack_bc_singularity.yaml name=%(name)s live
       vars: [name]
     production:
-      cmd: rsync -arivP --delete /exec/rbradley/buildsite/tz4/a02/ /software/apps/spack/a02/ && rsync -arivP --delete /exec/rbradley/buildsite/tz4/m02/ /software/apps/spack/m02/
       vars: []
+      # beware: this pushes the software to production
+      cmd: >-
+        rsync -arivP --delete 
+        /exec/rbradley/buildsite/tz4/a02/ 
+        /software/apps/spack/a02/ && 
+        rsync -arivP --delete 
+        /exec/rbradley/buildsite/tz4/m02/ 
+        /software/apps/spack/m02/
