@@ -68,6 +68,10 @@ python3: &python-3 >-
   python@3.7.6 +bz2 +ctypes +dbm +debug 
   +libxml2 +lzma +optimizations +pic +pyexpat +pythoncmd 
   +readline +shared +sqlite3 +ssl +uuid +zlib
+python36: &python-36 >-
+  python@3.6.8 +bz2 +ctypes +dbm +debug 
+  +libxml2 +lzma +optimizations +pic +pyexpat +pythoncmd 
+  +readline +shared +sqlite3 +ssl +uuid +zlib
 r36: &r36 !chain
   - r@3.6.1 +memory_profiling
   - *python-3
@@ -181,6 +185,14 @@ tf-v04: &tf-v04 !chain
   - *scipy-v01
   - *python-3
 
+tf-v05: &tf-v05 !chain
+  - !str 
+    - py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi ~mkl ~tensorrt ~verbs
+    - *gcc-7
+  - *cuda-10-2
+  - *cudnn-v01
+  - *scipy-v01
+  - *python-36
 
 ###
 ### CONFIGURATION
@@ -304,6 +316,7 @@ mods_config:
           autoload: all
           suffixes:
             "^cuda@10.2.89": "cuda-10.2"
+            "^python@3.7.6": "py37"
         py-scipy: {autoload: all}
         py-numpy: {autoload: all}
 
@@ -427,10 +440,10 @@ bc-singleton:
       specs: !merge_lists
         - [*gcc-7-out]
         # base python
-        - [!str [*python-3, *gcc-7]]
-        - [!strflush [py-pip, " ^", *python-3, *gcc-7]]
+        - [!str [*python-36, *gcc-7]]
+        - [!strflush [py-pip, " ^", *python-36, *gcc-7]]
         # tensorflow
-        - - *tf-v04
+        - - *tf-v05
     # modules for testing mode
     - lmod_refresh: null
       name: *env-singleton
