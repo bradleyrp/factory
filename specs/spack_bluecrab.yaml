@@ -53,6 +53,7 @@ history:
     # [streamline 95e44c9] tensorflow build
     # failures on tensorflow with mysterious excess_args issue
     # next: attempt proot with /dev/shm from gpudev002
+    spack mirror create py-tensorflow+cuda cuda_arch=35
 
 ###
 ### SOFTWARE SPECIFICATION
@@ -108,8 +109,8 @@ wl02: &wl02 !merge_lists
     py-keras-preprocessing, py-numpy, py-opt-einsum, py-protobuf,
     py-scipy, py-pybind11, py-termcolor, py-wheel, py-wrapt]
   #! more tensorflow requirements
-  #! bug: whitelist is difficult to properly infer
-  #!   the blacklist_implicits requires us to 
+  #! bug: whitelist is difficult to properly infer so
+  #!   consider disabling blacklist_implicits 
   - [intel-mkl, libxml]
 
 openmpi-3-1: &openmpi-3-1 >-
@@ -164,7 +165,7 @@ tf-v02: &tf-v02 !chain
   - *python-3
 
 tf-v03: &tf-v03 !chain
-  - !str [
+  - !str 
     - py-tensorflow@2.1.0 +cuda cuda_arch=35 +numa ~mpi +mkl ~tensorrt ~verbs
     - *gcc-7
   - *cuda-10-1
@@ -630,7 +631,7 @@ production:
         contents: *marcc-modulefile
     - lmod_defaults:
       - !strflush 
-        - *module-spot,
+        - *module-spot
         - '/linux-centos7-x86_64/gcc/7.4.0/openmpi/3.1.5.lua'
       - !strflush [*module-spot,'/linux-centos7-x86_64/Core/gcc/7.4.0.lua']
     # external modules from the original module tree

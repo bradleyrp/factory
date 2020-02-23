@@ -6,9 +6,9 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
     #   and specs/spack_hpc_go.yaml and make sure all paths match
     spec: specs/spack_bluecrab.yaml
     # make a custom temporary directory for staging spack builds
-    tmpdir: /exec/rbradley/stage
+    #! tmpdir: /exec/rbradley/stage
     #! using /dev/shm due to clock skew on cmake
-    #! tmpdir: /dev/shm/
+    tmpdir: /dev/shm/
     # select a name which must be a root-level key in the spec (above)
     # this name typically corresponds to a spack environment
     # the root-level key in the spec file has a special syntax
