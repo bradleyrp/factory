@@ -16,6 +16,12 @@ from ..misc import path_resolver
 from ..data import delveset,catalog
 from .templates import screen_maker
 
+# supply user information to docker-compose builds for ID mapping on mounts
+docker_compose_build_cmd = (
+	'docker-compose build '
+	'--build-arg USER_ID=$(id -u ${USER}) '
+	'--build-arg GROUP_ID=$(id -g ${USER}) ')
+
 def mount_macos(dmg,mount):
 	"""
 	Mount an image in macos.
@@ -377,7 +383,7 @@ class ReplicateCore(Handler):
 			if compose_cmd:
 				raise Exception(
 					'cannot set compose_cmd if mode is build: %s'%compose_cmd)
-			compose_cmd = 'docker-compose build'
+			compose_cmd = docker_compose_build_cmd
 		elif mode=='compose':
 			if not compose_cmd:
 				raise Exception('compose mode requires a compose_cmd')
@@ -486,7 +492,7 @@ class ReplicateCore(Handler):
 					'compose',{}).get('services',{}).keys()
 				if len(names_services)!=1: raise Exception('dev')
 				name_service = list(names_services)[0]
-				kwargs['line'] = ('docker-compose build %s && '%
+				kwargs['line'] = (docker_compose_build_cmd+' %s && '%
 					name_service + kwargs['line'])
 			# nickname is a simple method for preventing reexecution
 			# the nickname links us to the temporary location of the compose
