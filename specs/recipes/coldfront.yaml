@@ -31,7 +31,9 @@ select: !select
         cp coldfront/config/local_strings.py.sample \
           coldfront/config/local_strings.py
         python manage.py initial_setup
-        # after onetime setup modify the recipe below
+        # after onetime setup use the coldfront-up-entry as entrypoint
+        # you can alsu use: command: docker-compose up -d for background
+        make docker specs/recipes/coldfront.yaml coldfront
       coldfront-up: &coldfront-up-entry
         - '/bin/bash'
         - '-c'
@@ -42,7 +44,7 @@ select: !select
     image_name: &image_name_coldfront factory:coldfront
     # use the following command, visit for setup
     # command: docker-compose run --service-ports deploy
-    # visit: true
+    visit: true
     # use the following command and entrypoint for development
     command: docker-compose up -d
     site: !spots root
@@ -62,6 +64,9 @@ select: !select
           entrypoint: *coldfront-up-entry
           build: .
           image: *image_name_coldfront
+          name: coldfront
           volumes:
             - /Users/rpb/worker/dev/factory/coldfront:/home/user/coldfront
-          ports: [8000]
+          # critical note: use "8000:8000" and not "8000" or no tunnel
+          ports: ["8000:8000"]
+          hostname: localhost
