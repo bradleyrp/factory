@@ -1,4 +1,4 @@
-git statdockerfiles: !merge_spec
+dockerfiles: !merge_spec
   external: !import_spec 
     from: ./dockerfiles.yaml
     what: dockerfiles
