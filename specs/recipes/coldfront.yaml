@@ -1,4 +1,4 @@
-dockerfiles: !merge_spec
+git statdockerfiles: !merge_spec
   external: !import_spec 
     from: ./dockerfiles.yaml
     what: dockerfiles
@@ -21,7 +21,9 @@ select: !select
       docs: |
         # TESTING COLDFRONT IN DOCKER
         # instructions via https://github.com/ubccr/coldfront
-        # first we use the setup recipe
+        # first we use the setup recipe. this builds a persistent coldfront
+        # prepare a location outside of the container (not necessary on macos)
+        mkdir local/coldfront
         make docker specs/recipes/coldfront.yaml coldfront_setup
         # the following setup commands could be rolled into the dockerfile
         cd ~/coldfront
