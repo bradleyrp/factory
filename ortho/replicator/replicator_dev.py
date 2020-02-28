@@ -16,9 +16,16 @@ from ..misc import path_resolver
 from ..data import delveset,catalog
 from .templates import screen_maker
 
+def docker_bash_vars():
+	"""Assemble bash variables inline with docker commands."""
+	var = {}
+	var['FACTORY_ROOT'] = os.getcwd()
+	var['HOME'] = os.environ['HOME']
+	return ' '.join(['%s=%s'%(i,j) for i,j in var.items()])+' '
+
 # supply user information to docker-compose builds for ID mapping on mounts
 docker_compose_build_cmd = (
-	'docker-compose build '
+	'%sdocker-compose build '%docker_bash_vars()+
 	'--build-arg USER_ID=$(id -u ${USER}) '
 	'--build-arg GROUP_ID=$(id -g ${USER}) ')
 
@@ -387,6 +394,7 @@ class ReplicateCore(Handler):
 		elif mode=='compose':
 			if not compose_cmd:
 				raise Exception('compose mode requires a compose_cmd')
+			compose_cmd = docker_bash_vars() + compose_cmd
 		else: raise Exception('invalid mode: %s'%mode)
 		requires_python_check('yaml')
 		import yaml
@@ -398,14 +406,14 @@ class ReplicateCore(Handler):
 		# build the Dockerfile
 		dockerfile_obj = DockerFileMaker(dockerfiles_index=dockerfiles_index,
 			**dockerfile)
+		# ensure only one container
+		services = compose.get('services',{})
+		if len(services.keys())!=1:
+			raise Exception('cannot attach volumes for multiple containers')
+		service_name = list(services.keys())[0]
+		compose_service = compose['services'][service_name]
 		# add extra volumes
 		if compose_volumes:
-			# ensure only one container
-			services = compose.get('services',{})
-			if len(services.keys())!=1:
-				raise Exception('cannot attach volumes for multiple containers')
-			service_name = list(services.keys())[0]
-			compose_service = compose['services'][service_name]
 			extra_vols = compose_volumes.get('volumes',[])
 			if extra_vols and not compose_service.get('volumes',[]):
 				compose_service['volumes'] = []
@@ -551,7 +559,8 @@ class ReplicateCore(Handler):
 			if docker_args: docker_args += ' '
 			# removed "-u 0" which runs as root
 			# wrap the command in a `docker run` with arguments and volumes
-			cmd = 'docker run -i%s %s%s'%('t' if visit_direct else '',
+			cmd = '%sdocker run -i%s %s%s'%(docker_bash_vars(),
+				't' if visit_direct else '',
 				docker_args,self.container)
 			# case A: one-liner
 			if self.do['kind']=='line':
