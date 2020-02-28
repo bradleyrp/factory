@@ -5,18 +5,26 @@ dockerfiles: !merge_spec
   local:
     coldfront: |
       RUN apt-get -y update
-      #! RUN apt-get -y install python3.6 python3.6-venv memcached redis-server
       RUN apt-get -y install python3 python3-venv memcached redis-server
 select: !select
+  coldfront_setup:
+    via: coldfront
+    mods: 
+      visit: true
+      command: docker-compose run -w /home/user/coldfront --service-ports deploy 
+      compose: 
+        services:
+          deploy:
+            entrypoint: "/bin/bash"
   coldfront:
     notes: 
       docs: |
         # TESTING COLDFRONT IN DOCKER
         # instructions via https://github.com/ubccr/coldfront
-        # use this recipe
-        make docker specs/recipes/coldfront.yaml coldfront
-        # persistent directory
-        cd /home/user/coldfront
+        # first we use the setup recipe
+        make docker specs/recipes/coldfront.yaml coldfront_setup
+        # the following setup commands could be rolled into the dockerfile
+        cd ~/coldfront
         git clone https://github.com/ubccr/coldfront.git
         # venv next to the app
         python3 -mvenv venv
@@ -25,14 +33,14 @@ select: !select
         cd coldfront
         python -m pip install wheel
         python -m pip install -r requirements.txt
-        # onetime setup
+        # onetime setup via docs
         cp coldfront/config/local_settings.py.sample \
-          coldfront/config/local_settings.py
+        coldfront/config/local_settings.py
         cp coldfront/config/local_strings.py.sample \
-          coldfront/config/local_strings.py
+        coldfront/config/local_strings.py
         python manage.py initial_setup
-        # after onetime setup use the coldfront-up-entry as entrypoint
-        # you can alsu use: command: docker-compose up -d for background
+        exit
+        # to run the server and continue development
         make docker specs/recipes/coldfront.yaml coldfront
       coldfront-up: &coldfront-up-entry
         - '/bin/bash'
@@ -42,10 +50,6 @@ select: !select
           cd ~/coldfront/coldfront && 
           python manage.py runserver 0.0.0.0:8000
     image_name: &image_name_coldfront factory:coldfront
-    # use the following command, visit for setup
-    # command: docker-compose run --service-ports deploy
-    visit: true
-    # use the following command and entrypoint for development
     command: docker-compose up -d
     site: !spots root
     dockerfile:
@@ -58,15 +62,13 @@ select: !select
       version: '3'
       services:
         deploy:
-          # get a shell for onetime setup
-          # entrypoint: ['/bin/bash','-l']
-          # use the following entrypoint for development
           entrypoint: *coldfront-up-entry
           build: .
           image: *image_name_coldfront
-          name: coldfront
           volumes:
-            - /Users/rpb/worker/dev/factory/coldfront:/home/user/coldfront
-          # critical note: use "8000:8000" and not "8000" or no tunnel
+            - $FACTORY_ROOT/local/coldfront:/home/user/coldfront
+          #!!! critical note: use "8000:8000" and not "8000" or no tunnel
           ports: ["8000:8000"]
           hostname: localhost
+          container_name: coldfront
+          working_dir: /home/user/coldfront
