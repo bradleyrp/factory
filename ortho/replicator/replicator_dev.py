@@ -406,14 +406,14 @@ class ReplicateCore(Handler):
 		# build the Dockerfile
 		dockerfile_obj = DockerFileMaker(dockerfiles_index=dockerfiles_index,
 			**dockerfile)
-		# ensure only one container
-		services = compose.get('services',{})
-		if len(services.keys())!=1:
-			raise Exception('cannot attach volumes for multiple containers')
-		service_name = list(services.keys())[0]
-		compose_service = compose['services'][service_name]
 		# add extra volumes
 		if compose_volumes:
+			# ensure only one container
+			services = compose.get('services',{})
+			if len(services.keys())!=1:
+				raise Exception('cannot attach volumes for multiple containers')
+			service_name = list(services.keys())[0]
+			compose_service = compose['services'][service_name]
 			extra_vols = compose_volumes.get('volumes',[])
 			if extra_vols and not compose_service.get('volumes',[]):
 				compose_service['volumes'] = []
@@ -432,6 +432,11 @@ class ReplicateCore(Handler):
 				fp.write(dockerfile_obj.dockerfile)
 			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
 				yaml.dump(compose,fp)
+			# protect against running without visit
+			if re.match(r'.+docker-compose\s+run',compose_cmd) and not visit:
+				raise Exception('compose command appears to require a terminal '
+					'but the "visit" flag is not set in the compose file: %s'%
+						compose_cmd)
 			# run docker compose
 			if visit:
 				# we require a TTY to enter the container so we use os.system
