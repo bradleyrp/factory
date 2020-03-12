@@ -51,3 +51,6 @@ dockerfiles:
   firefox_attempt: |
     RUN apt-get update
     RUN apt-get install -y firefox
+  centos7: |
+    # section: centos7
+    FROM centos:centos7
