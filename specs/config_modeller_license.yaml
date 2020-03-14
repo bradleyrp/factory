@@ -11,6 +11,6 @@ script: |
   key = input("enter the modeller license key: ")
   if key:
     with open(config_fn,'a') as fp: 
-      fp.write('license = r"%s"'%key.strip())
+      fp.write('\nlicense = r"%s"'%key.strip())
   import modeller
   print('status imported modeller from: %s'%modeller.__file__)
