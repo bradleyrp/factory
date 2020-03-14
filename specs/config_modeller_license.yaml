@@ -4,6 +4,7 @@ script: |
   import pkgutil,os
   import glob
   package = pkgutil.get_loader("modeller")
+  if not package: raise Exception('cannot load modeller from pkgutil')
   config_fn = os.path.join(os.path.dirname(package.path),'config.py')
   if not os.path.isfile(config_fn): 
     raise Exception('cannot find modeller config')
