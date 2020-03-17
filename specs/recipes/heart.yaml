@@ -99,6 +99,8 @@ select: !select
     #!!! needs tested
     via: carp
     mods:
+      visit: true
+      command: docker-compose run --service-ports deploy
       compose:
         services:
           deploy:
@@ -200,7 +202,7 @@ select: !select
             target: /home/user/extern
             type: bind
 
-  vertigo_v04_visit:
+  vertigo_v04_visit_deprecated:
     via: carp
     mods: 
       visit: true
@@ -220,12 +222,16 @@ select: !select
             - /tmp/.X11-unix:/tmp/.X11-unix
             ports: []
 
+  # EXECUTE: VERTIGO v04
+  # vertigo_v04 and children run atrial_af
+  #! developing a better wrapper
   vertigo_v04:
     notes: |
       Tested on 2020.02.05 on heartland (a desktop) via:
         `make docker specs/recipes/heart.yaml name=vertigo_v04`
       Code via: factory@bbfeef, vertigo@f1cf53.
       This runs in the foreground.
+      Lasts ~17min and throws warning `Unexpected end of /proc/mounts line`.
     via: carp
     mods: 
       command: docker-compose run --service-ports deploy
@@ -244,3 +250,19 @@ select: !select
             entrypoint: >-
               /bin/bash -lic 'cd ~/spot/vertigo &&
               time lein run -- -n block01 runargs docker-v01 expt-v02'
+  vertigo_v04_visit:
+    via: vertigo_v04
+    mods: 
+      visit: true
+      compose: 
+        services:
+          deploy:
+            entrypoint: /bin/bash -lic 'cd ~/spot/vertigo && lein repl'
+  vertigo_v04_inspect:
+    via: vertigo_v04_visit
+    mods: 
+      visit: true
+      compose: 
+        services:
+          deploy:
+            entrypoint: /bin/bash -il
