@@ -164,9 +164,12 @@ def compose_cleanup(dn,sure=False):
 		raise Exception('not a link: %s'%dn)
 	if sure or confirm('okay to remove %s'%dn):
 		remote = os.readlink(dn)
-		print('status removing %s'%remote)
-		shutil.rmtree(remote)
-		print('status removing %s'%dn)
+		if not os.path.isdir(remote): 
+			print('status the temporary link is already gone')
+		else:
+			print('status removing %s'%remote)
+			shutil.rmtree(remote)
+			print('status removing %s'%dn)
 		os.unlink(dn)
 		return True
 	else: return False
