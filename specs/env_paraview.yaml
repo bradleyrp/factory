@@ -1,0 +1,11 @@
+name: pv
+dependencies:
+  - python==3.7.4
+  #! - anaconda::mayavi
+  - pip
+  - pip:
+    - meshio
+    - pillow
+    - pyevtk
+    - mayavi
+    - pyyaml

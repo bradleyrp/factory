@@ -42,14 +42,14 @@ gromacs_centos8_gpu:
   notes: |
     Install GROMACS with native GCC 8 on CentOS8 and CUDA.
   envs:
-    #! dev: make the computer check work with a major gcc version i.e. detect the native
-    - check_compiler: gcc@8.2.1
-    #! dev: make this a boolean flag
+    - find_compilers: null
+    # confirm the native compiler (might vary slightly)
+    - check_compiler: gcc@8.3.1
     - bootstrap: null
-    #! dev: create a naming scheme
+    # build gromacs against the native compiler
     - name: env_gromacs_2019.3_gcc_8.2.1_native
       via: template_basic
-      specs: ['gromacs@2019.3%gcc@8.2+cuda~mpi^fftw~mpi']
+      specs: ['gromacs@2019.3 %gcc@8.3 +cuda ~mpi ^fftw~mpi ^cuda@10.2']
 
 macos_vmd:
   notes: |
@@ -76,3 +76,15 @@ macos_test:
       via: template_basic
       specs:
         - curl
+
+tensorflow:
+  notes: Testing the tensorflow build on CentOS 8.
+  envs:
+    - find_compilers: null
+    # update moved the native compiler up
+    - check_compiler: gcc@8.3.1
+    - bootstrap: null
+    - name: env-tensorflow
+      via: template_basic
+      specs: 
+        - py-tensorflow cuda_arch=75
