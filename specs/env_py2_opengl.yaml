@@ -1,0 +1,10 @@
+name: py2_opengl
+dependencies:
+  - python<3
+  - wxpython
+  - pip
+  - pip:
+    - pyopengl
+    - numpy
+    - matplotlib
+    - scipy

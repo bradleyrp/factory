@@ -41,6 +41,10 @@ dockerfile_heart_min_8: &dockerfile_heart_min_8
     - jdk-11
     - user_sudo_ubuntu
 
+#! https://hub.docker.com/r/kitware/paraview
+#! dockerfile_paraview: &dockerfile_paraview
+#!   pull: docker pull kitware/paraview:pvw-v5.8.0-osmesa-py3
+
 ### SETTINGS
 
 # method for running GUI apps on macos
@@ -92,6 +96,7 @@ select: !select
       compose:
         services:
           deploy:
+            devices: []
             environment:
               - *macos_docker_display
 
@@ -107,6 +112,25 @@ select: !select
               target: /home/user/code
               type: bind
             - source: /home/rpb/work/hearts-data/2019.12.11-directed-graph-input-example-e01
+              target: /home/user/source
+              type: bind
+
+  dg_ex03:
+    #!!! needs tested
+    via: carp_macos
+    mods:
+      command: docker-compose run --service-ports deploy
+      visit: True
+      compose:
+        services:
+          deploy:
+            container_name: carp
+            volumes: 
+            # changed both below from heartland to macbook
+            - source: /Users/rpb/worker/heart/dev/directed-graph-rotor-analysis
+              target: /home/user/code
+              type: bind
+            - source: /Users/rpb/worker/heart/hearts-data/2019.12.11-directed-graph-input-example-e01
               target: /home/user/source
               type: bind
   
@@ -244,3 +268,61 @@ select: !select
             entrypoint: >-
               /bin/bash -lic 'cd ~/spot/vertigo &&
               time lein run -- -n block01 runargs docker-v01 expt-v02'
+
+  paraview:
+    image_name: &image_name_paraview heartland:paraview
+    command: docker-compose run --service-ports deploy
+    visit: true
+    dockerfile: 
+      raw: |
+        FROM kitware/paraview:pvw-v5.8.0-osmesa-py3
+        RUN apt-get update -y
+        RUN apt-get install -y python3-venv
+        RUN apt-get install -y libatlas-base-dev
+        RUN rm -rf /var/lib/apt/lists/*
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: paraview
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *image_name_paraview
+          ports:
+            - 9011:9011
+            - 9012:9012
+          environment:
+            - DISPLAY=$DISPLAY
+          devices:
+            - /dev/dri 
+            - /dev/snd
+            - /dev/nvidia0
+  paraview_macos:
+    notes: |
+      make docker specs/recipes/heart.yaml paraview_macos
+      # install persistent venv 
+      cd ~/spot
+      #! dev: package the above into the image
+      python -m venv ./venv
+      export LD_LIBRARY_PATH=/opt/paraview/lib/:$LD_LIBRARY_PATH 
+      export PYTHONPATH=/opt/paraview/lib/python3.6/site-packages
+      source ./venv/bin/activate
+      pip install meshio # requires libatlas-base-dev
+      pip install pillow
+      pip install wheel
+      pip install mayavi
+      pip install PyQt5
+    via: paraview
+    mods:
+      macos_gui: True
+      compose:
+        services:
+          deploy:
+            working_dir: /root/spot
+            environment:
+              - *macos_docker_display
+            devices: []
+            volumes: 
+            - source: /Users/rpb/worker/heart/2020.02.20-fiber-data-inspect
+              target: /root/spot
+              type: bind
