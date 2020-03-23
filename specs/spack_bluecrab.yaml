@@ -272,12 +272,12 @@ bc-config-modules:
         filter:
           environment_blacklist: []
         load: []
-      blacklist_implicits: false
+      blacklist_implicits: true
       core_compilers:
       - *gcc-back-compiler
       blacklist: 
       - *gcc-back
-      hash_length: 0
+      hash_length: 4
       hierarchy:
       - compiler
       - mpi
@@ -312,6 +312,7 @@ mods_config:
       lmod: 
         << : *mod-stage-02-lmod
         whitelist: *wl02
+        python: {autoload: all}
         py-tensorflow: 
           autoload: all
           suffixes:
@@ -444,6 +445,10 @@ bc-singleton:
         - [!strflush [py-pip, " ^", *python-36, *gcc-7]]
         # tensorflow
         - - *tf-v05
+        #! adding broken python to test hierarchy
+        - [!str [*python-3, *gcc-7]]
+        - [!strflush [py-pip, " ^", *python-3, *gcc-7]]
+        - - *tf-v01
     # modules for testing mode
     - lmod_refresh: null
       name: *env-singleton
