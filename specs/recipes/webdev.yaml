@@ -1,6 +1,16 @@
-dockerfiles: !import_spec 
-  from: ./dockerfiles.yaml
-  what: dockerfiles
+dockerfiles: !merge_spec
+  external: !import_spec 
+    from: ./dockerfiles.yaml
+    what: dockerfiles
+  local:
+    python_venv: |
+      RUN apt-get -y update
+      RUN apt-get -y install python3-venv
+    flask_example_setup: |
+      WORKDIR /home/user
+      RUN python3 -m venv env
+      RUN /bin/bash -c "source env/bin/activate && \
+          pip install Flask==1.0.2 Flask-Cors==3.0.7"
 dockerfile_wd01: &dockerfile_wd01
   series:
     - bionic
@@ -8,6 +18,15 @@ dockerfile_wd01: &dockerfile_wd01
     - ubuntu_python_latest
     - node_nvm
     - user_sudo_ubuntu
+dockerfile_wd02: &dockerfile_wd02
+  series:
+    - bionic
+    - ubuntu_build
+    - ubuntu_python_latest
+    - node_nvm
+    - python_venv
+    - user_sudo_ubuntu
+    - flask_example_setup
 select: !select
   ubuntu:
     image_name: &image_name_ubuntu factory:ubuntu_build
@@ -35,6 +54,7 @@ select: !select
     site: !spots root
     image_name: &image_name_e01 factory:wd01
     command: docker-compose run --service-ports deploy
+    visit: true
     compose:
       version: '3'
       services:
@@ -107,3 +127,51 @@ select: !select
   e01b:
     notes: Example for testing recursion with the "via" key.
     via: e01p2
+  e02:
+    via: e01
+    mods:
+      dockerfile: *dockerfile_wd02
+      compose:
+        services:
+          deploy:
+            # note no PS1 changes so check venv with pip -V
+            entrypoint: >
+              /bin/bash -c
+              "source ~/env/bin/activate && bash"
+
+  arch-pulse:
+    notes: |
+      !!! notes need updated
+      make docker specs/recipes/webdev.yaml name=arch-pulse rebuild
+       /tmp/pulse-secure/src/pulse/pulsesvc --help
+       /tmp/pulse-secure/src/pulse/pulsesvc -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
+      pacman --noconfirm -Sy vim
+    site: !spots root
+    image_name: &image_name_arch_pulse factory:arch-pulse
+    #! command: docker-compose run --service-ports deploy
+    command: docker-compose run deploy
+    visit: true
+    compose:
+      version: '3'
+      services:
+        deploy:
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *image_name_arch_pulse
+          volumes:
+            - ./devspot/e01:/home/user/dev
+          hostname: localhost
+          network_mode: host
+          privileged: true
+    dockerfile:
+      raw: |
+        FROM archlinux
+        WORKDIR /tmp
+        RUN pacman --noconfirm -Sy base-devel fakeroot jshon expac git wget
+        RUN pacman --noconfirm -Sy libgnome-keyring
+        RUN pacman --noconfirm -Sy openssh
+        RUN git clone https://aur.archlinux.org/pulse-secure.git
+        RUN chown nobody pulse-secure
+        WORKDIR /tmp/pulse-secure
+        RUN sudo -u nobody makepkg
+
