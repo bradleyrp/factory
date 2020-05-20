@@ -27,7 +27,6 @@ history:
       6. Preview the spack concretize result with the "live" feature.
       7. Push to production after testing with `bluecrab.yaml` rsync command.
   series5: |
-    # this is the most recent build
     # set up a new decoy site
     mkdir -p /exec/rbradley/buildsite/tz4
     # update with the new decoy site
@@ -54,6 +53,48 @@ history:
     # failures on tensorflow with mysterious excess_args issue
     # next: attempt proot with /dev/shm from gpudev002
     spack mirror create py-tensorflow+cuda cuda_arch=35
+  series6: |
+    # NEW METHOD START HERE (above will be deprecated)
+    # STEP 1: one-time setup for a new site
+    cd ~/stacksite && cd `realpath .`
+    git clone https://github.com/bradleyrp/factory -b bluecrab
+    # everything happens in the factory root
+    cd factory
+    # familiarize yourself with the files we will edit below
+    # one-time migration of the mimic singularity image
+    rsync -arivP /exec/rbradley/buildsite/mimic/ /ibox/BoneYard/rbradley/stacksite/mimic/
+    # update specs/spack_bc_proot.yaml with new paths, specifically the testzone, now tz5.
+    # important paths are /ibox/BoneYard/rbradley/stacksite/factory and /ibox/BoneYard/rbradley/stacksite/tz5
+    vim specs/spack_bc_proot.yaml
+    # repeat these changes on the singularity file, including the mimic.simg location
+    vim specs/spack_bc_singularity.yaml
+    # STEP 2: one-time software support
+    make conda specs/env_conda_min.yaml spot=local/conda/
+    source env.sh min
+    make use specs/cli_spack.yaml
+    # check the run file to set the SLURM job
+    vim specs/spack_bc_run.yaml
+    # note that we automatically clone on prelim and we must kickoff from login nodes because it automatically runs an salloc job for you
+    # blue crab note: you have to load up a ton of openssl locations
+    # prepare the spot according to the paths you set earlier
+    mkdir -p /ibox/BoneYard/rbradley/stacksite/tz5/
+    # STEP 3: run the preliminary and thereby clone spack
+    echo -e "build\n" | menu_name=bc-prelim make do specs/bluecrab.yaml
+    # possible issue: openssl must be added in several places to the bind mount on bluecrab because its headers are in /software/centos7
+    # possible issue: you may have a wonky compilers.yaml in the site location which you should clear before continuing. this might cause the CXX issue
+    # wait until this completes without error
+    # STEP 4: collect the right spack modifications for blue crab
+    cd factory/local/spack
+    git remote add backup /work-zfs/marccadmin/rbradley/spack-track
+    git checkout bluecrab
+    # merge the latest changes so we have a customized copy for bluecrab with the latest packages
+    git merge develop
+        # push back to the repo if you want
+        # back to factory root
+        cd ../../
+        # STEP 5: continue with the next phase: compile the compiler
+    echo -e "build\n" | menu_name=bc-gcc-7-compiler make do specs/bluecrab.yaml
+    # build is underway
 
 ###
 ### SOFTWARE SPECIFICATION
@@ -255,7 +296,7 @@ bc-config-modules:
       core_compilers:
       - *gcc-back-compiler
       hash_length: 0
-      naming_scheme: '{name}/{version}/{compiler.name}/{compiler.version}'
+      #! naming_scheme: '${name}/${version}/${compiler.name}/${compiler.version}'
       hierarchy:
       - compiler
       verbose: false
@@ -330,7 +371,6 @@ bc-prelim:
   envs:
     - find_compilers: null
     - check_compiler: *gcc-back-compiler
-    - bootstrap: null
     - name: env-prelim
       via: template_basic
       mods: *mc01
@@ -343,7 +383,6 @@ bc-gcc-7-compiler:
   envs:
     - find_compilers: null
     - check_compiler: *gcc-back-compiler
-    - bootstrap: null
     - name: &env-gcc-7-compiler env-gcc-7-compiler
       via: template_basic
       mods: *mc01

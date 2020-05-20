@@ -9,24 +9,38 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
       # create a custom decoy location where spack will build new packages
       # singularity maps the decoy location to the 
       #   production location in the container
-      - host: /exec/rbradley/buildsite/tz4/
+      - host: /ibox/BoneYard/rbradley/stacksite/tz5/
         local: /software/apps/spack
       # make sure the path below matches the factory location
-      - host: /exec/rbradley/buildsite/factory
+      - host: /ibox/BoneYard/rbradley/stacksite/factory
       - host: /software/apps/slurm/17.11.12.1.marcc
       - host: /software/centos7/usr
         local: /usr
-      - host: /etc/ssl
-        local: /etc/ssl
-      # openmpi build
-      - host: /etc/libibverbs.d
+      #- host: /etc/ssl
+      #  local: /etc/ssl
       # useful for connecting to original modules
       - host: /software/lmod/modulefiles
+      - host: /software/centos7/usr/bin/openssl
+        local: /usr/bin/openssl
+      - host: /software/centos7/usr/lib64/libcrypto.so
+        local: /usr/lib64/libcrypto.so
+      - host: /software/centos7/usr/lib64/libssl.so
+        local: /usr/lib64/libssl.so
+      - host: /software/centos7/usr/lib64/pkgconfig/libcrypto.pc
+        local: /usr/lib64/pkgconfig/libcrypto.pc
+      - host: /software/centos7/usr/lib64/pkgconfig/libssl.pc
+        local: /usr/lib64/pkgconfig/libssl.pc
+      - host: /software/centos7/usr/lib64/pkgconfig/openssl.pc
+        local: /usr/lib64/pkgconfig/openssl.pc
+      - host: /software/centos7/usr/include/openssl/
+        local: /usr/include/openssl/
+      # openmpi build
+      - host: /etc/libibverbs.d
   # NOTE: proot is only required for openmpi builds for verbs, slurm
   # NOTE: use singularity for building wherever possible
   # test the environment before production
   # usage: make spack_hpc_run run=<runfile> deploy=<deploy> test
   test: >-
     ml proot && proot -b 
-    /exec/rbradley/buildsite/tz4/:/software/apps/spack/ /bin/bash -c 
-    'MODULEPATH=/software/apps/spack/m02/linux-centos7-x86_64/Core /bin/bash -norc'
+    /ibox/BoneYard/rbradley/stacksite/tz5/:/software/apps/spack/ /bin/bash -c 
+    'MODULEPATH=/software/apps/spack/m05/linux-centos7-x86_64/Core /bin/bash -norc'
