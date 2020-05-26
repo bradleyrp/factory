@@ -45,5 +45,6 @@ basic:
         build: .
         image: factory:centos7_user
         volumes:
-          # - "../:/home/rpb/testbed/factory"
           - "../:/home/user/factory"
+
+#! this file is deprecated see webdev.yaml
