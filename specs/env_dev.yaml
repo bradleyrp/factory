@@ -51,3 +51,5 @@ dependencies:
     - pycrypto
     # for maths
     - scikit-learn
+    # for aws
+    - boto3
