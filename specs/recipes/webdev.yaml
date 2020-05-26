@@ -144,8 +144,15 @@ select: !select
       !!! notes need updated
       make docker specs/recipes/webdev.yaml name=arch-pulse rebuild
        /tmp/pulse-secure/src/pulse/pulsesvc --help
-       /tmp/pulse-secure/src/pulse/pulsesvc -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
+      /tmp/pulse-secure/src/pulse/pulsesvc -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
+      /tmp/pulse-secure/src/pulse/pulsesvc -S 
+      # FIXED
+      /tmp/pulse-secure/pkg/pulse-secure/usr/local/pulse/pulsesvc -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
+      /tmp/pulse-secure/pkg/pulse-secure/usr/local/pulse/pulsesvc -S
       pacman --noconfirm -Sy vim
+      /tmp/pulse-secure/pkg/pulse-secure/usr/local/pulse/PulseClient_x86_64.sh -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
+      # this is deprecated
+      # this image was designed to troubleshoot problems with connecting to the VPN experienced by a peer but it turned out to be a hosts.allow issue
     site: !spots root
     image_name: &image_name_arch_pulse factory:arch-pulse
     #! command: docker-compose run --service-ports deploy
@@ -174,4 +181,3 @@ select: !select
         RUN chown nobody pulse-secure
         WORKDIR /tmp/pulse-secure
         RUN sudo -u nobody makepkg
-
