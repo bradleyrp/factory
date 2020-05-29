@@ -138,46 +138,89 @@ select: !select
             entrypoint: >
               /bin/bash -c
               "source ~/env/bin/activate && bash"
-
-  arch-pulse:
+  e03:
     notes: |
-      !!! notes need updated
-      make docker specs/recipes/webdev.yaml name=arch-pulse rebuild
-       /tmp/pulse-secure/src/pulse/pulsesvc --help
-      /tmp/pulse-secure/src/pulse/pulsesvc -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
-      /tmp/pulse-secure/src/pulse/pulsesvc -S 
-      # FIXED
-      /tmp/pulse-secure/pkg/pulse-secure/usr/local/pulse/pulsesvc -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
-      /tmp/pulse-secure/pkg/pulse-secure/usr/local/pulse/pulsesvc -S
-      pacman --noconfirm -Sy vim
-      /tmp/pulse-secure/pkg/pulse-secure/usr/local/pulse/PulseClient_x86_64.sh -h vpn.jh.edu -U https://vpn.jh.edu/linux -r linux -u rbradle8 -L 5 -I
-      # this is deprecated
-      # this image was designed to troubleshoot problems with connecting to the VPN experienced by a peer but it turned out to be a hosts.allow issue
+      OBJECTIVE: use neo4j for development
+      mkdir -p ./up.neo4j
+      make docker specs/recipes/webdev.yaml e03
     site: !spots root
-    image_name: &image_name_arch_pulse factory:arch-pulse
-    #! command: docker-compose run --service-ports deploy
-    command: docker-compose run deploy
+    image_name: &image_name_dev03 factory:dev03
+    command: docker-compose run --service-ports deploy
     visit: true
     compose:
       version: '3'
       services:
         deploy:
-          entrypoint: ['/bin/bash','-l']
+          entrypoint: ["/sbin/tini", "-g", "--", "/docker-entrypoint.sh"]
+          command: ["neo4j"]
           build: .
-          image: *image_name_arch_pulse
+          image: *image_name_dev03
           volumes:
-            - ./devspot/e01:/home/user/dev
+            - ./up.neo4j/data:/data
+            - ./up.neo4j/logs:/logs
+            - ./up.neo4j/import:/var/lib/neo4j/import
+            - ./up.neo4j/plugins:/plugins
+          ports: 
+            - 7474:7474
+            - 7687:7687
           hostname: localhost
-          network_mode: host
-          privileged: true
-    dockerfile:
+          environment:
+            - NEO4J_AUTH=neo4j/test
+    dockerfile: 
       raw: |
-        FROM archlinux
-        WORKDIR /tmp
-        RUN pacman --noconfirm -Sy base-devel fakeroot jshon expac git wget
-        RUN pacman --noconfirm -Sy libgnome-keyring
-        RUN pacman --noconfirm -Sy openssh
-        RUN git clone https://aur.archlinux.org/pulse-secure.git
-        RUN chown nobody pulse-secure
-        WORKDIR /tmp/pulse-secure
-        RUN sudo -u nobody makepkg
+        FROM neo4j:4.0
+  e04:
+    notes: |
+      OBJECTIVE: use orientdb for development
+      make docker specs/recipes/webdev.yaml e04
+    site: !spots root
+    image_name: &image_name_e04 factory:e04
+    command: docker-compose run --service-ports deploy
+    visit: true
+    compose:
+      version: '3'
+      services:
+        deploy:
+          # see issue here: https://github.com/orientechnologies/orientdb/issues/8672
+          command: ["dserver.sh","-Dstorage.wal.allowDirectIO=false"]
+          build: .
+          image: *image_name_e04
+          #! volumes:
+          #!   - ./orientdb/backup:/orientdb/backup
+          #!   - ./orientdb/databases:/orientdb/databases
+          #!   - ./orientdb/config:/orientdb/config
+          ports: 
+            - 2424:2424
+            - 2480:2480
+          hostname: localhost
+          environment:
+            ORIENTDB_ROOT_PASSWORD: root
+            ORIENTDB_NODE_NAME: odb1
+    dockerfile: 
+      raw: |
+        FROM orientdb:3.0.31
+
+  e05:
+    notes: |
+      OBJECTIVE: use arango
+      make docker specs/recipes/webdev.yaml e05
+    site: !spots root
+    image_name: &image_name_e05 factory:e05
+    command: docker-compose run --service-ports deploy
+    visit: true
+    compose:
+      version: '3'
+      services:
+        deploy:
+          build: .
+          image: *image_name_e05
+          ports: 
+            - 8529:8529
+          hostname: localhost
+          environment:
+            ARANGO_RANDOM_ROOT_PASSWORD: 1
+            ORIENTDB_NODE_NAME: odb1
+    dockerfile: 
+      raw: |
+        FROM arangodb:3.4
+
