@@ -6,9 +6,9 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
     #   and specs/spack_hpc_go.yaml and make sure all paths match
     spec: specs/spack_bluecrab.yaml
     # make a custom temporary directory for staging spack builds
-    tmpdir: /exec/rbradley/stage
+    #! tmpdir: /exec/rbradley/stage
     #! using /dev/shm due to clock skew on cmake
-    #! tmpdir: /dev/shm/
+    tmpdir: /dev/shm/
     # select a name which must be a root-level key in the spec (above)
     # this name typically corresponds to a spack environment
     # the root-level key in the spec file has a special syntax
@@ -19,21 +19,35 @@ settings: !!python/object/apply:lib.spack.spack_hpc_decoy
     # note that these mutually exclusive options are handled by spack_run
     decoy_method: singularity 
     # obtain a copy of the singularity image matched to the base image
-    image: /exec/rbradley/buildsite/mimic/mimic.simg
+    image: /ibox/BoneYard/rbradley/stacksite/mimic/mimic.simg
     # mounts for both proot or singularity
     mounts: 
       # NOTE do not try building openmpi here. use proot. do not add /software/centos7 here!
       # create a custom decoy location where spack will build new packages
       # singularity maps the decoy location to the production location in the container
-      - host: /exec/rbradley/buildsite/tz4/
+      - host: /ibox/BoneYard/rbradley/stacksite/tz5/
         local: /software/apps/spack
       # make sure the path below matches the factory location
-      - host: /exec/rbradley/buildsite/factory
+      - host: /ibox/BoneYard/rbradley/stacksite/factory
       - host: /software/apps/slurm/17.11.12.1.marcc
       # openssl
-      - host: /usr/bin/openssl
+      #- host: /usr/bin/openssl
+      #  local: /usr/bin/openssl
+      #- host: /etc/ssl
+      #  local: /etc/ssl
+      - host: /software/centos7/usr/bin/openssl
         local: /usr/bin/openssl
-      - host: /etc/ssl
-        local: /etc/ssl
+      - host: /software/centos7/usr/lib64/libcrypto.so
+        local: /usr/lib64/libcrypto.so
+      - host: /software/centos7/usr/lib64/libssl.so
+        local: /usr/lib64/libssl.so
+      - host: /software/centos7/usr/lib64/pkgconfig/libcrypto.pc
+        local: /usr/lib64/pkgconfig/libcrypto.pc
+      - host: /software/centos7/usr/lib64/pkgconfig/libssl.pc
+        local: /usr/lib64/pkgconfig/libssl.pc
+      - host: /software/centos7/usr/lib64/pkgconfig/openssl.pc
+        local: /usr/lib64/pkgconfig/openssl.pc
+      - host: /software/centos7/usr/include/openssl/
+        local: /usr/include/openssl/
       # useful for connecting to original modules
       - host: /software/lmod/modulefiles
