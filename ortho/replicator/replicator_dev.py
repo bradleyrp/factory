@@ -16,6 +16,19 @@ from ..misc import path_resolver
 from ..data import delveset,catalog
 from .templates import screen_maker
 
+def docker_bash_vars():
+	"""Assemble bash variables inline with docker commands."""
+	var = {}
+	var['FACTORY_ROOT'] = os.getcwd()
+	var['HOME'] = os.environ['HOME']
+	return ' '.join(['%s=%s'%(i,j) for i,j in var.items()])+' '
+
+# supply user information to docker-compose builds for ID mapping on mounts
+docker_compose_build_cmd = (
+	'%sdocker-compose build '%docker_bash_vars()+
+	'--build-arg USER_ID=$(id -u ${USER}) '
+	'--build-arg GROUP_ID=$(id -g ${USER}) ')
+
 def mount_macos(dmg,mount):
 	"""
 	Mount an image in macos.
@@ -221,7 +234,7 @@ def get_recipe_subselector(recipe):
 		if len(subsel_hook_name)>1:
 			msg = '. matching keys are: %s'%subsel_hook_name
 		else: msg = ''
-		raise Exeception('failed to uniquely identify a tree_subselect '
+		raise Exception('failed to uniquely identify a tree_subselect '
 			'function populated from the !select tag'+msg)
 	else: select_func = recipe.pop(subsel_hook_name[0])
 	return select_func
@@ -377,10 +390,11 @@ class ReplicateCore(Handler):
 			if compose_cmd:
 				raise Exception(
 					'cannot set compose_cmd if mode is build: %s'%compose_cmd)
-			compose_cmd = 'docker-compose build'
+			compose_cmd = docker_compose_build_cmd
 		elif mode=='compose':
 			if not compose_cmd:
 				raise Exception('compose mode requires a compose_cmd')
+			compose_cmd = docker_bash_vars() + compose_cmd
 		else: raise Exception('invalid mode: %s'%mode)
 		requires_python_check('yaml')
 		import yaml
@@ -397,8 +411,7 @@ class ReplicateCore(Handler):
 			# ensure only one container
 			services = compose.get('services',{})
 			if len(services.keys())!=1:
-				#! raise Exception('cannot attach volumes for multiple containers')
-				print('warning multiple services')
+				raise Exception('cannot attach volumes for multiple containers')
 			service_name = list(services.keys())[0]
 			compose_service = compose['services'][service_name]
 			extra_vols = compose_volumes.get('volumes',[])
@@ -411,8 +424,6 @@ class ReplicateCore(Handler):
 				compose_service['volumes'].append(item)
 			workdir = compose_volumes.get('workdir',None)
 			if workdir: compose_service['working_dir'] = workdir
-			#!!! issue: with multiple volumes, factory is only added to one
-			#!!!   possibly a consequence oft he warning above on multiples
 		# run compose from the temporary location
 		try:
 			print('status compose from %s'%dn)
@@ -421,9 +432,11 @@ class ReplicateCore(Handler):
 				fp.write(dockerfile_obj.dockerfile)
 			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
 				yaml.dump(compose,fp)
-			# drop a set trace here if you want to halt and test manually
-			#!!! make this a testing option? add it to the command line
-			#!!! import pdb;pdb.set_trace()
+			# protect against running without visit
+			if re.match(r'.+docker-compose\s+run',compose_cmd) and not visit:
+				raise Exception('compose command appears to require a terminal '
+					'but the "visit" flag is not set in the compose file: %s'%
+						compose_cmd)
 			# run docker compose
 			if visit:
 				# we require a TTY to enter the container so we use os.system
@@ -490,10 +503,9 @@ class ReplicateCore(Handler):
 				if kwargs.keys()!={'line'}: raise Exception('dev')
 				names_services = compose_bundle.get(
 					'compose',{}).get('services',{}).keys()
-				if len(names_services)!=1: 
-					print('warning multiple services features are untested')
+				if len(names_services)!=1: raise Exception('dev')
 				name_service = list(names_services)[0]
-				kwargs['line'] = ('docker-compose build %s && '%
+				kwargs['line'] = (docker_compose_build_cmd+' %s && '%
 					name_service + kwargs['line'])
 			# nickname is a simple method for preventing reexecution
 			# the nickname links us to the temporary location of the compose
@@ -552,7 +564,8 @@ class ReplicateCore(Handler):
 			if docker_args: docker_args += ' '
 			# removed "-u 0" which runs as root
 			# wrap the command in a `docker run` with arguments and volumes
-			cmd = 'docker run -i%s %s%s'%('t' if visit_direct else '',
+			cmd = '%sdocker run -i%s %s%s'%(docker_bash_vars(),
+				't' if visit_direct else '',
 				docker_args,self.container)
 			# case A: one-liner
 			if self.do['kind']=='line':
