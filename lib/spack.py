@@ -126,7 +126,7 @@ class SpackEnvMaker(Handler):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
 		result = ortho.bash('source %s && %s'%
-			(starter,command),cwd=env_spot,scroll=not fetch)
+			(starter,command),announce=True,cwd=env_spot,scroll=not fetch)
 		return result
 	def std(self,spack,where,spack_spot):
 		os.makedirs(where,exist_ok=True)
@@ -151,8 +151,10 @@ class SpackLmodHooks(Handler):
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
-	def _run_via_spack(self,command,fetch=False):
+	def _run_via_spack(self,command,fetch=False,site_force=True):
 		"""Route commands to spack."""
+		if site_force and os.path.isdir(os.path.expanduser('~/.spack')):
+			raise Exception('cannot allow ~/.spack')
 		return SpackEnvMaker()._run_via_spack(
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],

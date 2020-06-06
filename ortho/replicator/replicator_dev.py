@@ -411,7 +411,8 @@ class ReplicateCore(Handler):
 			# ensure only one container
 			services = compose.get('services',{})
 			if len(services.keys())!=1:
-				raise Exception('cannot attach volumes for multiple containers')
+				#! raise Exception('cannot attach volumes for multiple containers')
+				print('warning multiple services')
 			service_name = list(services.keys())[0]
 			compose_service = compose['services'][service_name]
 			extra_vols = compose_volumes.get('volumes',[])
@@ -424,6 +425,8 @@ class ReplicateCore(Handler):
 				compose_service['volumes'].append(item)
 			workdir = compose_volumes.get('workdir',None)
 			if workdir: compose_service['working_dir'] = workdir
+			#!!! issue: with multiple volumes, factory is only added to one
+			#!!!   possibly a consequence oft he warning above on multiples
 		# run compose from the temporary location
 		try:
 			print('status compose from %s'%dn)
@@ -437,6 +440,9 @@ class ReplicateCore(Handler):
 				raise Exception('compose command appears to require a terminal '
 					'but the "visit" flag is not set in the compose file: %s'%
 						compose_cmd)
+			# drop a set trace here if you want to halt and test manually
+			#!!! make this a testing option? add it to the command line
+			#!!! import pdb;pdb.set_trace()
 			# run docker compose
 			if visit:
 				# we require a TTY to enter the container so we use os.system
@@ -503,7 +509,8 @@ class ReplicateCore(Handler):
 				if kwargs.keys()!={'line'}: raise Exception('dev')
 				names_services = compose_bundle.get(
 					'compose',{}).get('services',{}).keys()
-				if len(names_services)!=1: raise Exception('dev')
+				if len(names_services)!=1: 
+					print('warning multiple services features are untested')
 				name_service = list(names_services)[0]
 				kwargs['line'] = (docker_compose_build_cmd+' %s && '%
 					name_service + kwargs['line'])
