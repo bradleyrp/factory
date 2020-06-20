@@ -51,3 +51,6 @@ dependencies:
     - pycrypto
     # for maths
     - scikit-learn
+    # for aws
+    - awscli
+    - awsebcli

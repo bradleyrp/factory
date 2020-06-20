@@ -92,7 +92,7 @@ select: !select
                 /var/lib/slurmd/fed_mgr_state \
             && chown -R slurm:slurm /var/*/slurm* \
             && /sbin/create-munge-key
-        ARG CACHEBUST=1 
+        ARG CACHEBUST=1
         # use a basic conf here to mimic a real cluster
         COPY slurm.basic.conf /etc/slurm/slurm.conf
         COPY slurmdbd.conf /etc/slurm/slurmdbd.conf
