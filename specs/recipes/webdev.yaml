@@ -3,30 +3,51 @@ dockerfiles: !merge_spec
     from: ./dockerfiles.yaml
     what: dockerfiles
   local:
+    #! deprecated see below
     python_venv: |
       RUN apt-get -y update
       RUN apt-get -y install python3-venv
+    #! deprecated because we keep flask on the persistent volume or mount
     flask_example_setup: |
       WORKDIR /home/user
       RUN python3 -m venv env
       RUN /bin/bash -c "source env/bin/activate && \
           pip install Flask==1.0.2 Flask-Cors==3.0.7"
-dockerfile_wd01: &dockerfile_wd01
+    #! deprecated because no easy way to get pip in 18.04
+    python38: |
+      RUN apt-get -y update && \
+          apt-get install -y software-properties-common && \
+          add-apt-repository -y ppa:deadsnakes/ppa && \
+          apt-get -y install python3.8 python3.8-distutils python3.8-venv && \
+          python3.8 -m pip install --upgrade pip setuptools wheel && \
+          python3.8 -m ensurepip
+    nginx: |
+      RUN apt-get -y update && \
+          apt-get -y install build-essential libssl-dev libffi-dev && \
+          apt-get -y install nginx ufw
+  dockerfile_wd01: &dockerfile_wd01
   series:
     - bionic
     - ubuntu_build
-    - ubuntu_python_latest
+    - ubuntu_python3_latest
     - node_nvm
     - user_sudo_ubuntu
 dockerfile_wd02: &dockerfile_wd02
   series:
     - bionic
     - ubuntu_build
-    - ubuntu_python_latest
+    - ubuntu_python3_latest
     - node_nvm
     - python_venv
     - user_sudo_ubuntu
     - flask_example_setup
+dockerfile_wd03: &dockerfile_wd03
+  series:
+    - ubuntu20
+    - ubuntu_build
+    - ubuntu_python3_latest
+    - nginx_etc
+    - user_sudo_ubuntu
 select: !select
   ubuntu:
     image_name: &image_name_ubuntu factory:ubuntu_build
@@ -86,6 +107,7 @@ select: !select
       Note that this recipe is the first canonical multi-service recipe.
     via: e01
     mods:
+      visit: false
       compose:
         services:
           deploy:
@@ -124,10 +146,8 @@ select: !select
         export FLASK_ENV=development FLASK_APP=app.py 
         flask run --host=0.0.0.0
       command: docker-compose up -d
-  e01b:
+  e01p2:
     notes: Example for testing recursion with the "via" key.
-    via: e01p2
-  e02:
     via: e01
     mods:
       dockerfile: *dockerfile_wd02
@@ -138,6 +158,16 @@ select: !select
             entrypoint: >
               /bin/bash -c
               "source ~/env/bin/activate && bash"
+  e01p3:
+    notes: |
+      Flask development is happening here.
+      ...!!!
+    via: e01
+    mods:
+      visit: true
+      dockerfile: *dockerfile_wd03
+
+  # ONGOING development follows
   e03:
     notes: |
       OBJECTIVE: use neo4j for development
@@ -199,7 +229,6 @@ select: !select
     dockerfile: 
       raw: |
         FROM orientdb:3.0.31
-
   e05:
     notes: |
       OBJECTIVE: use arango
