@@ -60,3 +60,4 @@ dependencies:
     - py2neo
     - neomodel
     - pyarango
+    - snakemake

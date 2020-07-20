@@ -15,17 +15,18 @@ dockerfiles: !merge_spec
           pip install Flask==1.0.2 Flask-Cors==3.0.7"
     #! deprecated because no easy way to get pip in 18.04
     python38: |
-      RUN apt-get -y update && \
+      RUN apt-get update -y && \
           apt-get install -y software-properties-common && \
           add-apt-repository -y ppa:deadsnakes/ppa && \
-          apt-get -y install python3.8 python3.8-distutils python3.8-venv && \
+          apt-get -y install python3.8 python3.8-distutils \
+          python3.8-venv python3-pip && \
           python3.8 -m pip install --upgrade pip setuptools wheel && \
           python3.8 -m ensurepip
     nginx: |
-      RUN apt-get -y update && \
+      RUN apt-get update -y && \
           apt-get -y install build-essential libssl-dev libffi-dev && \
           apt-get -y install nginx ufw
-  dockerfile_wd01: &dockerfile_wd01
+dockerfile_wd01: &dockerfile_wd01
   series:
     - bionic
     - ubuntu_build
@@ -45,8 +46,8 @@ dockerfile_wd03: &dockerfile_wd03
   series:
     - ubuntu20
     - ubuntu_build
-    - ubuntu_python3_latest
-    - nginx_etc
+    - python38
+    - nginx
     - user_sudo_ubuntu
 select: !select
   ubuntu:
