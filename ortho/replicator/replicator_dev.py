@@ -273,7 +273,7 @@ def merge_spec(loader,node):
 		for path,value in catalog(this[key]):
 			#! very slow probably
 			if path in paths:
-				raise Excpetion('collision at: %s'%str(path))
+				raise Exception('collision at: %s'%str(path))
 			paths.append(path)
 			values.append(value)
 	outgoing = {}
