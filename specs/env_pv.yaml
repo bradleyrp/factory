@@ -14,3 +14,5 @@ dependencies:
     #! hangs so I tried pip install directly: - mayavi
     - scikit-learn
     - matplotlib
+    - numpy-indexed
+    - networkx

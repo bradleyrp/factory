@@ -51,3 +51,6 @@ dependencies:
     - pycrypto
     # for maths
     - scikit-learn
+    - py_d3
+    #! testing. takes a very long time
+    - ipyslurm
