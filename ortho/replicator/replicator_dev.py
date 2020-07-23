@@ -429,6 +429,7 @@ class ReplicateCore(Handler):
 				# we require a TTY to enter the container so we use os.system
 				# possible security issue
 				# this requires `visit: True` in the recipe alongside command
+				#! this is a typical site for pausing to investigate errors
 				print('status running docker: %s'%compose_cmd)
 				here = os.getcwd()
 				os.chdir(dn)
