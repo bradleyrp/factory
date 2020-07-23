@@ -41,6 +41,14 @@ dockerfile_heart_min_8: &dockerfile_heart_min_8
     - jdk-11
     - user_sudo_ubuntu
 
+dockerfile_carp_source: &dockerfile_carp_source
+  series:
+    - bionic
+    - ubuntu_build
+    - carp_meshalyzer_reqs
+    - carp_source_reqs
+    - user_sudo_ubuntu
+
 #! https://hub.docker.com/r/kitware/paraview
 #! dockerfile_paraview: &dockerfile_paraview
 #!   pull: docker pull kitware/paraview:pvw-v5.8.0-osmesa-py3
@@ -369,3 +377,29 @@ select: !select
             - source: /home/rpb/work/hearts-data/2019.12.11-directed-graph-input-example-e01
               target: /home/user/source
               type: bind
+
+  ###
+  ### Development
+  ###
+
+  carp_legacy_compile:
+    notes: |
+      Compile carp via: https://gitlab.com/natalia-trayanova/carp-1.8-legacy
+      Compiling locally.
+    image_name: &carp_source_image heartland:carp_source
+    command: docker-compose run --service-ports deploy
+    visit: true
+    dockerfile: *dockerfile_carp_source
+    #! using volumes instead of: site: local, spot, darwin_ok
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: carp
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *carp_source_image
+          volumes: 
+          - source: /home/rpb/work/factory/carpcomp
+            target: /home/user/local
+            type: bind

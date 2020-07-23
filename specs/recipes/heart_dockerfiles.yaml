@@ -11,6 +11,13 @@ dockerfiles: !merge_spec
       RUN apt-get install -y libpng-dev
       RUN apt-get install -y libglew-dev 
       RUN apt-get install -y freeglut3-dev
+    carp_source_reqs: |
+      # section extra requirements when compiling from source
+      RUN apt-get -y update --fix-missing
+      RUN apt-get install -y python python-dev
+      RUN apt-get install -y g++ gfortran 
+      RUN apt-get install -y swig gengetopt zlib1g-dev liblapack-dev
+      RUN apt-get install -y cmake 
     carp_meshalyzer: |
       RUN cd /tmp && \
           mkdir -p ./build-carp && \
@@ -89,4 +96,3 @@ dockerfiles: !merge_spec
       WORKDIR /tmp
       RUN mkdir vertigo_lein_user && cd vertigo_lein_user && echo '(defproject vertigo "0.1.0-SNAPSHOT" :plugins [[lein-git-deps "0.0.1-SNAPSHOT"] [lein-with-env-vars "0.2.0"] [cider/cider-nrepl "0.23.0"]] :git-dependencies [["https://github.com/bmillare/dj3.git"]] :dependencies [[org.clojure/clojure "1.10.0"] [org.bmillare/dj.core "0.2.0"] [com.cemerick/pomegranate "1.1.0"] [org.bmillare/dj.treefn "0.2.0"] [uncomplicate/neanderthal "0.26.1"] [nrepl "0.6.0"] [clojure-complete "0.2.5"]])' > project.clj && cat project.clj && lein install
       WORKDIR /home/user
-
