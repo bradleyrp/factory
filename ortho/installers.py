@@ -48,5 +48,5 @@ def install_miniconda(spot):
     # use of the logfile ensures this is safe for Python 2
     fn_log = 'log-install-miniconda'
     result = shell_script(script,log=fn_log)
-    if os.path.isfile('log-install-miniconda'): 
+    if result==True and os.path.isfile('log-install-miniconda'): 
     	os.remove(fn_log)
