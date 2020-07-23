@@ -41,6 +41,14 @@ dockerfile_heart_min_8: &dockerfile_heart_min_8
     - jdk-11
     - user_sudo_ubuntu
 
+dockerfile_carp_source: &dockerfile_carp_source
+  series:
+    - bionic
+    - ubuntu_build
+    - carp_meshalyzer_reqs
+    - carp_source_reqs
+    - user_sudo_ubuntu
+
 #! https://hub.docker.com/r/kitware/paraview
 #! dockerfile_paraview: &dockerfile_paraview
 #!   pull: docker pull kitware/paraview:pvw-v5.8.0-osmesa-py3
@@ -246,35 +254,6 @@ select: !select
             - /tmp/.X11-unix:/tmp/.X11-unix
             ports: []
 
-  # EXECUTE: VERTIGO v04
-  # vertigo_v04 and children run atrial_af
-  #! developing a better wrapper
-  vertigo_v04:
-    notes: |
-      Tested on 2020.02.05 on heartland (a desktop) via:
-        `make docker specs/recipes/heart.yaml name=vertigo_v04`
-      Code via: factory@bbfeef, vertigo@f1cf53.
-      This runs in the foreground.
-      Lasts ~17min and throws warning `Unexpected end of /proc/mounts line`.
-    via: carp
-    mods: 
-      command: docker-compose run --service-ports deploy
-      compose:
-        services:
-          deploy:
-            container_name: carp_visit
-            volumes: 
-            - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
-              target: /home/user/spot/data
-              type: bind
-            - source: /home/rpb/work/hearts-code/vertigo
-              target: /home/user/spot/vertigo
-              type: bind
-            - /tmp/.X11-unix:/tmp/.X11-unix
-            entrypoint: >-
-              /bin/bash -lic 'cd ~/spot/vertigo &&
-              time lein run -- -n block01 runargs docker-v01 expt-v02'
-
   paraview:
     image_name: &image_name_paraview heartland:paraview
     command: docker-compose run --service-ports deploy
@@ -333,6 +312,38 @@ select: !select
               target: /root/spot
               type: bind
 
+  ###
+  ### VALIDATED EXPERIMENTS
+  ###
+
+  # EXECUTE: VERTIGO v04
+  # vertigo_v04 and children run atrial_af
+  #! developing a better wrapper
+  vertigo_v04:
+    notes: |
+      Tested on 2020.02.05 on heartland (a desktop) via:
+        `make docker specs/recipes/heart.yaml name=vertigo_v04`
+      Code via: factory@bbfeef, vertigo@f1cf53.
+      This runs in the foreground.
+      Lasts ~17min and throws warning `Unexpected end of /proc/mounts line`.
+    via: carp
+    mods: 
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            volumes: 
+            - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
+              target: /home/user/spot/data
+              type: bind
+            - source: /home/rpb/work/hearts-code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+            entrypoint: >-
+              /bin/bash -lic 'cd ~/spot/vertigo &&
+              time lein run -- -n block01 runargs docker-v01 expt-v02'
   vertigo_v04_visit:
     via: vertigo_v04
     mods: 
@@ -349,3 +360,46 @@ select: !select
         services:
           deploy:
             entrypoint: /bin/bash -il
+
+  # EXECUTE: directed graph v01
+  dg_v01:
+    via: carp
+    mods:
+      visit: true
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            volumes: 
+            - source: /home/rpb/work/hearts-code/directed-graph-rotor-analysis
+              target: /home/user/code
+              type: bind
+            - source: /home/rpb/work/hearts-data/2019.12.11-directed-graph-input-example-e01
+              target: /home/user/source
+              type: bind
+
+  ###
+  ### Development
+  ###
+
+  carp_legacy_compile:
+    notes: |
+      Compile carp via: https://gitlab.com/natalia-trayanova/carp-1.8-legacy
+      Compiling locally.
+    image_name: &carp_source_image heartland:carp_source
+    command: docker-compose run --service-ports deploy
+    visit: true
+    dockerfile: *dockerfile_carp_source
+    #! using volumes instead of: site: local, spot, darwin_ok
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: carp
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *carp_source_image
+          volumes: 
+          - source: /home/rpb/work/factory/carpcomp
+            target: /home/user/local
+            type: bind
