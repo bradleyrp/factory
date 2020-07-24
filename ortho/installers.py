@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os,sys
-from .bash import shell_script
+from .bash import shell_script,command_check
 
 if sys.platform=='darwin':
 	miniconda_source = 'Miniconda3-latest-MacOSX-x86_64.sh'
@@ -44,6 +44,7 @@ def install_miniconda(spot):
     """
     Install miniconda from a temporary directory using a script.
     """
+    #! it would be nice to use a command check for wget here
     script = (install_miniconda_script % {'miniconda_path':spot})
     # use of the logfile ensures this is safe for Python 2
     fn_log = 'log-install-miniconda'
