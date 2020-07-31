@@ -134,6 +134,7 @@ def docker(recipe,name=None,unlink=False,rebuild=False,*args,**kwargs):
 	Run anything in a docker using `ReplicatorCore`.
 	make docker spot=./here script specs/demo_script.yaml delay
 	"""
+	#!! the delay function above is deprecated
 	#! is this deprecated by the new workflow
 	visit = kwargs.pop('visit',False)
 	# transform incoming arguments to RecipeRead
