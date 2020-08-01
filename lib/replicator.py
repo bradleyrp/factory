@@ -38,7 +38,7 @@ class ReplicateWrap(Handler):
 		site=None,command=None,notes=None,script=None,visit=False,
 		#! note that there is kwargs bloat here
 		# user-facing meta-level arguments
-		nickname=None,rebuild=False,unlink=False,
+		nickname=None,rebuild=False,unlink=False,tour=False,
 		macos_gui=False):
 		"""Standard method for translating a recipe into a ReplicateCore."""
 		if args and command:
@@ -73,8 +73,9 @@ class ReplicateWrap(Handler):
 		# nickname and mode come from the code. the rest comes from the recipe
 		ReplicateCore(mode=mode,
 			# user-facing meta-level arguments from the CLI
-			nickname=nickname,rebuild=rebuild,
-			visit=visit,macos_gui=macos_gui,unlink=unlink,
+			nickname=nickname,rebuild=rebuild,unlink=unlink,tour=tour,
+			# arguments from the yaml follow
+			visit=visit,macos_gui=macos_gui,
 			volume=site,image=image_name,line=command,
 			compose_bundle=compose_bundle,meta=ref)
 
@@ -129,14 +130,12 @@ class ReplicateWrap(Handler):
 			nickname=nickname,rebuild=rebuild,unlink=unlink,
 			**outgoing)
 
-def docker(recipe,name=None,unlink=False,rebuild=False,*args,**kwargs):
+def docker(recipe,name=None,unlink=False,rebuild=False,tour=False,
+	*args,**kwargs):
 	"""
 	Run anything in a docker using `ReplicatorCore`.
 	make docker spot=./here script specs/demo_script.yaml delay
 	"""
-	#!! the delay function above is deprecated
-	#! is this deprecated by the new workflow
-	visit = kwargs.pop('visit',False)
 	# transform incoming arguments to RecipeRead
 	kwargs_recipe_read = {}
 	if kwargs: raise Exception('unprocessed kwargs: %s'%kwargs)
@@ -149,12 +148,12 @@ def docker(recipe,name=None,unlink=False,rebuild=False,*args,**kwargs):
 	if os.path.isfile(recipe):
 		# test: make docker specs/recipes/basics_redev.yaml
 		recipe_pack = RecipeRead(path=recipe,**kwargs_recipe_read).solve
-	else: raise Exception('dev')
+	else: raise NotImplementedError
 	# unpack the recipe
 	recipe = recipe_pack['recipe']
 	recipe_out = ReplicateWrap(meta=recipe_pack,args=args,
 		# user-facing meta-level arguments
-		nickname=name,rebuild=rebuild,unlink=unlink,
+		nickname=name,rebuild=rebuild,unlink=unlink,tour=tour,
 		**recipe)
 
 def compose_cleanup(dn,sure=False):
