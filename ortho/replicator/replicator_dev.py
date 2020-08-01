@@ -227,7 +227,7 @@ def get_recipe_subselector(recipe):
 		if len(subsel_hook_name)>1:
 			msg = '. matching keys are: %s'%subsel_hook_name
 		else: msg = ''
-		raise Exeception('failed to uniquely identify a tree_subselect '
+		raise Exception('failed to uniquely identify a tree_subselect '
 			'function populated from the !select tag'+msg)
 	else: select_func = recipe.pop(subsel_hook_name[0])
 	return select_func
