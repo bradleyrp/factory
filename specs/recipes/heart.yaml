@@ -26,6 +26,17 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - carp_license
     - vertigo_lein_user
 
+dockerfile_carp_mesh_basic: &dockerfile_carp_mesh_basic
+  series:
+    - bionic
+    - ubuntu_build
+    - carp_meshalyzer_reqs
+    - carp_meshalyzer
+    - x11
+    - grace_gnuplot
+    - user_sudo_ubuntu
+    - carp_license
+
 dockerfile_heart_min: &dockerfile_heart_min
   series:
     - bionic
@@ -49,6 +60,15 @@ dockerfile_carp_source: &dockerfile_carp_source
     - carp_source_reqs
     - user_sudo_ubuntu
 
+dockerfile_carp_source_plus: &dockerfile_carp_source_plus
+  series:
+    - bionic
+    - ubuntu_build
+    - carp_meshalyzer_reqs
+    - carp_source_reqs
+    - user_sudo_ubuntu
+    - xmgrace
+
 #! https://hub.docker.com/r/kitware/paraview
 #! dockerfile_paraview: &dockerfile_paraview
 #!   pull: docker pull kitware/paraview:pvw-v5.8.0-osmesa-py3
@@ -56,6 +76,7 @@ dockerfile_carp_source: &dockerfile_carp_source
 ### SETTINGS
 
 # method for running GUI apps on macos
+# note that `docker run` requires DISPLAY via the -e flag in the custom command
 macos_docker_display: &macos_docker_display >-
   DISPLAY=docker.for.mac.host.internal:0
 # factory root location on spacegray macbook
@@ -385,7 +406,8 @@ select: !select
   carp_legacy_compile:
     notes: |
       Compile carp via: https://gitlab.com/natalia-trayanova/carp-1.8-legacy
-      Compiling locally.
+      Compiling locally. Note that we have to do this locally because the
+      source is proprietary and we download it from github.
     image_name: &carp_source_image heartland:carp_source
     command: docker-compose run --service-ports deploy
     visit: true
@@ -399,7 +421,34 @@ select: !select
           entrypoint: ['/bin/bash','-l']
           build: .
           image: *carp_source_image
-          volumes: 
-          - source: /home/rpb/work/factory/carpcomp
-            target: /home/user/local
-            type: bind
+
+  ###
+  ### Macbook carp recipes
+  ###
+
+  carpentry_mac:
+    notes: |
+      This recipe runs carpentry with meshalyzer on a mac.
+      It tentatively includes GUI programs including xmgrace and gnuplot.
+      It also provides meshalyzer however past experience suggests that this
+        is somewhat buggy and crashes frequently for some reason.
+      Beware that we mount the factory root locally with a case-insensitive 
+        filesystem, which can cause issues in some applications.
+      Features: automatic local mount, GUI programs on macos, carpentry
+    macos_gui: true
+    image_name: &carpentry_basic heartland:carpentry_basic
+    command: docker-compose run -e DISPLAY=docker.for.mac.host.internal:0 --service-ports deploy
+    visit: true
+    site:
+      darwin_ok: true
+      local: ./
+    dockerfile: *dockerfile_carp_mesh_basic
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: carp
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *carp_source_image_plus
+          devices: []
