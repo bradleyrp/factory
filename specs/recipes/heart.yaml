@@ -400,7 +400,7 @@ select: !select
               type: bind
 
   ###
-  ### Development
+  ### Legacy Carp Installation
   ###
 
   carp_legacy_compile:
@@ -408,11 +408,17 @@ select: !select
       Compile carp via: https://gitlab.com/natalia-trayanova/carp-1.8-legacy
       Compiling locally. Note that we have to do this locally because the
       source is proprietary and we download it from github.
+      This image only supplies the supporting software.
+      You must use `carp_builder.sh` and compile in a local volume.
+      We use the local factory root as an external volume.
+      Not yet tested on macos, but it should work there as well.
+    site:
+      darwin_ok: true
+      local: ./
     image_name: &carp_source_image heartland:carp_source
     command: docker-compose run --service-ports deploy
     visit: true
     dockerfile: *dockerfile_carp_source
-    #! using volumes instead of: site: local, spot, darwin_ok
     compose:
       version: '3.7'
       services:
@@ -450,5 +456,6 @@ select: !select
           container_name: carp
           entrypoint: ['/bin/bash','-l']
           build: .
-          image: *carp_source_image_plus
+          image: *carpentry_basic
           devices: []
+
