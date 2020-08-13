@@ -1,6 +1,8 @@
 dockerfiles: 
   bionic: |
     FROM ubuntu:bionic
+  focal: |
+    FROM ubuntu:focal
   ubuntu_build: |
     # section: basic requirements
     ENV DEBIAN_FRONTEND noninteractive

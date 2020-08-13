@@ -26,9 +26,20 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - carp_license
     - vertigo_lein_user
 
-dockerfile_carp_mesh_basic: &dockerfile_carp_mesh_basic
+dockerfile_carp_mesh_basic_bionic: &dockerfile_carp_mesh_basic_bionic
   series:
     - bionic
+    - ubuntu_build
+    - carp_meshalyzer_reqs
+    - carp_meshalyzer
+    - x11
+    - grace_gnuplot
+    - user_sudo_ubuntu
+    - carp_license
+
+dockerfile_carp_mesh_basic: &dockerfile_carp_mesh_basic
+  series:
+    - focal
     - ubuntu_build
     - carp_meshalyzer_reqs
     - carp_meshalyzer
