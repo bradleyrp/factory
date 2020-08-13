@@ -3,6 +3,7 @@
 """
 Replicator REDEVELOPMENT
 Rebuild a replicator feature to replace ortho.replicator, specifically `repl`.
+DEV NOTE: Documentation desperately needs a map of all use-cases
 """
 
 import os,re,tempfile,subprocess,string,sys,shutil,copy,time
@@ -16,16 +17,8 @@ from ..misc import path_resolver
 from ..data import delveset,catalog
 from .templates import screen_maker
 
-def docker_bash_vars():
-	"""Assemble bash variables inline with docker commands."""
-	var = {}
-	var['FACTORY_ROOT'] = os.getcwd()
-	var['HOME'] = os.environ['HOME']
-	return ' '.join(['%s=%s'%(i,j) for i,j in var.items()])+' '
-
 # supply user information to docker-compose builds for ID mapping on mounts
-docker_compose_build_cmd = (
-	'%sdocker-compose build '%docker_bash_vars()+
+docker_user_info_args = (
 	'--build-arg USER_ID=$(id -u ${USER}) '
 	'--build-arg GROUP_ID=$(id -g ${USER}) ')
 
@@ -273,7 +266,7 @@ def merge_spec(loader,node):
 		for path,value in catalog(this[key]):
 			#! very slow probably
 			if path in paths:
-				raise Exception('collision at: %s'%str(path))
+				raise Excpetion('collision at: %s'%str(path))
 			paths.append(path)
 			values.append(value)
 	outgoing = {}
@@ -378,7 +371,7 @@ class ReplicateCore(Handler):
 	"""
 
 	def _docker_compose(self,image,dockerfile,compose,
-		compose_cmd=None,mode='build',visit=False,
+		compose_cmd=None,mode='build',visit=False,tour=False,nickname=None,
 		cleanup=True,dockerfiles_index=None,compose_volumes=None):
 		"""
 		Run the standard docker-compose loop.
@@ -390,11 +383,10 @@ class ReplicateCore(Handler):
 			if compose_cmd:
 				raise Exception(
 					'cannot set compose_cmd if mode is build: %s'%compose_cmd)
-			compose_cmd = docker_compose_build_cmd
+			compose_cmd = 'docker-compose build '+docker_user_info_args
 		elif mode=='compose':
 			if not compose_cmd:
 				raise Exception('compose mode requires a compose_cmd')
-			compose_cmd = docker_bash_vars() + compose_cmd
 		else: raise Exception('invalid mode: %s'%mode)
 		requires_python_check('yaml')
 		import yaml
@@ -411,8 +403,7 @@ class ReplicateCore(Handler):
 			# ensure only one container
 			services = compose.get('services',{})
 			if len(services.keys())!=1:
-				#! raise Exception('cannot attach volumes for multiple containers')
-				print('warning multiple services')
+				raise Exception('cannot attach volumes for multiple containers')
 			service_name = list(services.keys())[0]
 			compose_service = compose['services'][service_name]
 			extra_vols = compose_volumes.get('volumes',[])
@@ -425,8 +416,6 @@ class ReplicateCore(Handler):
 				compose_service['volumes'].append(item)
 			workdir = compose_volumes.get('workdir',None)
 			if workdir: compose_service['working_dir'] = workdir
-			#!!! issue: with multiple volumes, factory is only added to one
-			#!!!   possibly a consequence oft he warning above on multiples
 		# run compose from the temporary location
 		try:
 			print('status compose from %s'%dn)
@@ -435,24 +424,26 @@ class ReplicateCore(Handler):
 				fp.write(dockerfile_obj.dockerfile)
 			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
 				yaml.dump(compose,fp)
-			# protect against running without visit
-			if re.match(r'.+docker-compose\s+run',compose_cmd) and not visit:
-				raise Exception('compose command appears to require a terminal '
-					'but the "visit" flag is not set in the compose file: %s'%
-						compose_cmd)
-			# drop a set trace here if you want to halt and test manually
-			#!!! make this a testing option? add it to the command line
-			#!!! import pdb;pdb.set_trace()
 			# run docker compose
 			if visit:
 				# we require a TTY to enter the container so we use os.system
 				# possible security issue
 				# this requires `visit: True` in the recipe alongside command
+				#! this is a typical site for pausing to investigate errors
 				print('status running docker: %s'%compose_cmd)
-				here = os.getcwd()
-				os.chdir(dn)
-				os.system(compose_cmd)
-				os.chdir(here)
+				if tour:
+					print('status skipping execution in favor of a tour')
+					print('status docker-compose are available at %s'%dn)
+					ln_name = 'up-'+nickname
+					print('status docker-compose is linked at %s'%ln_name)
+					os.symlink(dn,ln_name)
+					cleanup = False
+				else:
+					here = os.getcwd()
+					os.chdir(dn)
+					os.system(compose_cmd)
+					os.chdir(here)
+			elif tour: raise Exception('tour implies visit')
 			else:
 				# background execution
 				bash(compose_cmd,cwd=dn,v=True)
@@ -474,8 +465,7 @@ class ReplicateCore(Handler):
 	def _docker(self,image,volume={},
 		compose_bundle=None,rebuild=False,mode=None,
 		# user-facing meta-level arguments
-		nickname=None,unlink=False,
-		visit=False,
+		nickname=None,unlink=False,tour=False,visit=False,
 		**kwargs):
 		"""
 		Run a one-liner command in docker.
@@ -499,8 +489,10 @@ class ReplicateCore(Handler):
 		if (not self.container or rebuild) and mode=='visit':
 			if rebuild:
 				raise Exception('dev: need to modify compose to force build')
+			if tour: raise NotImplementedError
 			self.container = self._docker_compose(
-				image=image,compose_volumes=compose_vols,**compose_bundle)
+				image=image,compose_volumes=compose_vols,
+				**compose_bundle)
 		# we can run a command directly in the docker-compose folder
 		elif mode=='compose':
 
@@ -509,10 +501,10 @@ class ReplicateCore(Handler):
 				if kwargs.keys()!={'line'}: raise Exception('dev')
 				names_services = compose_bundle.get(
 					'compose',{}).get('services',{}).keys()
-				if len(names_services)!=1: 
-					print('warning multiple services features are untested')
+				if len(names_services)!=1: raise Exception('dev')
 				name_service = list(names_services)[0]
-				kwargs['line'] = (docker_compose_build_cmd+' %s && '%
+				kwargs['line'] = ('docker-compose build '+
+					docker_user_info_args+' %s && '%
 					name_service + kwargs['line'])
 			# nickname is a simple method for preventing reexecution
 			# the nickname links us to the temporary location of the compose
@@ -541,7 +533,8 @@ class ReplicateCore(Handler):
 
 			# note that the container may exist at this point but either way
 			#   we still need to run compose with the right command
-			spot = self._docker_compose(image=image,mode='compose',visit=visit,
+			spot = self._docker_compose(image=image,mode='compose',
+				visit=visit,tour=tour,nickname=nickname,
 				compose_cmd=compose_cmd,cleanup=visit,
 				compose_volumes=compose_vols,**compose_bundle)
 			#! need a feature to connect to compose!
@@ -558,7 +551,10 @@ class ReplicateCore(Handler):
 		elif not self.container:
 			raise Exception('failed to get a container')
 		elif mode=='visit': pass
-		else: raise Exception('dev')
+		else: raise NotImplementedError
+
+		# the tour mode only works for docker-compose
+		if tour: raise NotImplementedError
 
 		# remaining execution occurs with a manual command
 		if mode=='visit':
@@ -571,15 +567,14 @@ class ReplicateCore(Handler):
 			if docker_args: docker_args += ' '
 			# removed "-u 0" which runs as root
 			# wrap the command in a `docker run` with arguments and volumes
-			cmd = '%sdocker run -i%s %s%s'%(docker_bash_vars(),
-				't' if visit_direct else '',
-				docker_args,self.container)
+			cmd = 'docker run %s -i%s %s%s'%(docker_user_info_args,
+				't' if visit_direct else '',docker_args,self.container)
 			# case A: one-liner
 			if self.do['kind']=='line':
 				cmd += ' /bin/sh -c "%s"'%self.do['line']
 			# case B: write a script
 			elif self.do['kind']=='script': pass
-			else: raise Exception('dev')
+			else: raise NotImplementedError
 
 			# execute the docker run command
 			#! stdout for the script is clumsy because of newlines, escape
@@ -601,12 +596,12 @@ class ReplicateCore(Handler):
 			# standard execution
 			else: bash(cmd,scroll=True,v=True)
 
-		else: raise Exception('dev')
+		else: raise NotImplementedError
 	
 	def docker_mimic(self,image,volume,
 		macos_gui=False,
 		# user-facing meta-level arguments
-		nickname=None,rebuild=False,unlink=False,
+		nickname=None,rebuild=False,unlink=False,tour=False,
 		visit=False,**kwargs):
 		"""
 		Run a docker container in "mimic" mode where it substitutes for the
@@ -616,7 +611,7 @@ class ReplicateCore(Handler):
 		print('status running ReplicateCore.docker_mimic')
 		return self._docker(volume=volume,image=image,visit=visit,
 			# user-facing meta-level arguments
-			nickname=nickname,rebuild=rebuild,unlink=unlink,
+			nickname=nickname,rebuild=rebuild,unlink=unlink,tour=tour,
 			**kwargs)
 
 	def screen(self,screen,script,exclusive=True,**kwargs):
