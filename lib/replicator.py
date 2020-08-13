@@ -81,7 +81,7 @@ class ReplicateWrap(Handler):
 
 	def via(self,via,args=None,mods=None,notes=None,
 		# user-facing meta-level arguments
-		nickname=None,rebuild=False,unlink=False):
+		nickname=None,rebuild=False,unlink=False,tour=False):
 		"""Extend one recipe with another."""
 		if not mods: mods = {}
 		recipe_pack = self.meta
