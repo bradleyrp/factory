@@ -1,12 +1,53 @@
-dockerfiles: !import_spec 
-  from: ./dockerfiles.yaml
-  what: dockerfiles
+dockerfiles: !merge_spec
+  external: !import_spec 
+    from: ./dockerfiles.yaml
+    what: dockerfiles
+  local:
+    #! deprecated see below
+    python_venv: |
+      RUN apt-get -y update
+      RUN apt-get -y install python3-venv
+    #! deprecated because we keep flask on the persistent volume or mount
+    flask_example_setup: |
+      WORKDIR /home/user
+      RUN python3 -m venv env
+      RUN /bin/bash -c "source env/bin/activate && \
+          pip install Flask==1.0.2 Flask-Cors==3.0.7"
+    #! deprecated because no easy way to get pip in 18.04
+    python38: |
+      RUN apt-get update -y && \
+          apt-get install -y software-properties-common && \
+          add-apt-repository -y ppa:deadsnakes/ppa && \
+          apt-get -y install python3.8 python3.8-distutils \
+          python3.8-venv python3-pip && \
+          python3.8 -m pip install --upgrade pip setuptools wheel && \
+          python3.8 -m ensurepip
+    nginx: |
+      RUN apt-get update -y && \
+          apt-get -y install build-essential libssl-dev libffi-dev && \
+          apt-get -y install nginx ufw
 dockerfile_wd01: &dockerfile_wd01
   series:
     - bionic
     - ubuntu_build
-    - ubuntu_python_latest
+    - ubuntu_python3_latest
     - node_nvm
+    - user_sudo_ubuntu
+dockerfile_wd02: &dockerfile_wd02
+  series:
+    - bionic
+    - ubuntu_build
+    - ubuntu_python3_latest
+    - node_nvm
+    - python_venv
+    - user_sudo_ubuntu
+    - flask_example_setup
+dockerfile_wd03: &dockerfile_wd03
+  series:
+    - ubuntu20
+    - ubuntu_build
+    - python38
+    - nginx
     - user_sudo_ubuntu
 select: !select
   ubuntu:
@@ -35,6 +76,7 @@ select: !select
     site: !spots root
     image_name: &image_name_e01 factory:wd01
     command: docker-compose run --service-ports deploy
+    visit: true
     compose:
       version: '3'
       services:
@@ -66,6 +108,7 @@ select: !select
       Note that this recipe is the first canonical multi-service recipe.
     via: e01
     mods:
+      visit: false
       compose:
         services:
           deploy:
@@ -104,6 +147,110 @@ select: !select
         export FLASK_ENV=development FLASK_APP=app.py 
         flask run --host=0.0.0.0
       command: docker-compose up -d
-  e01b:
+  e01p2:
     notes: Example for testing recursion with the "via" key.
-    via: e01p2
+    via: e01
+    mods:
+      dockerfile: *dockerfile_wd02
+      compose:
+        services:
+          deploy:
+            # note no PS1 changes so check venv with pip -V
+            entrypoint: >
+              /bin/bash -c
+              "source ~/env/bin/activate && bash"
+  e01p3:
+    notes: |
+      Flask development is happening here.
+      ...!!!
+    via: e01
+    mods:
+      visit: true
+      dockerfile: *dockerfile_wd03
+
+  # ONGOING development follows
+  e03:
+    notes: |
+      OBJECTIVE: use neo4j for development
+      mkdir -p ./up.neo4j
+      make docker specs/recipes/webdev.yaml e03
+    site: !spots root
+    image_name: &image_name_dev03 factory:dev03
+    command: docker-compose run --service-ports deploy
+    visit: true
+    compose:
+      version: '3'
+      services:
+        deploy:
+          entrypoint: ["/sbin/tini", "-g", "--", "/docker-entrypoint.sh"]
+          command: ["neo4j"]
+          build: .
+          image: *image_name_dev03
+          volumes:
+            - ./up.neo4j/data:/data
+            - ./up.neo4j/logs:/logs
+            - ./up.neo4j/import:/var/lib/neo4j/import
+            - ./up.neo4j/plugins:/plugins
+          ports: 
+            - 7474:7474
+            - 7687:7687
+          hostname: localhost
+          environment:
+            - NEO4J_AUTH=neo4j/test
+    dockerfile: 
+      raw: |
+        FROM neo4j:4.0
+  e04:
+    notes: |
+      OBJECTIVE: use orientdb for development
+      make docker specs/recipes/webdev.yaml e04
+    site: !spots root
+    image_name: &image_name_e04 factory:e04
+    command: docker-compose run --service-ports deploy
+    visit: true
+    compose:
+      version: '3'
+      services:
+        deploy:
+          # see issue here: https://github.com/orientechnologies/orientdb/issues/8672
+          command: ["dserver.sh","-Dstorage.wal.allowDirectIO=false"]
+          build: .
+          image: *image_name_e04
+          #! volumes:
+          #!   - ./orientdb/backup:/orientdb/backup
+          #!   - ./orientdb/databases:/orientdb/databases
+          #!   - ./orientdb/config:/orientdb/config
+          ports: 
+            - 2424:2424
+            - 2480:2480
+          hostname: localhost
+          environment:
+            ORIENTDB_ROOT_PASSWORD: root
+            ORIENTDB_NODE_NAME: odb1
+    dockerfile: 
+      raw: |
+        FROM orientdb:3.0.31
+  e05:
+    notes: |
+      OBJECTIVE: use arango
+      make docker specs/recipes/webdev.yaml e05
+    site: !spots root
+    image_name: &image_name_e05 factory:e05
+    command: docker-compose run --service-ports deploy
+    visit: true
+    compose:
+      version: '3'
+      services:
+        deploy:
+          build: .
+          image: *image_name_e05
+          ports: 
+            - 8529:8529
+          hostname: localhost
+          environment:
+            ARANGO_RANDOM_ROOT_PASSWORD: 1
+            ORIENTDB_NODE_NAME: odb1
+    dockerfile: 
+      raw: |
+        FROM arangodb:3.4
+

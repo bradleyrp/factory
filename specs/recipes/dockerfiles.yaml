@@ -1,6 +1,8 @@
 dockerfiles: 
   bionic: |
     FROM ubuntu:bionic
+  ubuntu20: |
+    FROM ubuntu:bionic
   ubuntu_build: |
     # section: basic requirements
     ENV DEBIAN_FRONTEND noninteractive
@@ -16,9 +18,12 @@ dockerfiles:
     RUN apt-get install -y jq
     RUN apt-get install -y libssl-dev
     RUN apt-get install -y screen
-  ubuntu_python_latest: |
+  ubuntu_python3_latest: |
     # section: latest python3
-    RUN apt-get install -y python3
+    RUN apt-get update -y && \
+        apt-get install -y python3 python3-pip python3-dev \
+        python3-setuptools python3-distutils && \
+        python3 -m pip install --upgrade pip setuptools wheel
   node_nvm: |
     # section: install nvm and node as root
     RUN mkdir /usr/local/nvm
@@ -48,6 +53,3 @@ dockerfiles:
     USER user
     RUN touch ~/.sudo_as_admin_successful
     WORKDIR /home/user
-  firefox_attempt: |
-    RUN apt-get update
-    RUN apt-get install -y firefox

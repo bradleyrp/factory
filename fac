@@ -31,8 +31,10 @@ if [[ "$1" == "envrun" ]]; then
    if [[ ! -f $PYENV_CALL ]]; then 
       echo "[ERROR] no conda environment" && exit 1;
    fi
-   # hardcoded path to miniconda (different on osx?)
-   source conda/etc/profile.d/conda.sh
+   PROFILE_STARTER=conda/etc/profile.d/conda.sh
+   if [ ! -f $PROFILE_STARTER ]; then echo "[ERROR] failed to find conda.sh" && exit 1; fi
+   echo "[STATUS] sourcing $PROFILE_STARTER"
+   source $PROFILE_STARTER
    conda activate $(readlink .envcursor)
    ${@:2}
 # run something in the anaconda bin but not the full environment

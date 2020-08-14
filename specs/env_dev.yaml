@@ -32,6 +32,7 @@ dependencies:
   - conda-forge::ncurses
   # note that I later installed vtk via pip2 for python2, possibly in this environment
   - pip: 
+    - urllib3
     # documentation tools
     - sphinx
     - recommonmark
@@ -51,3 +52,12 @@ dependencies:
     - pycrypto
     # for maths
     - scikit-learn
+    # for aws
+    - boto3
+    # graphDB
+    - "--editable=git+https://github.com/orientechnologies/pyorient.git@master#egg=pyorient"
+    - neo4j
+    - py2neo
+    - neomodel
+    - pyarango
+    - snakemake
