@@ -94,7 +94,7 @@ select: !select
             && /sbin/create-munge-key
         ARG CACHEBUST=1
         # use a basic conf here to mimic a real cluster
-        COPY slurm.basic.conf /etc/slurm/slurm.conf
+        COPY slurm.conf /etc/slurm/slurm.conf
         COPY slurmdbd.conf /etc/slurm/slurmdbd.conf
         COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
         RUN ["chmod", "+x", "/usr/local/bin/docker-entrypoint.sh"]
@@ -102,7 +102,8 @@ select: !select
         CMD ["slurmdbd"]
     files:
       - specs/slurm-docker/docker-entrypoint.sh
-      - specs/slurm-docker/slurm.conf
+      - source: specs/slurm-docker/slurm.basic.conf
+        target: slurm.conf
       - specs/slurm-docker/slurmdbd.conf
     compose:
       version: "3.7"
