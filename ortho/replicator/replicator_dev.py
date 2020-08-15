@@ -365,6 +365,18 @@ def inspect_screens():
 		return screen_names
 	else: return []
 
+class DockerSupportFile(Handler):
+	def coterminus(self,dn,fn):
+		here = os.path.join(os.getcwd(),fn)
+		there = os.path.join(dn,os.path.basename(fn))
+		print('[STATUS] cp %s %s'%(here,there))
+		shutil.copyfile(here,there)
+	def rename(self,dn,source,target):
+		here = os.path.join(os.getcwd(),source)
+		there = os.path.join(dn,target)
+		print('[STATUS] cp %s %s'%(here,there))
+		shutil.copyfile(here,there)
+
 class ReplicateCore(Handler):
 	"""
 	DEV: replacement for the replicator functions
@@ -372,7 +384,7 @@ class ReplicateCore(Handler):
 
 	def _docker_compose(self,image,dockerfile,compose,
 		compose_cmd=None,mode='build',visit=False,tour=False,nickname=None,
-		cleanup=True,dockerfiles_index=None,compose_volumes=None):
+		cleanup=True,dockerfiles_index=None,compose_volumes=None,files=None):
 		"""
 		Run the standard docker-compose loop.
 		Note that ReplicateCore._docker can be used to run docker with a 
@@ -403,7 +415,9 @@ class ReplicateCore(Handler):
 			# ensure only one container
 			services = compose.get('services',{})
 			if len(services.keys())!=1:
-				raise Exception('cannot attach volumes for multiple containers')
+				#! previous exception: 
+				#!   cannot attach volumes for multiple containers
+				print('warning multiple services')
 			service_name = list(services.keys())[0]
 			compose_service = compose['services'][service_name]
 			extra_vols = compose_volumes.get('volumes',[])
@@ -424,6 +438,10 @@ class ReplicateCore(Handler):
 				fp.write(dockerfile_obj.dockerfile)
 			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
 				yaml.dump(compose,fp)
+			# copy files
+			for fn in files if files else []:
+				if not isinstance(fn,dict): fn = dict(fn=fn)
+				DockerSupportFile(dn=dn,**fn)
 			# run docker compose
 			if visit:
 				# we require a TTY to enter the container so we use os.system
@@ -466,7 +484,7 @@ class ReplicateCore(Handler):
 		compose_bundle=None,rebuild=False,mode=None,
 		# user-facing meta-level arguments
 		nickname=None,unlink=False,tour=False,visit=False,
-		**kwargs):
+		files=None,**kwargs):
 		"""
 		Run a one-liner command in docker.
 		Not suitable for complex bash commands.
@@ -474,6 +492,10 @@ class ReplicateCore(Handler):
 		# you cannot use decorators with Handler
 		is_terminal_command('docker')
 		if not mode: raise Exception('docker function requires a mode')
+		#! dev: cannot copy files unless you are doing compose
+		#!   note that the visit feature may be deprecated by compose anyway
+		if mode=='visit' and files:
+			raise NotImplementedError
 
 		# step 1: assemble the volume
 		if volume: self.spot = Volume(**volume).solve
@@ -491,8 +513,9 @@ class ReplicateCore(Handler):
 				raise Exception('dev: need to modify compose to force build')
 			if tour: raise NotImplementedError
 			self.container = self._docker_compose(
-				image=image,compose_volumes=compose_vols,
+				image=image,compose_volumes=compose_vols,files=files,
 				**compose_bundle)
+
 		# we can run a command directly in the docker-compose folder
 		elif mode=='compose':
 
@@ -536,7 +559,8 @@ class ReplicateCore(Handler):
 			spot = self._docker_compose(image=image,mode='compose',
 				visit=visit,tour=tour,nickname=nickname,
 				compose_cmd=compose_cmd,cleanup=visit,
-				compose_volumes=compose_vols,**compose_bundle)
+				compose_volumes=compose_vols,files=files,
+				**compose_bundle)
 			#! need a feature to connect to compose!
 			if visit:
 				print('status no link to compose folder because visit')
@@ -599,7 +623,7 @@ class ReplicateCore(Handler):
 		else: raise NotImplementedError
 	
 	def docker_mimic(self,image,volume,
-		macos_gui=False,
+		macos_gui=False,files=None,
 		# user-facing meta-level arguments
 		nickname=None,rebuild=False,unlink=False,tour=False,
 		visit=False,**kwargs):
@@ -612,7 +636,7 @@ class ReplicateCore(Handler):
 		return self._docker(volume=volume,image=image,visit=visit,
 			# user-facing meta-level arguments
 			nickname=nickname,rebuild=rebuild,unlink=unlink,tour=tour,
-			**kwargs)
+			files=files,**kwargs)
 
 	def screen(self,screen,script,exclusive=True,**kwargs):
 		"""
