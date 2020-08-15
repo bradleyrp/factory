@@ -39,7 +39,8 @@ class ReplicateWrap(Handler):
 		#! note that there is kwargs bloat here
 		# user-facing meta-level arguments
 		nickname=None,rebuild=False,unlink=False,tour=False,
-		macos_gui=False):
+		# yaml arguments continue
+		macos_gui=False,files=None):
 		"""Standard method for translating a recipe into a ReplicateCore."""
 		if args and command:
 			raise Exception(
@@ -75,7 +76,7 @@ class ReplicateWrap(Handler):
 			# user-facing meta-level arguments from the CLI
 			nickname=nickname,rebuild=rebuild,unlink=unlink,tour=tour,
 			# arguments from the yaml follow
-			visit=visit,macos_gui=macos_gui,
+			visit=visit,macos_gui=macos_gui,files=files,
 			volume=site,image=image_name,line=command,
 			compose_bundle=compose_bundle,meta=ref)
 
