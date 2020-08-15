@@ -22,6 +22,7 @@ import time
 import datetime
 import copy
 import traceback
+import difflib
 
 from .handler import introspect_function
 from .misc import str_types,say
@@ -293,6 +294,16 @@ class Parser:
 		"""
 		raise Exception('dev')
 
+	def _spellchecker(self,l,r,tol=0.7):
+		"""Spellchecker for argument mistakes since the CLI is so flexible."""
+		matcher = difflib.SequenceMatcher()
+		for i in l:
+			matcher.set_seq1(i)
+			for j in r:
+				matcher.set_seq2(j)
+				if matcher.quick_ratio() > tol:
+					print('[WARNING] word similarity: %s ~ %s'%(i,j))
+
 	def _call_free_function(self):
 		"""
 		Call a function with arbitrary parameters
@@ -354,7 +365,7 @@ class Parser:
 			inspected['kwargs'].items() if isinstance(j,bool)]
 		inds_kwargs_bool += [(ii,) for ii,i in enumerate(unknown) 
 			if i in floating_kwargs]
-		# fix the sys.argv by modifying these so they are not mistaken for args
+		# fix the sys.argv by mopdifying these so they are not mistaken for args
 		sys.argv = [i for i in sys.argv if i not in floating_kwargs]
 		# step 3: the remainder are arguments
 		inds_args = [i for i in range(len(unknown)) if i not in [m 
@@ -378,6 +389,10 @@ class Parser:
 		sub.set_defaults(func=func)
 		# now that we have prepared the parser we add the function and call
 		args = self.parser.parse_args()
+		# note that a misspelling on the argument list might erroneously
+		#   assign an intended kwarg boolean to another kwarg so we do a very
+		#   primitive spellcheck here
+		self._spellchecker(args.args,floating_kwargs)
 		self._call_free(incoming=args)
 
 	def __init__(self,parser_order=None):
