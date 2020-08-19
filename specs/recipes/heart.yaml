@@ -532,7 +532,41 @@ select: !select
             # the following will automatically point to paths above
             entrypoint: >-
               /bin/bash -lic 'cd ~/spot/vertigo &&
-              time lein run -- -n block01 runargs docker-v01 expt-v02'
+              time lein run -- -n block01 runargs docker-v01 expt-general'
+            environment:
+              - VERTIGO_REF_NAME=M15_400
+              - VERTIGO_TARGET_NAME=AtlasCGAL
+            volumes: 
+              # MODIFY: add the path to the data here
+            - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
+              target: /home/user/spot/data
+              type: bind
+              # MODIFY: add the path to the code here
+            - source: /home/rpb/work/hearts-code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+  # EXECUTE: VERTIGO vXX example
+  vertigo_v05:
+    notes: |
+      The following is an example recipe. You should copy the entire block 
+      and update the paths below, and replace XX with a number. Then run:
+        make docker specs/recipes/heart.yaml name=vertigo_vXX
+      See the vertigo_v04_visit and vertigo_v04_inspect recipes for debugging.
+    via: carp_nogpu
+    mods: 
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            # the following will automatically point to paths above
+            entrypoint: >-
+              /bin/bash -lic 'cd ~/spot/vertigo &&
+              time lein run -- -n block01 runargs docker-v01 expt-general'
+            environment:
+              - VERTIGO_REF_NAME=M15_400
+              - VERTIGO_TARGET_NAME=AtlasCGAL
             volumes: 
               # MODIFY: add the path to the data here
             - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
