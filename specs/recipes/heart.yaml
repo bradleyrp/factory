@@ -565,6 +565,7 @@ select: !select
               /bin/bash -lic 'cd ~/spot/vertigo &&
               time lein run -- -n block01 runargs docker-v01 expt-general'
             environment:
+              # MODIFY: add the target and reference names here
               - VERTIGO_REF_NAME=M15_400
               - VERTIGO_TARGET_NAME=AtlasCGAL
             volumes: 
