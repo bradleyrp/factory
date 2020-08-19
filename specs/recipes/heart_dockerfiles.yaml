@@ -100,3 +100,9 @@ dockerfiles: !merge_spec
       RUN apt-get -y install x11-apps
     grace_gnuplot: |
       RUN apt-get update --fix-missing && apt-get -y install grace gnuplot
+    cgal: |
+      RUN apt-get update --fix-missing && apt-get -y install libeigen3-dev cmake libboost-all-dev libmpfr-dev libcgal-dev
+    geomview: |
+      RUN apt-get install -y geomview
+    meshlab: |
+      RUN apt-get install -y geomview meshlab
