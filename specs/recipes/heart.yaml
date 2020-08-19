@@ -515,6 +515,9 @@ select: !select
     via: carp
     mods: {compose: {services: {deploy: {devices: []}}}}
 
+  # central location of the carpentry license file
+  carpentry_license: &carpentry_license "/home/rpb/work/hearts-code/license.bin"
+
   # EXECUTE: VERTIGO vXX example
   vertigo_vXX:
     notes: |
@@ -532,8 +535,15 @@ select: !select
             # the following will automatically point to paths above
             entrypoint: >-
               /bin/bash -lic 'cd ~/spot/vertigo &&
-              time lein run -- -n block01 runargs docker-v01 expt-v02'
+              time lein run -- -n block01 runargs docker-v01 expt-general'
+            environment:
+              - VERTIGO_REF_NAME=atria_f
+              - VERTIGO_TARGET_NAME=M15_400
             volumes: 
+              # MODIFY: set the carpentry_license path in a variable
+            - source: *carpentry_license
+              target: /usr/local/carp-1.1/license.bin
+              type: bind
               # MODIFY: add the path to the data here
             - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
               target: /home/user/spot/data
