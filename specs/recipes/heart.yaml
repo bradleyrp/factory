@@ -542,7 +542,7 @@ select: !select
             volumes: 
               # MODIFY: set the carpentry_license path in a variable
             - source: *carpentry_license
-              target: /usr/local/carp-1.1/bin/license.bin
+              target: /usr/local/carp-1.1/license.bin
               type: bind
               # MODIFY: add the path to the data here
             - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
