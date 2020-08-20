@@ -20,7 +20,7 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - carp_meshalyzer_reqs
     - carp_meshalyzer
     - emacs26
-    - jdk-13
+    - jdk-14
     - clojure
     - godot
     - ubuntu_mkl
@@ -54,7 +54,7 @@ dockerfile_heart_min: &dockerfile_heart_min
   series:
     - bionic
     - ubuntu_build
-    - jdk-13
+    - jdk-14
     - clojure
     - user_sudo_ubuntu
 

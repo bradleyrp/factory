@@ -43,13 +43,18 @@ dockerfiles: !merge_spec
       RUN add-apt-repository -y ppa:linuxuprising/java
       RUN echo debconf shared/accepted-oracle-license-v1-2 select true | debconf-set-selections
       RUN echo debconf shared/accepted-oracle-license-v1-2 seen true | debconf-set-selections
-      RUN apt-get update --fix-missing && apt-get install -y openjdk-13-jdk
-    jdk-11: |
+      RUN apt-get -y update --fix-missing && apt-get install -y openjdk-13-jre openjdk-13-jdk-headless && cd /tmp && wget http://ftp.br.debian.org/debian/pool/main/o/openjdk-13/openjdk-13-jdk_13.0.4+8-1_amd64.deb && apt-get install -y ./openjdk-13-jdk_13.0.4+8-1_amd64.deb && rm /tmp/openjdk-13-jdk_13.0.4+8-1_amd64.deb
+    jdk-13: |
+      # DEPRECATED: this method started failing circa 2020.08.20. try jdk-14 below instead
       RUN apt-get install -y software-properties-common
       RUN add-apt-repository -y ppa:linuxuprising/java
       RUN echo debconf shared/accepted-oracle-license-v1-2 select true | debconf-set-selections
       RUN echo debconf shared/accepted-oracle-license-v1-2 seen true | debconf-set-selections
-      RUN apt-get install -y openjdk-11-jdk
+      RUN apt-get -y update --fix-missing && apt-get install -y openjdk-13-jre openjdk-13-jdk-headless && cd /tmp && wget http://ftp.br.debian.org/debian/pool/main/o/openjdk-13/openjdk-13-jdk_13.0.4+8-1_amd64.deb && apt-get install -y ./openjdk-13-jdk_13.0.4+8-1_amd64.deb && rm /tmp/openjdk-13-jdk_13.0.4+8-1_amd64.deb
+    jdk-14: |
+      RUN add-apt-repository -y ppa:linuxuprising/java
+      RUN echo debconf shared/accepted-oracle-license-v1-2 select true | debconf-set-selections
+      RUN apt-get -y update --fix-missing && apt-get install -y openjdk-14-jdk
     clojure: | # https://github.com/Quantisan/docker-clojure/blob/be736864bf3e6d35c1bc6b13fd2add4a319fb92b/target/openjdk-13-buster/lein/Dockerfile
       ENV LEIN_VERSION=2.9.1
       ENV LEIN_INSTALL=/usr/local/bin/
