@@ -48,4 +48,11 @@ make -C specs/slurm-docker clean # this erases volumes so be careful
 make -C specs/slurm-docker deepclean # this erases images so be careful
 make -C specs/slurm-docker make_volumes
 make -C specs/slurm-docker build
+# run the command
+make docker specs/slurm-docker/marcc-hpc.yaml testcluster
+# visit the container for development
+docker exec -it accounts bash
+cd /opt/
+# develop here
+# later run an ldap server
 ~~~

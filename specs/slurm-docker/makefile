@@ -10,13 +10,13 @@ stop:
 clean:
 	docker system prune
 	docker volume rm \
-	etc_munge etc_slurm slurm_jobdir var_lib_mysql var_log_slurm
+	etc_munge etc_slurm slurm_jobdir var_lib_mysql var_log_slurm opt_accounts
 deepclean:
 	docker rmi -f marcc-hpc:testcluster
 	docker rmi -f marcc-hpc:ldap
 make_volumes:
 	for name in etc_munge etc_slurm var_log_slurm var_lib_mysql slurm_jobdir \
-	ldap_data ldap_config; do \
+	ldap_data ldap_config opt_accounts; do \
 		docker volume create --name=$${name}; \
 	done
 build:
