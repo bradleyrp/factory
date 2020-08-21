@@ -128,7 +128,6 @@ select: !select
     command: docker-compose up -d
     #! this is ignored for multiple services
     dockerfile: *dockerfile-testcluster
-    #! we visit and run this in the foreground
     visit: False
     compose:
       version: "3.7"
@@ -198,6 +197,7 @@ select: !select
             - etc_slurm:/etc/slurm
             - slurm_jobdir:/data
             - var_log_slurm:/var/log/slurm
+            - opt_accounts:/opt
           ports:
             - 6818:6818
             - 5000:5000
@@ -210,3 +210,80 @@ select: !select
         slurm_jobdir: {external: true}
         var_lib_mysql: {external: true}
         var_log_slurm: {external: true}
+        opt_accounts: {external: true}
+  testcluster_ldap: 
+    notes: |
+      OpenLDAP server for use with coldfront and slurm.
+      Shutdown: 
+        docker stop ldap_admin ; docker stop ldap ; docker rm ldap_admin ; docker rm ldap
+      Via: https://medium.com/better-programming/ldap-docker-image-with-populated-users-3a5b4d090aa4
+    visit: True
+    image_name: &marcc-hpc-image-openldap marcc-hpc:ldap
+    command: docker-compose up 
+    #! this is ignored for multiple services
+    dockerfile: &dockerfile-testcluster-openldap
+      raw: |
+        FROM osixia/openldap
+        LABEL maintainer="ryanbradley@jhu.edu"
+        ENV LDAP_ORGANISATION="Rockfish" 
+        ENV LDAP_DOMAIN="rockfish.intern"
+        COPY bootstrap.ldif /container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+    compose:
+      version: "3.7"
+      services:
+        ldap_server:
+          command: "--copy-service --loglevel debug"
+          build: .
+          image: *marcc-hpc-image-openldap
+          hostname: ldap
+          container_name: ldap
+          environment:
+            LDAP_ADMIN_PASSWORD: test1234
+            LDAP_BASE_DN: dc=rockfish,dc=intern
+          ports:
+            - 389:389
+          volumes:
+            - ldap_data:/var/lib/ldap
+            - ldap_config:/etc/ldap/slapd.d
+        ldap_server_admin:
+          hostname: ldap_admin
+          container_name: ldap_admin
+          image: osixia/phpldapadmin:0.7.2
+          ports:
+            - 8090:80
+          environment:
+            PHPLDAPADMIN_LDAP_HOSTS: ldap_server
+            PHPLDAPADMIN_HTTPS: 'false'
+      volumes:
+        ldap_data:
+        ldap_config:
+  testcluster_ldap_build: 
+    notes: |
+      Since the `via` method cannot subtract items we must 
+      repeat ourselves below.
+    visit: True
+    image_name: *marcc-hpc-image-openldap
+    command: docker-compose up -d
+    dockerfile: *dockerfile-testcluster-openldap
+    compose:
+      version: "3.7"
+      services:
+        ldap_server:
+          build: .
+          image: *marcc-hpc-image-openldap
+          hostname: ldap
+          container_name: ldap
+          environment:
+            LDAP_ADMIN_PASSWORD: test1234
+            LDAP_BASE_DN: dc=rockfish,dc=intern
+          ports:
+            - 389:389
+          volumes:
+            - ldap_data:/var/lib/ldap
+            - ldap_config:/etc/ldap/slapd.d
+      volumes:
+        ldap_data:
+        ldap_config:
+    files:
+      - source: specs/slurm-docker/bootstrap.ldif
+        target: bootstrap.ldif
