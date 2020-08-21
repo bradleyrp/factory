@@ -263,7 +263,7 @@ select: !select
       repeat ourselves below.
     visit: True
     image_name: *marcc-hpc-image-openldap
-    command: docker-compose up -d
+    command: docker-compose build --build-arg CACHEBUST=$(date +%s) ldap_server
     dockerfile: *dockerfile-testcluster-openldap
     compose:
       version: "3.7"

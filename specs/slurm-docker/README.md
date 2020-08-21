@@ -42,6 +42,7 @@ Refactoring notes below:
 ~~~
 git clone https://github.com/bradleyrp/factory -b bluecrab
 cd factory
+./fac use specs/cli_replicator.yaml
 make -C specs/slurm-docker stop
 make -C specs/slurm-docker clean # this erases volumes so be careful
 make -C specs/slurm-docker deepclean # this erases images so be careful
