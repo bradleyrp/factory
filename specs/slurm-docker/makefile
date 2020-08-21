@@ -21,4 +21,4 @@ make_volumes:
 	done
 build:
 	make -C ../../ docker specs/slurm-docker/marcc-hpc.yaml testcluster_build rebuild
-	make -C ../../ docker specs/slurm-docker/marcc-hpc.yaml ldap_build rebuild
+	make -C ../../ docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap_build rebuild
