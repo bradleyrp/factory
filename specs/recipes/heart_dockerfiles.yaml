@@ -111,3 +111,9 @@ dockerfiles: !merge_spec
       RUN apt-get install -y geomview
     meshlab: |
       RUN apt-get install -y geomview meshlab
+    ffmpeg: |
+      RUN apt-get -y update && apt-get install -y ffmpeg
+    parallel: |
+      RUN apt-get -y update && apt-get install -y parallel bc
+    xvfb:
+      RUN apt-get -y update && apt-get install -y xvfb

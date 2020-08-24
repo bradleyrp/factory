@@ -24,6 +24,10 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - clojure
     - godot
     - ubuntu_mkl
+    # video rendering requirements follow
+    - ffmpeg
+    - parallel
+    - xvfb
     - user_sudo_ubuntu
     - carp_license
     - vertigo_lein_user
@@ -505,6 +509,53 @@ select: !select
           build: .
           image: *image_cgal
           devices: []
+
+  ###
+  ### MAKE VIDEOS
+  ###
+
+  videos:
+    notes: |
+      Reproduce make_videos portion of the pipeline.
+      Critical note about xauth, firewalls, etc. When using ssh, docker, 
+      and X11, you need several items in combination.
+        - Correct DISPLAY variable for your session
+        - The DISPLAY number must match the `auth list` number i.e. `/10`
+        - Otherwise you might need to log in again or get a new ~/.Xauthority
+        - You need `network_mode: host` or else you might have routing or
+          firewall problems of some kind.
+        - Some sites recommend socat.
+    command: /usr/local/bin/docker-compose run --service-ports deploy
+    image_name: &image_videos heartland:carp_meshalyzer
+    dockerfile: *dockerfile_carp_meshalyzer
+    visit: true
+    site:
+      darwin_ok: true
+      local: ./
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: carp
+          entrypoint: ['/bin/bash','-l']
+          # critical for docker X11 over ssh
+          network_mode: host
+          build: .
+          image: *image_name_ubuntu
+          ports:
+            - 9011:9011
+            - 9012:9012
+          environment:
+            - DISPLAY=$DISPLAY
+            #- XAUTHORITY=$XAUTH
+          devices:
+            - /dev/dri 
+            - /dev/snd
+            - /dev/nvidia0
+          volumes:
+            - /tmp/.X11-unix:/tmp/.X11-unix
+            # critical for docker X11 over ssh
+            - ${HOME}/.Xauthority:/home/user/.Xauthority
 
   ###
   ### VERTIGO EXAMPLE
