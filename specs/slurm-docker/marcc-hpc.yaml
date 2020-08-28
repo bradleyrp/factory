@@ -100,7 +100,16 @@ select: !select
             cd sqlite-autoconf-3280000 && \
             ./configure && \
             make && \
-            sudo make install
+            make install && \
+            rm -rf /tmp/sqlite-autoconf-3280000
+        # recompile python which depends on sqlite
+        RUN cd /tmp && \
+            wget https://www.python.org/ftp/python/3.8.1/Python-3.8.1.tgz && \
+            tar xvf Python-3.8.1.tgz && \
+            cd Python-3.8.1 && \
+            ./configure  && \
+            make -j && make install && \
+            rm -rf /tmp/Python-3.8.1
         ARG CACHEBUST=1
         # use a basic conf here to mimic a real cluster
         COPY slurm.conf /etc/slurm/slurm.conf

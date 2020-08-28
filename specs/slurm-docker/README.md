@@ -1,3 +1,5 @@
+The following documentation is hosted on the [factory github](https://github.com/bradleyrp/factory/tree/bluecrab/specs/slurm-docker) however the portal code will point elsewhere (possibly a private repository [here](https://github.com/marcc-hpc/portal)).
+
 # Setup Instructions
 
 1. Build docker volumes and containers with the [latest instructions](#setup-latest).
@@ -5,7 +7,7 @@
 
 # Historical Notes
 
-## [2020.06.06] Historical notes
+## Historical notes [2020.06.06]
 
 Deprecated notes from the initial setup. 
 
@@ -45,7 +47,7 @@ docker-compose run slurmctld bash
 ~~~
 
 <a id="setup-latest"></a>
-## [2020.08.21] Setup notes, retest
+## Setup notes, retest [2020.08.21] 
 
 ~~~
 git clone https://github.com/bradleyrp/factory -b bluecrab
@@ -73,7 +75,7 @@ make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap tour
 ~~~
 
 <a id="coldfront-quickstart"></a>
-## Minimal Coldfront setup [2020.08.27] {#coldfront-quickstart}
+## Minimal Coldfront setup [2020.08.27]
 
 ~~~
 # via https://github.com/ubccr/coldfront
