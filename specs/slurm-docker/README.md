@@ -85,7 +85,7 @@ cd /opt
 mkdir coldfront_app
 cd coldfront_app
 git clone https://github.com/ubccr/coldfront.git
-python3.6 -mvenv venv
+python3.8 -m venv venv
 source venv/bin/activate
 cd coldfront
 pip install wheel
@@ -93,8 +93,10 @@ pip install -r requirements.txt
 # copy settings
 cp coldfront/config/local_settings.py.sample coldfront/config/local_settings.py
 cp coldfront/config/local_strings.py.sample coldfront/config/local_strings.py
+# check sqlite version is high enough
+python3.8 -c "import sqlite3; print(sqlite3.sqlite_version)"
 # setup
 python manage.py initial_setup
 python manage.py load_test_data
-python manage.py runserver 0.0.0.0:8000
+python manage.py runserver 0.0.0.0:5000
 ~~~

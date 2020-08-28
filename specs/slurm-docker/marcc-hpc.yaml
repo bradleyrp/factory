@@ -102,13 +102,18 @@ select: !select
             make && \
             make install && \
             rm -rf /tmp/sqlite-autoconf-3280000
+        # requirement for python ctypes
+        RUN yum makecache fast && \
+            yum -y update && \
+            yum install -y libffi-devel
         # recompile python which depends on sqlite
         RUN cd /tmp && \
             wget https://www.python.org/ftp/python/3.8.1/Python-3.8.1.tgz && \
             tar xvf Python-3.8.1.tgz && \
             cd Python-3.8.1 && \
-            ./configure  && \
-            make -j && make install && \
+            LD_RUN_PATH=/usr/local/lib ./configure && \
+            LD_RUN_PATH=/usr/local/lib make -j && \
+            LD_RUN_PATH=/usr/local/lib make altinstall && \
             rm -rf /tmp/Python-3.8.1
         ARG CACHEBUST=1
         # use a basic conf here to mimic a real cluster
