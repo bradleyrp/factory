@@ -1,6 +1,13 @@
-# Historical notes
+# Setup Instructions
 
-Deprecated notes. Under construction; see below.
+1. [Set up docker volumes and containers](#setup-latest)
+2. Deploy an application [like coldfront](#coldfront-quickstart)
+
+# Historical Notes
+
+## [2020.06.06] Historical notes
+
+Deprecated notes from the initial setup. 
 
 ~~~
 # ca 2020.06.06 deploying the cluster (notes cleaned from factory.md)
@@ -37,7 +44,7 @@ cd up-testcluster
 docker-compose run slurmctld bash
 ~~~
 
-Refactoring notes below:
+## [2020.08.21] Setup notes, retest {#setup-latest}
 
 ~~~
 git clone https://github.com/bradleyrp/factory -b bluecrab
@@ -49,10 +56,39 @@ make -C specs/slurm-docker deepclean # this erases images so be careful
 make -C specs/slurm-docker make_volumes
 make -C specs/slurm-docker build
 # run the command
+make docker specs/slurm-docker/marcc-hpc.yaml testcluster_build rebuild
 make docker specs/slurm-docker/marcc-hpc.yaml testcluster
 # visit the container for development
 docker exec -it accounts bash
+# develop in the container
 cd /opt/
-# develop here
+# proposed github location
+git clone https://github.com/marcc-hpc/portal
+# ongoing development activity can happen at this repository
 # later run an ldap server
+make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap
+# inspect dockerfiles for export to native docker
+make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap tour
 ~~~
+
+## Minimal Coldfront setup [2020.08.27] {#coldfront-quickstart}
+
+~~~
+# via https://github.com/ubccr/coldfront
+# builting this in /opt which is a persistent volume
+# via docker exec -it accounts bash 
+cd /opt
+mkdir coldfront_app
+cd coldfront_app
+git clone https://github.com/ubccr/coldfront.git
+python3.6 -mvenv venv
+source venv/bin/activate
+cd coldfront
+pip install wheel
+pip install -r requirements.txt
+# copy settings
+cp coldfront/config/local_settings.py.sample coldfront/config/local_settings.py
+cp coldfront/config/local_strings.py.sample coldfront/config/local_strings.py
+# setup
+python manage.py initial_setup
+python manage.py load_test_data
