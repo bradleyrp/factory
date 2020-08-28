@@ -1,7 +1,7 @@
 # Setup Instructions
 
-1. [Set up docker volumes and containers](#setup-latest)
-2. Deploy an application [like coldfront](#coldfront-quickstart)
+1. Build docker volumes and containers with the [latest instructions](#setup-latest).
+2. Deploy an application [like coldfront](#coldfront-quickstart).
 
 # Historical Notes
 
@@ -44,7 +44,8 @@ cd up-testcluster
 docker-compose run slurmctld bash
 ~~~
 
-## [2020.08.21] Setup notes, retest {#setup-latest}
+<a id="setup-latest"></a>
+## [2020.08.21] Setup notes, retest
 
 ~~~
 git clone https://github.com/bradleyrp/factory -b bluecrab
@@ -71,6 +72,7 @@ make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap
 make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap tour
 ~~~
 
+<a id="coldfront-quickstart"></a>
 ## Minimal Coldfront setup [2020.08.27] {#coldfront-quickstart}
 
 ~~~
@@ -92,3 +94,5 @@ cp coldfront/config/local_strings.py.sample coldfront/config/local_strings.py
 # setup
 python manage.py initial_setup
 python manage.py load_test_data
+python manage.py runserver 0.0.0.0:8000
+~~~

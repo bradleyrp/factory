@@ -6,6 +6,7 @@ select: !select
       This recipe is for building only. Run this before the allocations recipe.
       Usage: make docker specs/recipes/marcc-hpc.yaml allocations_build
       This code is via: https://github.com/giovtorres/slurm-docker-cluster
+      Replaced python-34 with python-36 below.
     site: !spots root
     visit: True
     image_name: &marcc-hpc-image marcc-hpc:testcluster
@@ -39,9 +40,9 @@ select: !select
                munge-devel \
                python-devel \
                python-pip \
-               python34 \
-               python34-devel \
-               python34-pip \
+               python36 \
+               python36-devel \
+               python36-pip \
                mariadb-server \
                mariadb-devel \
                psmisc \
@@ -49,7 +50,7 @@ select: !select
                vim-enhanced \
             && yum clean all \
             && rm -rf /var/cache/yum
-        RUN pip install Cython nose && pip3.4 install Cython nose
+        RUN pip install Cython nose && pip3.6 install Cython nose
         RUN set -ex \
             && wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-amd64" \
             && wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-amd64.asc" \
@@ -92,6 +93,14 @@ select: !select
                 /var/lib/slurmd/fed_mgr_state \
             && chown -R slurm:slurm /var/*/slurm* \
             && /sbin/create-munge-key
+        # sqlite 3.8 for coldfront
+        RUN cd /tmp && \
+            wget https://www.sqlite.org/2019/sqlite-autoconf-3280000.tar.gz && \
+            tar -xzf sqlite-autoconf-3280000.tar.gz && \
+            cd sqlite-autoconf-3280000 && \
+            ./configure && \
+            make && \
+            sudo make install
         ARG CACHEBUST=1
         # use a basic conf here to mimic a real cluster
         COPY slurm.conf /etc/slurm/slurm.conf
