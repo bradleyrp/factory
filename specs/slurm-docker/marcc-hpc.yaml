@@ -242,6 +242,8 @@ select: !select
       Shutdown: 
         docker stop ldap_admin ; docker stop ldap ; docker rm ldap_admin ; docker rm ldap
       Via: https://medium.com/better-programming/ldap-docker-image-with-populated-users-3a5b4d090aa4
+      #!! Removed from dockerfile:
+        COPY bootstrap.ldif /container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
     visit: True
     image_name: &marcc-hpc-image-openldap marcc-hpc:ldap
     command: docker-compose up 
@@ -252,7 +254,7 @@ select: !select
         LABEL maintainer="ryanbradley@jhu.edu"
         ENV LDAP_ORGANISATION="Rockfish" 
         ENV LDAP_DOMAIN="rockfish.intern"
-        COPY bootstrap.ldif /container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
+        COPY bootstrap.ldif /container/service/slapd/assets/config/bootstrap/ldif/custom/bootstrap.ldif
     compose:
       version: "3.7"
       services:
@@ -315,3 +317,118 @@ select: !select
     files:
       - source: specs/slurm-docker/bootstrap.ldif
         target: bootstrap.ldif
+  testcluster_combo:
+    site: !spots root
+    # image_name and dockerfile must be valid but not unique
+    image_name: *marcc-hpc-image
+    dockerfile: *dockerfile-testcluster
+    command: docker-compose up -d
+    visit: False
+    compose:
+      version: "3.7"
+      services:
+        mysql:
+          image: mysql:5.7
+          hostname: mysql
+          container_name: mysql
+          environment:
+            MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+            MYSQL_DATABASE: slurm_acct_db
+            MYSQL_USER: slurm
+            MYSQL_PASSWORD: password
+          volumes:
+            - var_lib_mysql:/var/lib/mysql
+        slurmdbd:
+          image: *marcc-hpc-image
+          command: ["slurmdbd"]
+          container_name: slurmdbd
+          hostname: slurmdbd
+          volumes:
+            - etc_munge:/etc/munge
+            - etc_slurm:/etc/slurm
+            - var_log_slurm:/var/log/slurm
+          expose:
+            - "6819"
+          depends_on:
+            - mysql
+        slurmctld:
+          image: *marcc-hpc-image
+          command: ["slurmctld"]
+          container_name: slurmctld
+          hostname: slurmctld
+          volumes:
+            - etc_munge:/etc/munge
+            - etc_slurm:/etc/slurm
+            - slurm_jobdir:/data
+            - var_log_slurm:/var/log/slurm
+          expose:
+            - "6817"
+          depends_on:
+            - "slurmdbd"
+        c1:
+          image: *marcc-hpc-image
+          command: ["slurmd"]
+          hostname: c1
+          container_name: c1
+          volumes:
+            - etc_munge:/etc/munge
+            - etc_slurm:/etc/slurm
+            - slurm_jobdir:/data
+            - var_log_slurm:/var/log/slurm
+          expose:
+            - "6818"
+          depends_on:
+            - "slurmctld"
+        accounts:
+          build: .
+          image: *marcc-hpc-image
+          command: ["slurmd"]
+          # we must use a valid name so slurmd starts
+          #! cannot change this but not sure where it exists
+          hostname: c2
+          container_name: accounts
+          volumes:
+            - etc_munge:/etc/munge
+            - etc_slurm:/etc/slurm
+            - slurm_jobdir:/data
+            - var_log_slurm:/var/log/slurm
+            - opt_accounts:/opt
+          ports:
+            - 6818:6818
+            - 5000:5000
+          depends_on:
+            - "slurmctld"
+        ldap_server:
+          command: "--copy-service --loglevel debug"
+          build: .
+          image: *marcc-hpc-image-openldap
+          hostname: ldap
+          container_name: ldap
+          environment:
+            #! not sure if this is in the image or container
+            LDAP_ADMIN_PASSWORD: test1234
+            LDAP_BASE_DN: dc=rockfish,dc=intern
+          ports:
+            - 389:389
+          volumes:
+            - ldap_data:/var/lib/ldap
+            - ldap_config:/etc/ldap/slapd.d
+        ldap_server_admin:
+          hostname: ldap_admin
+          container_name: ldap_admin
+          image: osixia/phpldapadmin:0.7.2
+          ports:
+            - 8090:80
+          environment:
+            PHPLDAPADMIN_LDAP_HOSTS: ldap_server
+            PHPLDAPADMIN_HTTPS: 'false'
+      volumes:
+        # set external volumes to avoid space creep
+        etc_munge: {external: true}
+        etc_slurm: {external: true}
+        slurm_jobdir: {external: true}
+        var_lib_mysql: {external: true}
+        var_log_slurm: {external: true}
+        opt_accounts: {external: true}
+        ldap_data: {external: true}
+        ldap_config: {external: true}

@@ -1,0 +1,67 @@
+# example PI who is a user
+# dn: cn=rbradle8@jhu.edu,dc=rockfish,dc=intern
+# changetype: add
+# objectclass: inetOrgPerson
+# cn: rbradle8@jhu.edu
+# displayname: Ryan Bradley
+# mail: rbradle8@jhu.edu
+# userpassword: userpass
+# 
+# # example shortname admin
+# dn: cn=rbradley,dc=rockfish,dc=intern
+# changetype: add
+# objectclass: inetOrgPerson
+# cn: ryanbradley@jhu.edu
+# displayname: Ryan Bradley
+# mail: ryanbradley@jhu.edu
+# userpassword: shortpass
+# 
+# # groups for PIs
+# dn: ou=Groups,dc=rockfish,dc=intern
+# changetype: add
+# objectclass: organizationalUnit
+# ou: Groups
+# 
+# #!? where are users implemented?
+# dn: ou=Users,dc=rockfish,dc=intern
+# changetype: add
+# objectclass: organizationalUnit
+# ou: Users
+# 
+# # admins group
+# dn: cn=Admins,ou=Groups,dc=rockfish,dc=intern
+# changetype: add
+# cn: Admins
+# objectclass: groupOfUniqueNames
+# uniqueMember: cn=rbradley,dc=rockfish,dc=intern
+# 
+# # a single research group
+# dn: cn=rbradle8,ou=Groups,dc=rockfish,dc=intern
+# changetype: add
+# cn: rbradle8
+# objectclass: groupOfUniqueNames
+# uniqueMember: cn=rbradle8@jhu.edu,dc=rockfish,dc=intern
+
+# rbradle8, rockfish.intern
+dn: cn=rbradle8,dc=rockfish,dc=intern
+changetype: add
+cn: rbradle8
+gidNumber: 501
+objectClass: posixGroup
+objectClass: top
+
+# Ryan Bradley, rockfish.intern
+dn: cn=Ryan Bradley,dc=rockfish,dc=intern
+changetype: add
+givenName: Ryan
+sn: Bradley
+cn: Ryan Bradley
+uid: rbradle8
+userPassword:: e01ENX15OXQrS3g3VlpzNjNscTh0OEhJRm93PT0=
+uidNumber: 1001
+gidNumber: 501
+homeDirectory: /home/users/rbradle8
+loginShell: /bin/sh
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
