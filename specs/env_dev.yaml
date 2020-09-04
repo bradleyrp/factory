@@ -54,3 +54,5 @@ dependencies:
     # for aws
     - awscli
     - awsebcli
+    # general use
+    - beautifulsoup4

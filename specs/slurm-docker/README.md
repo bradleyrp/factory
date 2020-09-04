@@ -47,7 +47,7 @@ docker-compose run slurmctld bash
 ~~~
 
 <a id="setup-latest"></a>
-## Setup notes, retest [2020.08.21] 
+## Setup notes [2020.08.21] 
 
 ~~~
 git clone https://github.com/bradleyrp/factory -b bluecrab
@@ -69,6 +69,7 @@ cd /opt/
 git clone https://github.com/marcc-hpc/portal
 # ongoing development activity can happen at this repository
 # later run an ldap server
+for i in ldap ldap_admin; do docker stop $i; docker rm $i; done
 make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap
 # inspect dockerfiles for export to native docker
 make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap tour
@@ -98,5 +99,13 @@ python3.8 -c "import sqlite3; print(sqlite3.sqlite_version)"
 # setup
 python manage.py initial_setup
 python manage.py load_test_data
+python manage.py runserver 0.0.0.0:5000
+# install more things
+source /opt/coldfront_app/venv/bin/activate
+cd /opt/coldfront_app/coldfront/
+pip install -r requirements.txt
+# upon revisit
+source /opt/coldfront_app/venv/bin/activate
+cd /opt/coldfront_app/coldfront/
 python manage.py runserver 0.0.0.0:5000
 ~~~
