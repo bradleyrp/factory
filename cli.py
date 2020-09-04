@@ -225,7 +225,7 @@ class Interface(Parser):
             if shortname in toc: raise Exception('collision: %s'%shortname)
             toc[shortname] = dict(kind=detail['kind'],spot=env)
         if not name:
-			# casting strings below to avoid prefix for unicode in python 2
+            # casting strings below to avoid prefix for unicode in python 2
             print('status available environments: %s'%str(list(str(i) for i in toc.keys())))
             return
         else:
@@ -252,6 +252,14 @@ class Interface(Parser):
         args = [name]
         if rebuild: args += ['rebuild']
         ortho.replicator.repl(*args)
+
+    def down(self,name):
+        """Shortcut to docker-compose down."""
+        # hardcoded naming convention for docker clusters
+        lname = 'up-%s'%name
+        if not os.path.islink(lname):
+            raise Exception('cannot find %s'%lname)
+        bash('docker-compose down',cwd=lname)
 
     def use(self,what):
         """Update the config with a prepared set of changes."""
@@ -294,7 +302,7 @@ class Interface(Parser):
                 for pack in packages:
                     bash('source %s/bin/activate && pip install %s'%(
                         spot,pack))
-			# after sourcing we call it python even if it came from python3
+            # after sourcing we call it python even if it came from python3
             else: bash('source %s/bin/activate && '
                 '%s -m pip install -r %s'%(spot,'python',file),v=True)
             #!! set_env_cursor(os.path.join(spot))
