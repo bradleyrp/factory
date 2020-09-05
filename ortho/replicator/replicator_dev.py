@@ -7,6 +7,7 @@ DEV NOTE: Documentation desperately needs a map of all use-cases
 """
 
 import os,re,tempfile,subprocess,string,sys,shutil,copy,time
+import datetime as dt
 #! refer to ortho by name for top-level imports simplified by init?
 from ..bash import bash
 from ..dictionary import DotDict
@@ -679,7 +680,8 @@ class ReplicateCore(Handler):
 				script = re.sub(r'#\s*%s\s*'%staged_flag,
 					variable_injection,script)
 		# prepare the execution script
-		screen_log = os.path.join(os.getcwd(),'screen-%s.log'%screen)
+		ts = dt.datetime.now().strftime('%Y%m%d%H%M')
+		screen_log = os.path.join(os.getcwd(),'screen-%s-%s.log'%(screen,ts))
 		detail = dict(screen_name=screen,contents=script,screen_log=screen_log,
 			prelim='' if not spot else '\ncd %s'%spot)
 		with tempfile.NamedTemporaryFile(delete=False) as fp:
