@@ -126,8 +126,10 @@ class SpackEnvMaker(Handler):
 		cpu_count_opt = min(multiprocessing.cpu_count(),6)
 		# flags from CLI passed via meta
 		live = self.meta.get('live',False)
-		if not live: command = 'spack install -j %d'%cpu_count_opt
-		else: command = 'spack concretize -f'
+		if not live: 
+			#! deprecated: command = 'spack install -j %d'%cpu_count_opt
+			command = "spack --env . install -j %d"%cpu_count_opt
+		else: command = 'spack --env . concretize -f'
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 			command=command)
 
@@ -208,11 +210,13 @@ class SpackEnvItem(Handler):
 		if not re.match(r'^\w+@[\d\.]+',check_compiler):
 			raise Exception('unusual spack spec: %s'%check_compiler)
 		if not re.search(check_compiler,stdout):
+			import pdb;pdb.set_trace()
 			raise Exception('failed compiler check: %s'%check_compiler)
 	#! the bootstrap and find_compilers and others must take null arguments
 	#!   this is unavoidable in the YAML list format when using Handler
 	def bootstrap(self,bootstrap):
 		"""Bootstrap installs modules."""
+		#! this is deprecated from spack and should be removed
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
 	def lmod_refresh(self,lmod_refresh,name=None,spack_lmod_hook=None):
