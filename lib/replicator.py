@@ -188,7 +188,10 @@ def screen(*args,**kwargs):
 	Run anything in a screen using `ReplicatorCore`.
 	e.g. make screen screen=anon script specs/demo_script.yaml delay spot=./here
 	"""
-	screen_name = kwargs.pop('screen','screen_anon')
+	# we write to a log file with a timestamp with the format:
+	#   screen-anon-2020.09.05.1000.log to keep things separate
+	#! user must clean log files
+	screen_name = kwargs.pop('screen','anon')
 	# note that running in a remote location typically uses a 'spot' flag
 	#   however everything is passed through so the reciever has to accept it
 	cmd = feedback_args_to_command(*args,**kwargs)
