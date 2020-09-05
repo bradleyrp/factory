@@ -2,7 +2,7 @@
 
 #! manually pick up the overloaded print
 from __future__ import print_function
-import os,copy,re,sys
+import os,copy,re,sys,glob
 import ortho
 import multiprocessing
 # several functions below use yaml 
@@ -12,9 +12,17 @@ try:
 	from lib.yaml_mods import YAMLObjectInit
 	# loading yaml_mods adds extra tags and constructors
 	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_lists
-	#! the following is failing!
-	# yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
-	#! why are these not automatic
+	# chain feature for handling dependencies
+	yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
+	# additional shorthand
+	yaml.add_constructor('!str',yaml_tag_strcat_custom(" "))
+	yaml.add_constructor('!strflush',yaml_tag_strcat_custom(""))
+	def yaml_tag_loop_r_packages(self,node):
+		this = self.construct_mapping(node)
+		if this.keys()!={'base','loop'}:
+			raise Exception('invalid format: %s'%str(this))
+		return ['%s %s'%(i,this['base']) for i in this['loop']]
+	yaml.add_constructor('!loopcat',yaml_tag_loop_r_packages)
 except Exception as e: 
 	#! yaml error here if you raise
 	#! hence this is loaded twice. consider fixing? or explicate
@@ -25,6 +33,7 @@ from ortho import path_resolver
 from ortho import catalog
 from ortho import delveset
 from ortho import requires_python_check
+from ortho import bash
 
 """
 NOTES on path configuration and order of precedence
@@ -117,7 +126,7 @@ class SpackEnvMaker(Handler):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
 		result = ortho.bash('source %s && %s'%
-			(starter,command),cwd=env_spot,scroll=not fetch)
+			(starter,command),announce=True,cwd=env_spot,scroll=not fetch)
 		return result
 	def std(self,spack,where,spack_spot):
 		os.makedirs(where,exist_ok=True)
@@ -138,11 +147,16 @@ class SpackLmodHooks(Handler):
 		"""Write a custom lua file into the tree."""
 		with open(os.path.join(moduleroot,modulefile),'w') as fp:
 			fp.write(contents)
+	def mkdir(self,mkdir):
+		print('status creating: %s'%mkdir)
+		os.makedirs(mkdir,exist_ok=True)	
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
-	def _run_via_spack(self,command,fetch=False):
+	def _run_via_spack(self,command,fetch=False,site_force=True):
 		"""Route commands to spack."""
+		if site_force and os.path.isdir(os.path.expanduser('~/.spack')):
+			raise Exception('cannot allow ~/.spack')
 		return SpackEnvMaker()._run_via_spack(
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
@@ -240,7 +254,7 @@ class SpackEnvItem(Handler):
 		"""
 		print('status cleaning nested modules')
 		# hardcoded 7-character hashes
-		regex_nested_hashed = '.+-[0-9a-z]{7}$'
+		regex_nested_hashed = '(.+)-[0-9a-z]{7}$'
 		spot = os.path.realpath(lmod_hide_nested)
 		if not os.path.isdir(spot):
 			raise Exception('cannot find %s'%spot)
@@ -259,6 +273,58 @@ class SpackEnvItem(Handler):
 				fp.write('#%Module\n')
 				for item in val:
 					fp.write('hide-version %s\n'%item)
+	def lmod_remove_nested_hashes(self,lmod_remove_nested_hashes):
+		"""
+		Incompatible with `lmod_hide_nested_hashes`. 
+		Make the openmpi modules more transparent.
+		DEPRECATED. This prevents the use of a default module. 
+		  This method likely deviates too far from the usual Lmod scheme.
+		Options: remove all of the nested openmpi or not. 
+		You cannot keep the nesting and remove the hashes while using defaults.
+    	via: lmod_remove_nested_hashes: *module-spot
+		"""
+		#! repeated from above
+		# hardcoded 7-character hashes
+		regex_nested_hashed = '(.+)-[0-9a-z]{7}$'
+		spot = os.path.realpath(lmod_remove_nested_hashes)
+		if not os.path.isdir(spot):
+			raise Exception('cannot find %s'%spot)
+		result = {}
+		for root,dns,fns in os.walk(spot):
+			path = root.split(os.path.sep)
+			if len(path)>=2 and re.match(regex_nested_hashed,path[-2]):
+				base = os.path.sep.join(path[:-3])
+				if base not in result: result[base] = []
+				result[base].extend([os.path.sep.join(path[-3:]+[
+					re.match(r'^(.+)\.lua$',f).group(1)]) for f in fns])
+		for key,vals in result.items():
+			root = list(set([os.path.sep.join(
+				val.split(os.path.sep)[:2]) for val in vals]))
+			if len(root)!=1: raise Exception('inconsistent roots')
+			target = vals[0].split(os.path.sep)[:2]
+			hashed_name = target[1]
+			simple_name = re.match(regex_nested_hashed,hashed_name).group(1)
+			dest = os.path.join(key,target[0],simple_name)
+			target_dn = os.path.join(key,os.path.sep.join(target))
+			bash('mv %s %s'%(target_dn,dest),scroll=False,v=True)
+			# replace the hash in the modulefile
+			fns_hashed = glob.glob(dest+'.lua')
+			if len(fns_hashed)!=1:
+				raise Exception('failed to replace hashes')
+			target = fns_hashed[0]
+			print('status replacing "%s" with "%s" in: %s'%(
+				hashed_name,simple_name,target))
+			with open(target) as fp: text = fp.read()
+			text = re.sub(hashed_name,simple_name,text)
+			with open(target,'w') as fp: fp.write(text)
+	def lmod_defaults(self,lmod_defaults):
+		"""Create links for lmod defaults."""
+		for fn in lmod_defaults:
+			if not os.path.isfile(fn):
+				raise Exception('cannot find %s'%fn)	
+			dirname = os.path.dirname(fn)
+			bash('ln -s %s %s'%(os.path.basename(fn),'default'),
+				cwd=dirname,scroll=False,v=True)
 
 def spack_env_maker(what):
 	"""
@@ -345,19 +411,23 @@ def spack_tree(what,name,live=False):
 	# register the spack location
 	return CacheChange(spack=spack_spot)
 
-spack_hpc_singularity_deploy_script = """
-export TMPDIR=%(tmpdir)s
-export TMP_DIR=%(tmpdir)s
-cd %(factory_site)s
-# assume the min environment is available with yaml
-source env.sh min
-./fac spack %(spec)s %(target)s %(flags)s
-echo "[STATUS] you are inside singularity!"
-"""
-
-def spack_hpc_singularity(spec,name=None,live=False,
-	tmpdir=None,factory_site=None,mounts=None,image=None):
-	"""Special functions for cluster deployment."""
+def spack_hpc_decoy(spec,name=None,live=False,
+	tmpdir=None,factory_site=None,mounts=None,image=None,decoy_method='proot'):
+	"""
+	Operate spack in a decoy environment
+	See `spack_hpc_run` for instructions.
+	This function can be called directly with `make do` or using the 
+	  wrapper function below via `make spack_hpc_deploy`.
+	"""
+	spack_hpc_singularity_deploy_script = '\n'.join([
+		'export TMPDIR=%(tmpdir)s',
+		'export TMP_DIR=%(tmpdir)s',
+		'cd %(factory_site)s',
+		'# assume the min environment is available with yaml',
+		#! make the env name flexible
+		'source env.sh min',
+		'./fac spack %(spec)s %(target)s %(flags)s',
+		'echo "[STATUS] you are inside the decoy environment!"'])
 	factory_site = os.getcwd() if not factory_site else factory_site
 	#! do not call this from the CLI. remove from cli_spack.yaml
 	# check if we are in a slurm job
@@ -369,6 +439,7 @@ def spack_hpc_singularity(spec,name=None,live=False,
 	if os.path.isfile(script_token):
 		raise Exception('cannot execute when %s exists'%script_token)
 	# ask user for the name
+	#! untested after major changes. moved to lib.generic.menu
 	if not name:
 		with open(spec) as fp:
 			text = yaml.load(fp,Loader=yaml.Loader)
@@ -409,22 +480,33 @@ def spack_hpc_singularity(spec,name=None,live=False,
 		mounts_out.append((this['host'],this['local']))
 	mounts_out.append((detail['tmpdir'],detail['tmpdir']))
 	mounts = ['%s:%s'%(i,j) for i,j in mounts_out]
+	absent_dns = [i for i,j in mounts_out 
+		if not os.path.isdir(i) and not os.path.isfile(i)]
+	if any(absent_dns):
+		raise Exception('missing: %s'%str(absent_dns))
 	print('status mounts follow')
 	print('\n'.join(mounts))
 	#! check existence of host directories and image or let singularity?
-	cmd = (
+	if decoy_method=='proot': cmd = (
+		#! need a flexible proot location
+		"/software/apps/proot/5.1.0/bin/proot "+
+		" ".join(['-b %s'%i for i in mounts])+" "
+		"/bin/bash -c 'cd %s && "%detail['factory_site'])
+	elif decoy_method=='singularity': cmd = (
 		"ml singularity && SINGULARITY_BINDPATH= "+
 		"singularity "+("shell " if live else "run ")+ 
 		" ".join(['-B %s'%i for i in mounts])+
 		" "+image+" "+"-c 'cd %s && "%detail['factory_site'])
+	else: raise Exception('invalid decoy method: %s'%decoy_method)
 	if live:
-		# go to the environments folder if we know it
 		spack_envs_dn = ortho.conf.get('spack_envs',None)
+		# to figure out the right env we would have to read the spec file here
+		#   so instead we just go to the environments folder
 		if spack_envs_dn: envs_cd = 'cd %s && '%os.path.realpath(spack_envs_dn)
 		else: envs_cd = ''
 		postscript = (" source env.sh spack && %s"%envs_cd+
 			"export TMPDIR=%s &&"%detail['tmpdir'])
-		cmd += ("/bin/bash %s &&%s /bin/bash'"%(script_token,postscript))
+		cmd += ("/bin/bash %s &&%s /bin/bash --norc'"%(script_token,postscript))
 	else: cmd += "/bin/bash %s'"%script_token
 	print('status running: %s'%cmd)
 	# execution loop
@@ -444,33 +526,120 @@ def spack_hpc_singularity(spec,name=None,live=False,
 	os.remove(script_token)
 	print('status exiting')
 
-def spack_hpc_deploy(deploy,name=None,live=False,spec=None):
-	"""
-	Run spack-via-singularity directly from a terminal.
-	Install via: `make use specs/cli_spack.yaml`
-	Usage: `make spack_hpc specs/spack_hpc_go.yaml <name>`
-	Note that the `live` and `spec` flags can override the defaults.
-	"""
-	if spec: raise Exception('dev')
+def read_deploy(deploy,entire=False):
+	"""Interpret a deploy file without directly executing it."""
 	# note that we cannot edit the deploy yaml in place so we read without tags
-	#   then manipulate, then pass the result to `spack_hpc_singularity`.
+	#   then apply overrides, then pass the result to `spack_hpc_decoy`.
 	with open(deploy) as fp: text = fp.read()
-	# use the correct python tag to subert the call to the function
+	# use the correct python tag to subvert the call to the function
 	# the following trick therefore accomplishes the override
-	target_tag = 'tag:yaml.org,2002:python/object/apply:lib.spack.spack_hpc_singularity'
+	target_tag = 'tag:yaml.org,2002:python/object/apply:lib.spack.spack_hpc_decoy'
 	# use safe loader otherwise reading the deploy yaml triggers the tag
 	from ortho.yaml_mods import YAMLTagFilter,select_yaml_tag_filter
 	tree = yaml.load(text,Loader=YAMLTagFilter(target_tag))
 	deliver = select_yaml_tag_filter(tree,target_tag)
-	# the deliver tree would normally go right to spack_hpc_singularity via `make do`
-	#   so we pick off kwds and send it there after modifications
-	if deliver.keys()!={'kwds'}:
+	# the deliver tree would normally go right to spack_hpc_decoy via `make do`
+	#   so we pick off kwds and send it there after overrides
+	if deliver.keys()>{'kwds','test'}:
 		raise Exception('invalid %s in %s with keys: %s'%(
 			target_tag,deploy,str(deliver.keys())))
+	return deliver
+
+def spack_hpc_deploy(deploy,name=None,live=False,spec=None):
+	"""
+	Run spack in a decoy environment. This can be called from `spack_hpc_run`.
+	We can run this directly via:
+	  ./fac spack_hpc_deploy specs/spack_hpc_deploy.yaml \
+	    --name=bc-std --decoy_method=proot --spec=specs/spack_hpc.yaml --live
+	"""
+	deliver = read_deploy(deploy)
 	kwargs = deliver['kwds']
-	# modify keys
+	# override the deploy file with incoming kwargs
 	kwargs['live'] = live
 	if name: kwargs['name'] = name
 	if spec: kwargs['spec'] = spec
-	spack_hpc_singularity(**kwargs)	
+	# run the decoy environment
+	print('status calling spack_decoy with: %s'%str(kwargs))
+	spack_hpc_decoy(**kwargs)	
 
+def spack_hpc_test_visit(deploy):
+	"""Test a spack build before production using deploy notes."""
+	deliver = read_deploy(deploy,entire=True)
+	# include the test command with keywords to decoy
+	cmd = deliver.get('test',None)
+	if not cmd: raise Exception('cannot find "test" in %s'%deploy)
+	print('status running: %s'%cmd)
+	os.system(cmd)
+
+def spack_hpc_run(run=None,deploy=None,
+	spec=None,live=False,test=False,**kwargs):
+	"""
+	Prepare a call to SLURM to build software with spack.
+	This script takes the place of a bash script to kickoff new jobs.
+	Usage:
+	  make spack_hpc_run \
+        run=specs/spack_hpc_run.yaml \
+	    deploy=specs/spack_hpc_deploy.yaml \
+        spec=specs/spack_hpc.yaml \
+        name=bc-std live
+	The run file can define the deploy file to supply the remaining arguments.
+	"""
+	print('status preparing to use spack')
+	# collapse flags at the CLI into a single decoy_method
+	# fold default kwargs into one object
+	kwargs.update(run=run,spec=spec,deploy=deploy,live=live)
+	if not run: raise Exception('we require a run file')
+	# a yaml tag allows the CLI to override the run file 
+	def yaml_tag_flag(self,node):
+		scalar = self.construct_scalar(node)
+		if scalar not in kwargs: 
+			if test and scalar=='name': return "testing"
+			raise Exception('cannot get this flag from the cli: %s'%scalar)
+		else: return kwargs[scalar]
+	yaml.add_constructor('!flag',yaml_tag_flag)
+	# load the run file
+	with open(run) as fp: 
+		detail = yaml.load(fp,Loader=yaml.Loader)
+	# contents check
+	if detail.keys()>{'docs','settings'}:
+		raise Exception('run file has invalid format: %s'%str(detail))
+	settings = detail['settings']
+	#! beware no use of kwargs unless you use the `!flag` tag in the run file
+	# prepare the script we will execute in SLURM
+	script = [
+		'cd %s'%os.getcwd(),
+		# use the venv to provide the environment or override
+		'source env.sh %s'%settings.get('env_name','venv')]
+	if 'sbatch' in settings:
+		script += ['module purge']
+	if not settings['deploy']: raise Exception('no deploy file')
+	# call the spack_hpc_deploy function with the deploy file and name
+	script += ['./fac spack_hpc_deploy %s --name=%s'%(settings['deploy'],settings['name'])]
+	# pass the spec through
+	if spec: script[-1] += ' --spec=%s'%spec
+	if live and test:
+		raise Exception('cannot use live and test at the same time')
+	# prepare an salloc command
+	if live:
+		cmd = ['salloc']
+		script[-1] += ' --live'
+		cmd.extend(['%s=%s'%(i,j) 
+			for i,j in settings.get('sbatch',{}).items()])
+		cmd.extend(["srun --pty /bin/bash -c '%s'"%' && '.join(script)])
+	# test the code by visiting 
+	elif test:
+		spack_hpc_test_visit(deploy=deploy)
+		return
+	else: 
+		cmd = ['sbatch']
+		cmd.extend(['%s=%s'%(i,j) 
+			for i,j in settings.get('sbatch',{}).items()])
+		script_fn = 'script-spack-build.sh'
+		script = ['#!/bin/bash',
+			'trap "{ rm -f %s; }" EXIT ERR'%script_fn]+script
+		with open(script_fn,'w') as fp: fp.write('\n'.join(script))
+		cmd += [script_fn]
+	cmd_out = ' '.join(cmd)
+	print('status running command: %s'%cmd_out)
+	# using os.system for the PTY
+	os.system(cmd_out)
