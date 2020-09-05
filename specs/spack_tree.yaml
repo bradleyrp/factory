@@ -18,6 +18,8 @@ template_basic:
   packages: {}
   config: 
     checksum: false
+    # avoid the default cache in the home directory
+    misc_cache: $spack/misc_cache
   specs: []
   view: false
 
@@ -25,11 +27,12 @@ gromacs_gcc6:
   notes: |
     This sequence installs gcc 6 which is necessary for compiling for skylake.
     Then it compiles gromacs with gcc 6 and little else.
+    This recipe is designd for a standard CentOS7 box.
     We pin explicitly to the system gcc (4.8.5) to prevent recompile.
     We also use bootstrap to build modules.
   envs:
+    #! dev auto-detect the system GCC if above 6
     - check_compiler: gcc@4.8.5
-    - bootstrap: null
     - name: env_gcc_6.4.0
       via: template_basic
       specs: ['gcc@6.4.0%gcc@4.8.5']
@@ -41,38 +44,12 @@ gromacs_gcc6:
 gromacs_centos8_gpu:
   notes: |
     Install GROMACS with native GCC 8 on CentOS8 and CUDA.
+    Last tested on heartland on 2020.09.05.
   envs:
-    #! dev: make the computer check work with a major gcc version i.e. detect the native
-    - check_compiler: gcc@8.2.1
-    #! dev: make this a boolean flag
-    - bootstrap: null
+    - find_compilers: null
+    #! dev: check the major gcc version i.e. detect the native and use MAJ.MIN
+    - check_compiler: gcc@8.3.1
     #! dev: create a naming scheme
-    - name: env_gromacs_2019.3_gcc_8.2.1_native
+    - name: env_gromacs_2020.3_gcc_8.3.1_native
       via: template_basic
-      specs: ['gromacs@2019.3%gcc@8.2+cuda~mpi^fftw~mpi']
-
-macos_vmd:
-  notes: |
-    Catalina broke 32-bit binaries so we compile vmd from source.
-    Note that it was easier to simply run VMD in a docker container.
-    Currently deprecated because a VMD source compile is painful.
-  envs:
-    - find_compilers: null
-    - bootstrap: null
-    - name: env_vmd_support
-      via: template_basic
-      specs:
-        - fltk@1.3.5
-        - tcl
-        - tk
-        - opengl@4.5
-
-macos_test:
-  notes: Tested 2020.02.02 after updating the clone and path configs.
-  envs:
-    - find_compilers: null
-    - bootstrap: null
-    - name: env-macos-test
-      via: template_basic
-      specs:
-        - curl
+      specs: ['gromacs@2020.3%gcc@8.3.1+cuda+mpi^cuda@10.2.89']
