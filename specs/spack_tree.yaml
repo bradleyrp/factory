@@ -31,6 +31,7 @@ gromacs_gcc6:
     We pin explicitly to the system gcc (4.8.5) to prevent recompile.
     We also use bootstrap to build modules.
   envs:
+    - find_compilers: null
     #! dev auto-detect the system GCC if above 6
     - check_compiler: gcc@4.8.5
     - name: env_gcc_6.4.0

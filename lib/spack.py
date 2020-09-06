@@ -224,7 +224,6 @@ class SpackEnvItem(Handler):
 		if not re.match(r'^\w+@[\d\.]+',check_compiler):
 			raise Exception('unusual spack spec: %s'%check_compiler)
 		if not re.search(check_compiler,stdout):
-			import pdb;pdb.set_trace()
 			raise Exception('failed compiler check: %s'%check_compiler)
 	#! the bootstrap and find_compilers and others must take null arguments
 	#!   this is unavoidable in the YAML list format when using Handler
