@@ -79,19 +79,25 @@ def example_yaml_function(*args,**kwargs):
 
 def menu(**kwargs):
 	"""Ask the user to select a command."""
-	print('status available targets:')
-	#! very clusmy
-	opts_num = dict(sorted(zip(*(zip(enumerate(kwargs.keys())))))[0]) 
-	print('\n'.join(['  {:3d}: {:s}'.format(ii+1,i) for ii,i in enumerate(kwargs.keys())]))
-	asker = (input if sys.version_info>(3,0) else raw_input)
-	select = asker('select a target: ')
-	if select.isdigit() and int(select)-1 in opts_num:
-		name = opts_num[int(select)-1]
-	elif select.isdigit():
-		raise Exception('invalid number %d'%int(select))
-	elif select not in kwargs:
-		raise Exception('invalid selection "%s"'%select)
-	else: name = select
+	import pdb;pdb.set_trace()
+	# automatic selection via keyword name
+	name = kwargs.pop('name',False)
+	if name: pass
+	# manual selection
+	else:
+		print('status available targets:')
+		#! very clusmy
+		opts_num = dict(sorted(zip(*(zip(enumerate(kwargs.keys())))))[0]) 
+		print('\n'.join(['  {:3d}: {:s}'.format(ii+1,i) for ii,i in enumerate(kwargs.keys())]))
+		asker = (input if sys.version_info>(3,0) else raw_input)
+		select = asker('select a target: ')
+		if select.isdigit() and int(select)-1 in opts_num:
+			name = opts_num[int(select)-1]
+		elif select.isdigit():
+			raise Exception('invalid number %d'%int(select))
+		elif select not in kwargs:
+			raise Exception('invalid selection "%s"'%select)
+		else: name = select
 	from ortho import bash
 	target = kwargs[name]
 	if isinstance(target,dict):
