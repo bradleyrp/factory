@@ -1,0 +1,28 @@
+# USAGE: `make do specs/demo_do_select.yaml name=test`
+# this demo shows you how to execute a portion of a file via YAML tags
+fork: !select 
+
+  # untagged reference data should live under the select at the top
+  refdata:
+    message: &message "Hello, World!"
+
+  # the following items are selected for execution by name
+  test:
+    # replace print with module.module.function to pass this to custom code
+    call: !!python/object/apply:print
+      args: [*message]
+  test:
+    call: !!python/object/apply:print
+      args: ["You can repeat keys in a make-do-select call."]
+  alt:
+    call: !!python/object/apply:print
+      args: ["The selection is keyed by name"]
+
+  wheel:
+    # of course we can reinvent the wheel and use yaml as a scripting language
+    call: !!python/object/apply:print
+      args: ["Custom code circuit via yaml starts here (1/3)."]
+    call: !!python/object/apply:print
+      args: ["In this case YAML is acting like a scripting language (2/3)."]
+    call: !!python/object/apply:print
+      args: ["This appears to respect order but otherwise use nesting(3/3)."]

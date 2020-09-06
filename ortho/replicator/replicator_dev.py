@@ -211,7 +211,7 @@ def constructor_site_hook(loader,node):
 
 def subselect_hook(loader,node):
 	"""Select a portion of a recipe."""
-	# see twin function get_recupe_subselector to unpack this
+	# see twin function get_recipe_subselector to unpack this
 	subtree = loader.construct_mapping(node)
 	def tree_subselect(name=None):
 		"""Promote a child node to the parent to whittle a tree."""
