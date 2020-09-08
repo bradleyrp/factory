@@ -34,6 +34,7 @@ from ortho import catalog
 from ortho import delveset
 from ortho import requires_python_check
 from ortho import bash
+from ortho.yaml_run import yaml_do_select
 
 """
 NOTES on path configuration and order of precedence
@@ -128,17 +129,24 @@ class SpackEnvMaker(Handler):
 		result = ortho.bash('source %s && %s'%
 			(starter,command),announce=True,cwd=env_spot,scroll=not fetch)
 		return result
-	def std(self,spack,where,spack_spot):
+	def std(self,spack,where,spack_spot,cache_mirror=None,cache_only=False):
 		os.makedirs(where,exist_ok=True)
 		with open(os.path.join(where,'spack.yaml'),'w') as fp:
 			yaml.dump({'spack':spack},fp)
 		cpu_count_opt = min(multiprocessing.cpu_count(),6)
 		# flags from CLI passed via meta
 		live = self.meta.get('live',False)
-		if not live: 
-			#! deprecated: command = 'spack install -j %d'%cpu_count_opt
-			command = "spack --env . install -j %d"%cpu_count_opt
-		else: command = 'spack --env . concretize -f'
+		extras = ''
+		if cache_only and not live: extras += '--cache-only '
+		# inspect the concretize output
+		if live:
+			command = 'spack --env . concretize %s-f'%(extras)
+		# build for cache by selecting a mirror
+		elif cache_mirror:
+			command = 'spack --env . buildcache create -m %s'%cache_mirror
+		# standard installation
+		else:
+			command = "spack --env . install %s-j %d"%(extras,cpu_count_opt)
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 			command=command)
 
@@ -161,7 +169,8 @@ class SpackEnvItem(Handler):
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
 			command=command,fetch=fetch)
-	def make_env(self,name,specs,mods=None,via=None):
+	def make_env(self,name,specs,mods=None,via=None,
+		cache_only=False,cache_mirror=None):
 		"""
 		Pass this item along to SpackEnvMaker
 		"""
@@ -182,6 +191,7 @@ class SpackEnvItem(Handler):
 				delveset(instruct,*route,value=val)
 		print('status building spack environment at "%s"'%spot)
 		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct,
+			cache_only=cache_only,cache_mirror=cache_mirror,
 			# pass through meta for flags e.g. "live" to visit the env
 			meta=self.meta)
 	def find_compilers(self,find_compilers):
@@ -642,3 +652,12 @@ def spack_hpc_run(run=None,deploy=None,
 	print('status running command: %s'%cmd_out)
 	# using os.system for the PTY
 	os.system(cmd_out)
+
+### Refactor rockfish follows
+
+def spack_center(spec,name,**kwargs):
+	"""Catchall spack builds and deployment."""
+	if not os.path.isfile(spec):
+		raise Exception('cannot find %s'%spec)
+	print('status received kwargs: %s'%kwargs)
+	yaml_do_select(what=spec,name=name,**kwargs)

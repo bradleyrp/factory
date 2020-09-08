@@ -1,5 +1,6 @@
 config:
   cli_extensions:
-    spack: lib.spack.spack_tree
+    spack_tree: lib.spack.spack_tree
     spack_hpc_deploy: lib.spack.spack_hpc_deploy
     spack_hpc_run: lib.spack.spack_hpc_run
+    spack: lib.spack.spack_center
