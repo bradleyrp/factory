@@ -5,6 +5,7 @@ from __future__ import print_function
 import os,copy,re,sys,glob
 import ortho
 import multiprocessing
+import tempfile
 # several functions below use yaml 
 #! we typically use the requirement function to load yaml in each function
 try:
@@ -31,10 +32,11 @@ from ortho import Handler
 from ortho import CacheChange
 from ortho import path_resolver
 from ortho import catalog
-from ortho import delveset
+from ortho import delveset,delve
 from ortho import requires_python_check
 from ortho import bash
 from ortho.yaml_run import yaml_do_select
+from ortho.handler import incoming_handlers
 
 """
 NOTES on path configuration and order of precedence
@@ -59,6 +61,17 @@ this file, but also provided for the yaml when it is loaded.
 spack_tree_defaults = {
 	'spot':'./local/spack',
 	'spot_envs':'./local/envs-spack',}
+
+spack_mirror_complete = """
+import subprocess,re,os
+proc = subprocess.Popen('spack -e . concretize -f'.split(),
+	stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+stdout,stderr = proc.communicate()
+if stderr: raise ValueError
+specs = [re.match('^.+\\^(.+)$',i).group(1) 
+	for i in stdout.decode().splitlines() if re.match('^.+\\^(.+)$',i)]
+for spec in specs: os.system('spack buildcache create -m testbed -a %s'%spec)
+"""
 
 def spack_clone(where=None):
 	"""
@@ -143,7 +156,23 @@ class SpackEnvMaker(Handler):
 			command = 'spack --env . concretize %s-f'%(extras)
 		# build for cache by selecting a mirror
 		elif cache_mirror:
-			command = 'spack --env . buildcache create -m %s'%cache_mirror
+			# previously used: command = 'spack --env . '
+			#   'buildcache create -a -m %s'%cache_mirror
+			# however this does not cover upstream dependencies so we run 
+			#   a script to do this
+			# write a temporary file to perform this
+			#! is this inefficient?
+			fn = tempfile.NamedTemporaryFile(delete=False)
+			with fn as fp:
+				fp.write(spack_mirror_complete.encode())
+				fp.close()
+			# somewhat redundant with the _run_via_spack above
+			starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
+			result = ortho.bash('source %s && python %s'%
+				(starter,fn.name),announce=True,
+				cwd=where,scroll=True)
+			os.remove(fn.name)
+			return
 		# standard installation
 		else:
 			command = "spack --env . install %s-j %d"%(extras,cpu_count_opt)
@@ -174,10 +203,44 @@ class SpackEnvItem(Handler):
 		"""
 		Pass this item along to SpackEnvMaker
 		"""
+		# hook to allow cache_mirror from a Handler
+		if getattr(cache_mirror,'_is_Handler',False):
+			cache_mirror = cache_mirror.solve
+		#!!! write environments to a temporary location instead?
 		spack_envs_dn = self.meta['spack_envs_dn']
 		spack_dn = self.meta['spack_dn']
 		spot = os.path.join(spack_envs_dn,name)
 		env = {'specs':specs}
+
+		# CUSTOM environment options from the CLI or yaml are managed here
+		# supra arguments override the argument
+		cache_mirror = self.meta.get('supra',{}).get(
+			'cache_mirror',cache_mirror)
+		cache_only = self.meta.get('supra',{}).get(
+			'cache_only',cache_only)
+		# arguments unique to the supra call
+		# install_tree sets the target location to install the packages
+		install_tree = self.meta.get('supra',{}).get(
+			'install_tree',None)
+		# install_tree sets the target location to install the packages
+		lmod_spot = self.meta.get('supra',{}).get(
+			'lmod_spot',None)
+
+		# custom modifications to the environment
+		if not mods: mods = {}
+		if install_tree:
+			delveset(mods,'config','install_tree',value=install_tree)
+		if lmod_spot:
+			try: 
+				modules_enable: delve(mods,'modules','enable')
+				if not 'lmod' in modules_enable:
+					delveset(mods,'modules','enable',
+						value=list(modules_enable)+['lmod'])
+			except: 
+				delveset(mods,'modules','enable',value=['lmod'])
+			delveset(mods,'config','module_roots','lmod',value=lmod_spot)
+		# end of customizations
+
 		# typically use a Handler here but we need meta so simplifying
 		if via:
 			# start with a template from the parent file in meta
@@ -190,6 +253,7 @@ class SpackEnvItem(Handler):
 			for route,val in catalog(mods):
 				delveset(instruct,*route,value=val)
 		print('status building spack environment at "%s"'%spot)
+		# continue to the spack environment interface
 		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct,
 			cache_only=cache_only,cache_mirror=cache_mirror,
 			# pass through meta for flags e.g. "live" to visit the env
@@ -334,6 +398,26 @@ class SpackEnvItem(Handler):
 			dirname = os.path.dirname(fn)
 			bash('ln -s %s %s'%(os.path.basename(fn),'default'),
 				cwd=dirname,scroll=False,v=True)
+	def _check_mirror(self,mirror_name,spot=None):
+		result = self._run_via_spack('spack mirror list',fetch=True)
+		if result['stderr']: raise OSError
+		mirrors = dict([i.split() for i in result['stdout'].splitlines()])
+		if mirror_name not in mirrors: return False
+		if spot:
+			spot_dn = os.path.realpath(spot)
+			spot_abs = 'file://%s'%spot_dn
+			if mirrors[mirror_name]!=spot_abs:
+				#! add html options
+				raise Exception('mirror %s exists but we cannot confirm it is '
+					'located at is at %s'%(mirror_name,spot_abs))
+		return True
+	def make_mirror(self,mirror_name,spot):
+		#! no spot checking so you cannot change the spot and thereby move it
+		if self._check_mirror(mirror_name,spot=spot): return
+		spot_dn = os.path.realpath(spot)
+		self._run_via_spack('spack mirror add --scope site %s %s'%(
+			mirror_name,spot_dn))
+		return mirror_name
 
 def spack_env_maker(what):
 	"""
@@ -383,7 +467,7 @@ class SpackSeqSub(Handler):
 		self.deploy = SpackSeq(meta=self.tree,**tree[name])
 		return self
 
-def spack_tree(what,name,live=False):
+def spack_tree(what,name,live=False,**meta):
 	"""
 	Install a sequence of spack environments.
 	"""
@@ -414,11 +498,19 @@ def spack_tree(what,name,live=False):
 	print('status installing spack seq from %s with name %s'%(what,name))
 	with open(what) as fp: 
 		tree = yaml.load(fp,Loader=yaml.Loader)
+	# meta arguments percolate to downstream functions
+	#   however we already later use meta for the tree, so we add supra-meta
+	#   arguments here as supra
+	if meta:
+		if 'supra' in tree: raise KeyError
+		tree['supra'] = meta
 	spack = SpackSeqSub(name=name,tree=tree,live=live).solve
 	# assume no changes to the tree, it has a spot, and the spot is parent
 	spack_spot = ortho.path_resolver(tree['spot'])
 	# register the spack location
 	return CacheChange(spack=spack_spot)
+
+### Spack HPC deployment for Blue Crab
 
 def spack_hpc_decoy(spec,name=None,live=False,
 	tmpdir=None,factory_site=None,mounts=None,image=None,decoy_method='proot'):
@@ -653,11 +745,72 @@ def spack_hpc_run(run=None,deploy=None,
 	# using os.system for the PTY
 	os.system(cmd_out)
 
-### Refactor rockfish follows
+### Refactor Spack on Rockfish 
 
-def spack_center(spec,name,**kwargs):
+## router functions
+
+"""
+redundancy note. the typical spack_tree installation allows you to map simple 
+configuration files in yaml into a spack environment which we then either 
+inspect (concretize) or install. when developing more elaborate workflows, we
+would typically use the "via" flag in SpackEnvItem.make_env
+"""
+
+def spack_router(spec,sub,debug=False,slurm=False,**kwargs):
 	"""Catchall spack builds and deployment."""
+	#! example usage: make spack specs/rockfish.yaml t03 do=gromacs slurm
 	if not os.path.isfile(spec):
 		raise Exception('cannot find %s'%spec)
 	print('status received kwargs: %s'%kwargs)
-	yaml_do_select(what=spec,name=name,**kwargs)
+	# reformulate incomming command line arguments
+	yaml_do_select(
+		# standard arguments
+		what=spec,name=sub,debug=debug,
+		# custom arguments
+		slurm=slurm,**kwargs)
+
+def spack_env_install(spec,do):
+	print('status building environment %s from %s'%(do,spec))
+	spack_tree(what=spec,name=do)
+
+@incoming_handlers
+def spack_env_cache(spec,do,cache_mirror=None):
+	print('status making buildcache for environment %s from %s'%(do,spec))
+	#! the following is clumsy
+	if not cache_mirror: raise Exception('needs cache_mirror')
+	spack_tree(what=spec,name=do,
+		# custom supra-meta arguments
+		cache_mirror=cache_mirror)
+
+def spack_install_cache(spec,do,target,modules=None):
+	"""Deploy the code to another tree from a build cache."""
+	target = os.path.abspath(os.path.expanduser(target))
+	if not modules:
+		# place lmod files in a subdirectory
+		modules = os.path.join(target,'lmod')
+	print('status installing to %s'%target)
+	spack_tree(what=spec,name=do,
+		# custom supra-meta arguments
+		# we insist on a cache build, choose an alternate location, and 
+		#   ensure that the lmod modules are build nearby
+		cache_only=True,install_tree=target,lmod_spot=modules)
+
+## spack supervision
+
+class SpackMirror(Handler):
+	_protected = {'realname','meta'}
+	_internals = {'name':'realname','meta':'meta'}
+	def make_mirror(self,name,spot):
+		SpackSeqSub(name='only',tree=dict(only=dict(envs=[dict(
+			mirror_name=name,spot=spot)])))
+		return name
+
+def spack_seq_alt(envs,ref=None):
+	"""Use a spack_tree recipe in a parent yaml file."""
+	# we use the SpackSeqSub not for subselecting but to get other variables 
+	#   from the spack_rockfish.yaml file with another pointer for modularity
+	tree = dict(only=dict(envs=envs))
+	# refer to a file to use a config in a via
+	if ref:
+		with open(ref) as fp: tree.update(**yaml.load(fp))
+	SpackSeqSub(name='only',tree=tree)

@@ -30,6 +30,7 @@ gromacs_gcc6:
     This recipe is designd for a standard CentOS7 box.
     We pin explicitly to the system gcc (4.8.5) to prevent recompile.
     We also use bootstrap to build modules.
+    Last tested on alphaville on 2020.09.06.
   envs:
     - find_compilers: null
     #! dev auto-detect the system GCC if above 6
@@ -54,3 +55,39 @@ gromacs_centos8_gpu:
     - name: env_gromacs_2020.3_gcc_8.3.1_native
       via: template_basic
       specs: ['gromacs@2020.3%gcc@8.3.1+cuda+mpi^cuda@10.2.89']
+      cache_mirror: testbed
+
+### TESTING
+
+template_deploy: 
+  concretization: separately
+  mirrors: {}
+  repos: []
+  upstreams: {}
+  modules:
+    enable: [lmod]
+    lmod:
+      hash_length: 0
+  definitions: []
+  packages: {}
+  config: 
+    checksum: false
+    # avoid the default cache in the home directory
+    misc_cache: $spack/misc_cache
+    # deploy location
+    install_tree: /home/rpb/local/stack3app
+    module_roots: 
+      lmod: /home/rpb/local/stack3mod
+  specs: []
+  view: false
+
+gromacs_deploy_test:
+  notes: |
+    Test the use of a build cache for installing somewhere else.
+  envs:
+    - find_compilers: null
+    - check_compiler: gcc@8.3.1
+    - name: env_gromacs_2020.3_gcc_8.3.1_native_deploy
+      via: template_deploy
+      specs: ['gromacs@2020.3%gcc@8.3.1+cuda+mpi^cuda@10.2.89']
+      cache_only: true

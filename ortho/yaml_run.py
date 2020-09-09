@@ -98,10 +98,36 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 				# ignore non-mappings because we are trying to run code
 				else: pass
 				return mapping
+			def cli_hook(loader,data):
+				"""
+				This hook connects the CLI via kwargs to the YAML file.
+
+				This yaml_do_select function is typically run with 
+				`make do <target.yaml> <name>` from the factory. If you need to
+				hook this up to the command line, but wish to simply run the
+				yaml file with all of the tags, you can use the !cli tag to add
+				a value from a kwargs key to the yaml document. To connect this
+				to the CLI, you can use `make use specs/cli_<name>.yaml` to
+				add a command with unstructured arguments, and then this command
+				can pass these along to yaml_do_select kwargs. In short, this
+				hook allows you to run a stock yaml file with tags that point
+				to other codes while also populating variables directly from
+				the command line. The only mediator is the CLI function which
+				must be registered in config.json with a `make use` call.
+				"""
+				#! this needs better docs because it is very abstract
+				return kwargs[data.value]
 			# add the constructor here and load will end the execution
 			yaml.add_constructor("!select",constructor)
+			yaml.add_constructor("!cli",cli_hook)
 			# EXECUTE the yaml here
 			spec = yaml.load(text,Loader=yaml.Loader)
+			if debug:
+				# note that we may wish to manipulate objects after the yaml
+				#! document this option
+				import code
+				code.interact(local=spec,
+					banner='[INTERACT] welcome to YAML land')
 	# standard execution
 	else: 
 		spec = yaml.load(text,Loader=yaml.Loader)
