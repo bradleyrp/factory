@@ -1,0 +1,38 @@
+spot: ./local/spack
+spot_envs: ./local/envs-spack
+
+# spack environment build template
+template_basic: 
+  concretization: separately
+  mirrors: {}
+  repos: []
+  upstreams: {}
+  modules:
+    enable: []
+  definitions: []
+  packages: {}
+  config: 
+    checksum: false
+    # avoid the default cache in the home directory
+    misc_cache: $spack/misc_cache
+  specs: []
+  view: false
+
+lmod_base:
+  envs:
+    - name: env_lmod
+      via: template_basic
+      specs: ['lmod']
+
+gromacs_centos8_gpu:
+  notes: |
+    Install GROMACS with native GCC 8 on CentOS8 and CUDA.
+    Last tested on heartland on 2020.09.05.
+  envs:
+    - find_compilers: null
+    #! dev: check the major gcc version i.e. detect the native and use MAJ.MIN
+    - check_compiler: gcc@8.3.1
+    #! dev: create a naming scheme
+    - name: env_gromacs_2020.3_gcc_8.3.1_native
+      via: template_basic
+      specs: ['gromacs@2020.3%gcc@8.3.1+cuda+mpi^cuda@10.2.89']
