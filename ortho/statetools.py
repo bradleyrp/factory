@@ -442,7 +442,10 @@ class Parser:
 						#! @functools.wraps
 						def inject_kwargs(func):
 							def decorated_command(*args,**kwargs):
-								return func(*args,**kwargs_out,**kwargs)
+								kwargs_out_this = copy.deepcopy(kwargs_out)
+								# kwargs can be overridden
+								kwargs_out_this.update(**kwargs)
+								return func(*args,**kwargs_out_this)
 							return decorated_command
 						# decorate the function
 						self.specials[name] = inject_kwargs(self.specials[name])
