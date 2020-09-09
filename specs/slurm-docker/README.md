@@ -158,6 +158,7 @@ make -C specs/slurm-docker build
 # build containers
 make docker specs/slurm-docker/marcc-hpc.yaml testcluster_build rebuild
 make docker specs/slurm-docker/marcc-hpc.yaml testcluster_ldap_build rebuild
+# command to start everything if volumes and containers are ready
 make docker specs/slurm-docker/marcc-hpc.yaml testcluster_combo
 # shortcut to offline everything later
 make down testcluster_combo
