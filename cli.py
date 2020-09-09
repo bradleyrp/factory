@@ -247,6 +247,8 @@ class Interface(Parser):
         if os.path.isfile(what):
             with open(what) as fp: text = fp.read()
             changes = yaml.load(text,Loader=yaml.SafeLoader)
+            #! note that MakeUse is always non-destructive so if you
+            #!   rename a key, you might need to prune the old one manually
             Convey(state=self.cache)(MakeUse)(**changes).solve
         else: raise Exception('unclear what: %s'%what)
 

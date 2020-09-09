@@ -4,4 +4,7 @@ config:
     spack_hpc_deploy: lib.spack.spack_hpc_deploy
     spack_hpc_run: lib.spack.spack_hpc_run
     spack: lib.spack.spack_router
-    spack_builder: lib.spack.spack_builder
+    rf: # rockfish shortcut
+      function: lib.spack.spack_hpc_shortcut
+      kwargs: 
+        spec: specs/rockfish.yaml

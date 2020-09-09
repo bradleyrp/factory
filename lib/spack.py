@@ -12,7 +12,7 @@ try:
 	import yaml
 	from lib.yaml_mods import YAMLObjectInit
 	# loading yaml_mods adds extra tags and constructors
-	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_lists
+	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_list
 	# chain feature for handling dependencies
 	yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
 	# additional shorthand
@@ -27,6 +27,7 @@ try:
 except Exception as e: 
 	#! yaml error here if you raise
 	#! hence this is loaded twice. consider fixing? or explicate
+	print(e)
 	pass
 from ortho import Handler
 from ortho import CacheChange
@@ -156,19 +157,20 @@ class SpackEnvMaker(Handler):
 			command = 'spack --env . concretize %s-f'%(extras)
 		# build for cache by selecting a mirror
 		elif cache_mirror:
-			# previously used: command = 'spack --env . '
-			#   'buildcache create -a -m %s'%cache_mirror
-			# however this does not cover upstream dependencies so we run 
-			#   a script to do this
+			# command for the target after we add buildcache dependencies
+			command = 'spack --env . buildcache create -a -m %s'%cache_mirror
 			# write a temporary file to perform this
 			#! is this inefficient?
 			fn = tempfile.NamedTemporaryFile(delete=False)
 			with fn as fp:
 				fp.write(spack_mirror_complete.encode())
+				# we must also add the target here
+				fp.write(("os.system('%s')\n"%command).encode())
 				fp.close()
 			# somewhat redundant with the _run_via_spack above
 			starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
-			result = ortho.bash('source %s && python %s'%
+			#! requires python3
+			result = ortho.bash('source %s && python3 %s'%
 				(starter,fn.name),announce=True,
 				cwd=where,scroll=True)
 			os.remove(fn.name)
@@ -202,6 +204,8 @@ class SpackEnvItem(Handler):
 		cache_only=False,cache_mirror=None):
 		"""
 		Pass this item along to SpackEnvMaker
+		If you change the keys above, you must update them below to make sure
+		that SpackSeq does not run *other* items when live.
 		"""
 		# hook to allow cache_mirror from a Handler
 		if getattr(cache_mirror,'_is_Handler',False):
@@ -238,7 +242,8 @@ class SpackEnvItem(Handler):
 						value=list(modules_enable)+['lmod'])
 			except: 
 				delveset(mods,'modules','enable',value=['lmod'])
-			delveset(mods,'config','module_roots','lmod',value=lmod_spot)
+			delveset(mods,'config','module_roots','lmod',
+				value=lmod_spot)
 		# end of customizations
 
 		# typically use a Handler here but we need meta so simplifying
@@ -315,7 +320,7 @@ class SpackEnvItem(Handler):
 		chdir_cmd = self._env_chdir(name)
 		self._run_via_spack(command=chdir_cmd+\
 			# always delete and rebuild the entire tree
-			"spack module lmod refresh --delete-tree -y")
+			"spack -e . module lmod refresh --delete-tree -y")
 	def lmod_hooks(self,lmod_hooks):
 		"""Look over lmod hook objects."""
 		for item in lmod_hooks: SpackLmodHooks(**item).solve
@@ -446,8 +451,14 @@ class SpackSeq(Handler):
 		self.meta['spack_dn'] = spack_dn
 		self.meta['spack_envs_dn'] = spack_envs_dn
 		for env in envs: 
-			#! should we allow live only in certain cases?
 			# pass along the live flag via meta from CLI
+			# filter out anything that is not environment when live
+			# the following must match the make_env signature
+			keys_make_env = {'name','specs','mods',
+				'via','cache_only','cache_mirror'}
+			# skip items that are not routed to make_env
+			if self.meta.get('live',True) and not env.keys()<=keys_make_env:
+				continue
 			SpackEnvItem(meta=self.meta,**env)
 
 class SpackSeqSub(Handler):
@@ -470,6 +481,8 @@ class SpackSeqSub(Handler):
 def spack_tree(what,name,live=False,**meta):
 	"""
 	Install a sequence of spack environments.
+	Previously we linked this to `make spack` but this was retired to
+	`make spack_tree` in specs/cli_spack.yaml.
 	"""
 	notes = """
 		reqs:
@@ -769,9 +782,20 @@ def spack_router(spec,sub,debug=False,slurm=False,**kwargs):
 		# custom arguments
 		slurm=slurm,**kwargs)
 
-def spack_env_install(spec,do):
+def spack_hpc_shortcut(sub,debug=False,slurm=False,**kwargs):
+	"""Shortcut to call the router with a spec set by a make use operation."""
+	# see specs/cli_spack.yaml rockfish recipe for an example
+	return spack_router(sub=sub,debug=False,slurm=False,**kwargs)
+
+def spack_env_install(spec,do,target=None):
 	print('status building environment %s from %s'%(do,spec))
-	spack_tree(what=spec,name=do)
+	spack_tree(what=spec,name=do,install_tree=target)
+
+def spack_env_concretize(spec,do,target=None):
+	print('status building environment %s from %s'%(do,spec))
+	tree = spack_tree(what=spec,name=do,install_tree=target,live=True)
+	raise Exception('need a way to return the environment location for '
+		'inspection and modification')
 
 @incoming_handlers
 def spack_env_cache(spec,do,cache_mirror=None):
@@ -814,3 +838,4 @@ def spack_seq_alt(envs,ref=None):
 	if ref:
 		with open(ref) as fp: tree.update(**yaml.load(fp))
 	SpackSeqSub(name='only',tree=tree)
+
