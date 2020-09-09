@@ -50,3 +50,7 @@ module avail
 ml openmpi
 ml gromacs
 ~~~
+
+# 2020.09.09
+
+Completed minimal demo with a restricted Lmod tree. Included a tool for running concretize.

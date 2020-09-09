@@ -1,3 +1,4 @@
+# Rockfish Software Stack via Spack
 # USAGE: `make do specs/rockfish.yaml name=test` except where otherwise
 select: !select 
 
@@ -8,28 +9,14 @@ select: !select
       name: testbed
       spot: local/spack/mirror-spot
     prefix: &prefix ~/local/stack
-    #! redundant with items in spack_rockfish.yaml but useful in setup below
-    template_basic: &template_basic
-      concretization: separately
-      mirrors: {}
-      repos: []
-      upstreams: {}
-      modules:
-        enable: []
-      definitions: []
-      packages: {}
-      config: 
-        checksum: false
-        # avoid the default cache in the home directory
-        misc_cache: $spack/misc_cache
-      specs: []
-      view: false
 
-  # RECIPE: preliminary setup
-  # usage: make spack specs/rockfish.yaml setup
-  setup:
+  # DEMO: preliminary setup
+  # usage: make spack specs/rockfish.yaml setup_explicit
+  # this demo creates spack environments directly from this file
+  # see alternate setup: make specs/rockfish.yaml go do=full 
+  setup_explicit:
     # talk directly to lib.spack in the same format as spack_tree.yaml
-    # the first step compilest he code
+    # the first step compilest the code however the setup select deploys
     - !!python/object/apply:lib.spack.spack_seq_alt
       kwds:
         ref: *spec
@@ -72,7 +59,7 @@ select: !select
         # cli argument to select the environment name in the spec
         do: !cli do
 
-  # recipe: deploy to an install location
+  # RECIPE: deploy to an install location
   # usage: make spack specs/rockfish.yaml deploy do=<name>
   deploy:
     # deploy to the location
@@ -81,4 +68,40 @@ select: !select
         spec: *spec
         target: *prefix
         do: !cli do
-    # refresh modules ...!!! spack -e . module lmod refresh
+
+  # RECIPE: full build including: build, cache, and deploy
+  # setup should be run with the following command
+  # usage: make spack specs/rockfish.yaml full do=setup
+  # usage: make spack specs/rockfish.yaml deploy do=<name>
+  #!!! lots of redundancy and repeated commands as the environment is rerun
+  go:
+    # compile the code
+    - !!python/object/apply:lib.spack.spack_env_install
+      kwds:
+        spec: *spec
+        # cli argument to select the environment name in the spec
+        do: !cli do
+    # create the build cache
+    - !!python/object/apply:lib.spack.spack_env_cache
+      kwds:
+        spec: *spec
+        cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
+          kwds: *mirror
+        # cli argument to select the environment name in the spec
+        do: !cli do
+    # deploy to the location
+    - !!python/object/apply:lib.spack.spack_install_cache
+      kwds:
+        spec: *spec
+        target: *prefix
+        do: !cli do
+
+  # RECIPE: inspect an environment
+  # this recipe selects on the make_env items in a spack recipe 
+  #   and then runs concretize so you can inspect the environment
+  live:
+    - !!python/object/apply:lib.spack.spack_env_concretize
+      kwds:
+        spec: *spec
+        # cli argument to select the environment name in the spec
+        do: !cli do
