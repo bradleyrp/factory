@@ -436,7 +436,7 @@ class Parser:
 				# customizations to the function call
 				if special_subcommander:
 					# inject kwargs into a function call
-					if special_subcommander.keys()=={'kwargs'}:
+					if special_subcommander.keys()=={'kwargs','function'}:
 						kwargs_out = special_subcommander['kwargs']
 						func_target = self.specials[name]
 						#! @functools.wraps
