@@ -1,5 +1,8 @@
-spot: local/spack
-spot_envs: local/envs-spack
+# paths for the spack source and environments
+# defaults are in local otherwise use "make set (spack|spack_envs) path"
+#! dev: centralize all configurations
+spot: !orthoconf [spack, local/spack]
+spot_envs: !orthoconf [spack_envs, local/envs-spack]
 
 ### DEFS
 
@@ -69,6 +72,8 @@ gmxdemo:
     Install GROMACS with native GCC 8 on CentOS8 and CUDA.
     Tested: heartland on 2020.09.05.
     Note that openmpi for GROMACS retains a hash.
+    As of 2020.09.09 gromacs has an issue with cuda and fftw
+      which you must fix with specs/rockfish/spack-gromacs-patch.txt
   envs:
     - find_compilers: null
     #! dev: check the major gcc version i.e. detect the native and use MAJ.MIN
