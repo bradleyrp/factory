@@ -71,7 +71,9 @@ stdout,stderr = proc.communicate()
 if stderr: raise ValueError
 specs = [re.match('^.+\\^(.+)$',i).group(1) 
 	for i in stdout.decode().splitlines() if re.match('^.+\\^(.+)$',i)]
-for spec in specs: os.system('spack buildcache create -m testbed -a %s'%spec)
+for spec in specs: 
+	os.system(
+		'spack buildcache create -m %(mirror)s -a %%s'%%spec)
 """
 
 def spack_clone(where=None):
@@ -163,7 +165,8 @@ class SpackEnvMaker(Handler):
 			#! is this inefficient?
 			fn = tempfile.NamedTemporaryFile(delete=False)
 			with fn as fp:
-				fp.write(spack_mirror_complete.encode())
+				fp.write((spack_mirror_complete%
+					dict(mirror=cache_mirror)).encode())
 				# we must also add the target here
 				fp.write(("os.system('%s')\n"%command).encode())
 				fp.close()
@@ -760,6 +763,53 @@ def spack_hpc_run(run=None,deploy=None,
 
 ### Refactor Spack on Rockfish 
 
+## detritus
+
+def spack_seq_alt(envs,ref=None):
+	"""Use a spack_tree recipe in a parent yaml file."""
+	"""
+	retired this method from rockfish.yaml but here is the spec for posterity
+	  # DEMO: preliminary setup
+	  # usage: make spack specs/rockfish.yaml setup_explicit
+	  # this demo creates spack environments directly from this file
+	  # see alternate setup: make specs/rockfish.yaml go do=full 
+	  setup_explicit:
+	    # talk directly to lib.spack in the same format as spack_tree.yaml
+	    # the first step compilest the code however the setup select deploys
+	    - !!python/object/apply:lib.spack.spack_seq_alt
+	      kwds:
+	        ref: *spec
+	        envs:
+	          - find_compilers: null
+	          - name: env_lmod
+	            via: template_basic
+	            specs: ['lmod']
+	    # repeat to the cache mirror
+	    - !!python/object/apply:lib.spack.spack_seq_alt
+	      kwds:
+	        ref: *spec
+	        envs:
+	          - find_compilers: null
+	          - name: env_lmod
+	            via: template_basic
+	            specs: ['lmod']
+	            cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
+	              kwds: *mirror
+	    # this do item is redundant with the lmod spec above
+	    - !!python/object/apply:lib.spack.spack_install_cache
+	      kwds:
+	        spec: *spec
+	        target: *prefix
+	        do: lmod_base
+	"""
+	# we use the SpackSeqSub not for subselecting but to get other variables 
+	#   from the spack_rockfish.yaml file with another pointer for modularity
+	tree = dict(only=dict(envs=envs))
+	# refer to a file to use a config in a via
+	if ref:
+		with open(ref) as fp: tree.update(**yaml.load(fp))
+	SpackSeqSub(name='only',tree=tree)
+
 ## router functions
 
 """
@@ -828,14 +878,3 @@ class SpackMirror(Handler):
 		SpackSeqSub(name='only',tree=dict(only=dict(envs=[dict(
 			mirror_name=name,spot=spot)])))
 		return name
-
-def spack_seq_alt(envs,ref=None):
-	"""Use a spack_tree recipe in a parent yaml file."""
-	# we use the SpackSeqSub not for subselecting but to get other variables 
-	#   from the spack_rockfish.yaml file with another pointer for modularity
-	tree = dict(only=dict(envs=envs))
-	# refer to a file to use a config in a via
-	if ref:
-		with open(ref) as fp: tree.update(**yaml.load(fp))
-	SpackSeqSub(name='only',tree=tree)
-
