@@ -425,7 +425,7 @@ class Parser:
 				special_subcommander = False
 				if isinstance(target,dict):
 					special_subcommander = target
-					target = special_subcommander.pop('function')
+					target = special_subcommander.get('function',None)
 				try: 
 					mod_target,func_name = re.match(
 						r'^(.+)\.(.*?)$',target).groups()
