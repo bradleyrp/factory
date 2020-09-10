@@ -389,6 +389,11 @@ class Interface(Parser):
         #! add protection agaist `./fac nuke --sure`
         ortho.bash(cmd,scroll=True,announce=True)
 
+    def set(self,name,value):
+        """Set a config value."""
+        # to use Cacher we manipulate the state, not ortho.conf
+        state[name] = value
+
 if __name__ == '__main__':
     # the ./fac script calls this interface
     Interface()
