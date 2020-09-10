@@ -9,6 +9,8 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 	We moved it outside of the cli.py Interface(Parser) object to generalize
 	it further and allow other command-line arguments.
 	"""
+	#!!! issue: incorrect kwargs are routed into yaml and there is no warning
+	#!!!   that they are invalid. this is an inherent downside possibly
 	with open(what) as fp: text = fp.read()
 	from lib.yaml_mods import YAMLTagIgnorer,YAMLTagCat
 	# the YAMLTagIgnorer decorates a placeholder tree with _has_tag
@@ -115,7 +117,16 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 				the command line. The only mediator is the CLI function which
 				must be registered in config.json with a `make use` call.
 				"""
-				#! this needs better docs because it is very abstract
+				# two arguments imply a key and a default
+				if isinstance(data.value,list)==1:
+					if len(data.value)==2:
+						key,default = [i.value for i in data.value]
+						return kwargs.get(key,default)
+					elif len(data.value)==1:
+						key = kwargs[data.value[0].value]
+						return kwargs[key]
+					else: raise ValueError
+				# if not a list, then a string and we return the value
 				return kwargs[data.value]
 			# add the constructor here and load will end the execution
 			yaml.add_constructor("!select",constructor)
