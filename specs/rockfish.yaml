@@ -7,7 +7,7 @@ select: !select
     spec: &spec specs/spack_rockfish.yaml
     mirror: &mirror 
       name: rfcache
-      spot: /home/rpb/work/spack/mirror-spot
+      spot: local/spack/mirror-spot
     prefix: &prefix ~/local/stack
 
   # DEMO: preliminary setup
