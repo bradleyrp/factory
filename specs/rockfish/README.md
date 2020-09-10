@@ -55,48 +55,87 @@ ml openmpi
 ml gromacs
 ~~~
 
-<a id="current"></a>
 # Proof of concept
 
-[2020.09.09] Completed minimal demo with a restricted Lmod tree. Included a tool for running concretize. Started testing from scratch. Considered complexity in the execution loop and decided on a minor refactor in the medium term. Until then, added features to point the code to an external spack source tree. Added the `!orthoconf` tag to accomplish this elegantly. New deployment instructions follow.
-
-~~~
-# clone to ~/work/stack
-# reset everything
-cd ~/work/stack
-rm -rf ~/work/spack
-rm -rf ./local
-rm config.json
-# install spack
-make use specs/cli_spack.yaml
-# setup spack
-cd ~/work/
-git clone https://github.com/spack/spack
-mkdir spack/envs-spack
-# set the paths
-cd ~/work/stack
-make set spack /home/rpb/work/spack
-make set spack_envs /home/rpb/work/spack/envs-spack
-make set spack_mirror_name rfcache
-make set spack_mirror_path /home/rpb/work/spack/mirror
-# deploy
-cd ~/work/stack
-make rf go do=setup 2>&1 | tee log
-# onetime gpg
-make rf gpg
-# patch gromacs
-patch ~/work/spack/var/spack/repos/builtin/packages/gromacs/package.py specs/rockfish/spack-gromacs-patch.txt	
-# block home spack in development until we find out which command makes it
-mkdir ~/.spack
-chmod -rwx ~/.spack
-# inside a screen, start the build
-make rf go do=setup 2>&1 | tee log
-# teardown test: remove the production demployment
-rm -rf ~/local/stack
-time (make rf go do=setup 2>&1 | tee log && make rf go do=gmxdemo 2>&1 | tee log)
-~~~
+[2020.09.09] Completed minimal demo with a restricted Lmod tree. Included a tool for running concretize. Started testing from scratch. Considered complexity in the execution loop and decided on a minor refactor in the medium term. Until then, added features to point the code to an external spack source tree. Added the `!orthoconf` tag to accomplish this elegantly. New deployment instructions follow in the next section
 
 The teardown above for Lmod, the GROMACS example, and supporting softwware, takes less than six minutes on a fast machine using the buildcache. Pending **issue**: the initial build procedure uses `~/.spack/cache` which means our `misc_cache` override is failing during build, but not after teardown and reinstallation from the buildcache.
+
+<a id="current"></a>
+## Instructions to deploy
+
+### Create a centralized spack source tree
+
+**Onetime only.** Note that we may need to modify the spack source and quickly build new software before we can submit a pull request. On Blue Crab we also made custom modifications related to stateless operation. In order to maintain a cluster-specific spack branch, we clone a central copy.
+
+~~~
+# choose an appropriate paths
+export SPACK_CENTRAL=$HOME/work/spack
+git clone https://github.com/spack/spack $SPACK_CENTRAL
+# create branches as necessary
+~~~
+
+### Setup prefix, environments, and mirror
+
+**Onetime only.** Make folders for the production or testing target (`$SPACK_PREFIX`) as well as a place for the buildcache and environments.
+
+~~~
+export SPACK_PREFIX=$HOME/local/stack
+export SPACK_MIRROR_NAME=rfcache
+export SPACK_MIRROR_PATH=$HOME/work/mirror-$SPACK_MIRROR_NAME
+export SPACK_ENVS=$HOME/work/spackenvs
+mkdir $SPACK_PREFIX
+mkdir $SPACK_ENVS
+~~~
+
+### Clone the Rockfish factory code
+
+**Onetime only.** Clone this code for personal use. Each contributor (or maintainer or admin) can do this. In the example above I have used the home directory, but when we deploy this on the cluster we can choose shared locations.
+
+~~~
+export SPACK_FACTORY=$HOME/work/stack
+git clone https://github.com/bradleyrp/factory -b bluecrab $SPACK_FACTORY
+cd $SPACK_FACTORY
+~~~
+
+### Configure
+
+**Onetime only.** Connect the factory to shared locations.
+
+~~~
+cd $SPACK_FACTORY
+make set spack $SPACK_CENTRAL
+make set spack_envs $SPACK_ENVS
+make set spack_mirror_name $SPACK_MIRROR_NAME
+make set spack_mirror_path $SPACK_MIRROR_PATH
+# check your work
+make config
+~~~
+
+### GPG keys
+
+**Onetime only.** Make some GPG keys.
+
+~~~
+cd $SPACK_FACTORY
+source env.sh spack
+spack gpg init
+spack gpg create "John Doe" "jdoe123@gmail.com"
+~~~
+
+### Build
+
+Now we are ready to build Lmod and the demonstration codes.
+
+~~~
+# build in a screen so we can go get coffee or our connection can be interrupted
+screen -S spack
+cd $SPACK_FACTORY
+# make a log because screen prevents scrolling up to see elaborate errors
+make rf go do=setup 2>&1 | tee log
+# make the demo
+make rf go do=gmxdemo 2>&1 | tee -a log
+~~~
 
 # Rockfish buildout
 
