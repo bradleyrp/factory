@@ -1,5 +1,5 @@
-spot: ./local/spack
-spot_envs: ./local/envs-spack
+spot: /home/rpb/work/spack
+spot_envs: /home/rpb/work/spack/envs-spack
 
 ### DEFS
 

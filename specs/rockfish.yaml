@@ -6,8 +6,8 @@ select: !select
   vars:
     spec: &spec specs/spack_rockfish.yaml
     mirror: &mirror 
-      name: testbed
-      spot: local/spack/mirror-spot
+      name: rfcache
+      spot: /home/rpb/work/spack/mirror-spot
     prefix: &prefix ~/local/stack
 
   # DEMO: preliminary setup
@@ -42,6 +42,14 @@ select: !select
         spec: *spec
         target: *prefix
         do: lmod_base
+
+  # RECIPE: create GPG keys
+  #! onetime only
+  #! spack gpg has bugs. clear gpg by removing spack/opt/spack/gpg
+  gpg:
+    - !!python/object/apply:os.system ["spack gpg init"]
+    - !!python/object/apply:os.system [
+      'spack gpg create "Ryan Bradley" "bradleyrp@gmail.com"']
 
   # RECIPE: build with cache
   # usage: make spack specs/rockfish.yaml cache do=<name>
