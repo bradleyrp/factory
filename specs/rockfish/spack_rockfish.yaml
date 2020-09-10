@@ -1,5 +1,11 @@
+### SPACK on ROCKFISH deployment
+### This file builds the software stack.
+### See specs/rockfish/README.md for instructions.
+
+### SETTINGS
+
 # paths for the spack source and environments
-# defaults are in local otherwise use "make set (spack|spack_envs) path"
+# defaults are in local otherwise use "make set (spack|spack_envs) <path>"
 #! dev: centralize all configurations
 spot: !orthoconf [spack, local/spack]
 spot_envs: !orthoconf [spack_envs, local/envs-spack]
@@ -18,7 +24,8 @@ wl01: &wl01 [openmpi, gromacs]
 
 # spack environment build template
 # note that the via tag refers to this by key not reference
-template_basic: &config-basic
+#! dev: convert the via flag to pure yaml
+template_basic: 
   concretization: separately
   mirrors: {}
   repos: []
@@ -73,7 +80,7 @@ gmxdemo:
     Tested: heartland on 2020.09.05.
     Note that openmpi for GROMACS retains a hash.
     As of 2020.09.09 gromacs has an issue with cuda and fftw
-      which you must fix with specs/rockfish/spack-gromacs-patch.txt
+      which you must fix with a patch, see specs/rockfish/README.md
   envs:
     - find_compilers: null
     #! dev: check the major gcc version i.e. detect the native and use MAJ.MIN

@@ -1,3 +1,7 @@
+# Index
+
+1. Current instructions for testing this proof-of-concept code is [below](#current).
+
 # Rockfish Software Development Roadmap
 
 ## Bluecrab history
@@ -51,6 +55,50 @@ ml openmpi
 ml gromacs
 ~~~
 
-# 2020.09.09
+<a id="current"></a>
+# Proof of concept
 
-Completed minimal demo with a restricted Lmod tree. Included a tool for running concretize.
+[2020.09.09] Completed minimal demo with a restricted Lmod tree. Included a tool for running concretize. Started testing from scratch. Considered complexity in the execution loop and decided on a minor refactor in the medium term. Until then, added features to point the code to an external spack source tree. Added the `!orthoconf` tag to accomplish this elegantly. New deployment instructions follow.
+
+~~~
+# clone to ~/work/stack
+# reset everything
+cd ~/work/stack
+rm -rf ~/work/spack
+rm -rf ./local
+rm config.json
+# install spack
+make use specs/cli_spack.yaml
+# setup spack
+cd ~/work/
+git clone https://github.com/spack/spack
+mkdir spack/envs-spack
+# set the paths
+cd ~/work/stack
+make set spack /home/rpb/work/spack
+make set spack_envs /home/rpb/work/spack/envs-spack
+make set spack_mirror_name rfcache
+make set spack_mirror_path /home/rpb/work/spack/mirror
+# deploy
+cd ~/work/stack
+make rf go do=setup 2>&1 | tee log
+# onetime gpg
+make rf gpg
+# patch gromacs
+patch ~/work/spack/var/spack/repos/builtin/packages/gromacs/package.py specs/rockfish/spack-gromacs-patch.txt	
+# block home spack in development until we find out which command makes it
+mkdir ~/.spack
+chmod -rwx ~/.spack
+# inside a screen, start the build
+make rf go do=setup 2>&1 | tee log
+# teardown test: remove the production demployment
+rm -rf ~/local/stack
+time (make rf go do=setup 2>&1 | tee log && make rf go do=gmxdemo 2>&1 | tee log)
+~~~
+
+The teardown above for Lmod, the GROMACS example, and supporting softwware, takes less than six minutes on a fast machine using the buildcache. Pending **issue**: the initial build procedure uses `~/.spack/cache` which means our `misc_cache` override is failing during build, but not after teardown and reinstallation from the buildcache.
+
+# Rockfish buildout
+
+[2020.09.10] Now that the code is working we can start adding compilers and packages in a systematic way. Our first objective is to build a single compiler, openmpi, and Python.
+

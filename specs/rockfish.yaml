@@ -19,6 +19,15 @@ select: !select
     - !!python/object/apply:os.system [
       'spack gpg create "Ryan Bradley" "bradleyrp@gmail.com"']
 
+  # RECIPE: build only
+  # usage: make spack specs/rockfish.yaml build do=<name>
+  build: 
+    - !!python/object/apply:lib.spack.spack_env_install
+      kwds:
+        spec: *spec
+        # cli argument to select the environment name in the spec
+        do: !cli do
+
   # RECIPE: build with cache
   # usage: make spack specs/rockfish.yaml cache do=<name>
   cache: 
@@ -81,3 +90,4 @@ select: !select
         spec: *spec
         # cli argument to select the environment name in the spec
         do: !cli do
+        visit: !cli [visit, true]

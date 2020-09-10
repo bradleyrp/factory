@@ -157,6 +157,9 @@ class SpackEnvMaker(Handler):
 		# inspect the concretize output
 		if live:
 			command = 'spack --env . concretize %s-f'%(extras)
+			#! register this globally for later. somewhat clumsy
+			global _LAST_SPACK_ENV
+			_LAST_SPACK_ENV = where
 		# build for cache by selecting a mirror
 		elif cache_mirror:
 			# command for the target after we add buildcache dependencies
@@ -197,8 +200,14 @@ class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
 	def _run_via_spack(self,command,fetch=False,site_force=True):
 		"""Route commands to spack."""
-		if site_force and os.path.isdir(os.path.expanduser('~/.spack')):
-			raise Exception('cannot allow ~/.spack')
+		home_spack = os.path.expanduser('~/.spack')
+		if site_force and os.path.isdir(home_spack):
+			if os.access(home_spack,os.X_OK | os.W_OK): 
+				raise Exception('cannot allow ~/.spack')
+			# if spack exists but is not writable we continue
+			# we added this feature to identify parts of the workflow that
+			#   write to ~/.spack in order to prevent this
+			else: pass
 		return SpackEnvMaker()._run_via_spack(
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
@@ -841,11 +850,14 @@ def spack_env_install(spec,do,target=None):
 	print('status building environment %s from %s'%(do,spec))
 	spack_tree(what=spec,name=do,install_tree=target)
 
-def spack_env_concretize(spec,do,target=None):
+def spack_env_concretize(spec,do,target=None,visit=False):
 	print('status building environment %s from %s'%(do,spec))
 	tree = spack_tree(what=spec,name=do,install_tree=target,live=True)
-	raise Exception('need a way to return the environment location for '
-		'inspection and modification')
+	#!! dev: hack to get the environment from globals. note that we need
+	#!!   a minor refactor to make this more elegant
+	if '_LAST_SPACK_ENV' in globals():
+		#! can we change directory? probably not but it would be useful
+		print('status spack environment spot: %s'%_LAST_SPACK_ENV)
 
 @incoming_handlers
 def spack_env_cache(spec,do,cache_mirror=None):
