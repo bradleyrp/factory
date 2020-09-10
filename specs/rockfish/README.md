@@ -108,8 +108,11 @@ make set spack $SPACK_CENTRAL
 make set spack_envs $SPACK_ENVS
 make set spack_mirror_name $SPACK_MIRROR_NAME
 make set spack_mirror_path $SPACK_MIRROR_PATH
+make set spack_prefix $SPACK_PREFIX
 # check your work
 make config
+# install the spack extensions to the factory
+make use specs/cli_spack.yaml
 ~~~
 
 ### GPG keys
@@ -132,12 +135,16 @@ Now we are ready to build Lmod and the demonstration codes.
 screen -S spack
 cd $SPACK_FACTORY
 # make a log because screen prevents scrolling up to see elaborate errors
-make rf go do=setup 2>&1 | tee log
+time make rf go do=setup 2>&1 | tee log
 # make the demo
-make rf go do=gmxdemo 2>&1 | tee -a log
+time make rf go do=gmxdemo 2>&1 | tee -a log
 ~~~
 
 # Rockfish buildout
 
-[2020.09.10] Now that the code is working we can start adding compilers and packages in a systematic way. Our first objective is to build a single compiler, openmpi, and Python.
+[2020.09.10] Now that the code is working we can start adding compilers and packages in a systematic way. Our first objective is to build a single compiler, openmpi, and Python. The following example has been customized for testing in Centos8, where the default compiler is GCC 8.3.1.
 
+~~~
+cd $SPACK_FACTORY
+time make rf go do=gcc-8-compiler 2>&1 | tee -a log
+~~~

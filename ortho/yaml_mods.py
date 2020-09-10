@@ -99,6 +99,8 @@ yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
 def yaml_tag_orthoconf(self,node):
 	"""Tag to check the ortho.conf for a value."""
 	from .config import conf
+	if len(node.value)!=2: raise Exception('orthoconf tag requires two '
+		'arguments: a key and a default')
 	# we expect two arguments
 	key,default = [i.value for i in node.value]
 	return conf.get(key,default)

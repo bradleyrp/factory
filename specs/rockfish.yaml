@@ -8,7 +8,7 @@ select: !select
     mirror: &mirror 
       name: !orthoconf [spack_mirror_name, local-mirror]
       spot: !orthoconf [spack_mirror_path, local/spack/mirror-spot]
-    prefix: &prefix ~/local/stack
+    prefix: &prefix !orthoconf [spack_prefix, ~/local/stack]
 
   # RECIPE: create GPG keys
   #! onetime only. needs automated
