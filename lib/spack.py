@@ -248,7 +248,7 @@ class SpackEnvItem(Handler):
 			delveset(mods,'config','install_tree',value=install_tree)
 		if lmod_spot:
 			try: 
-				modules_enable: delve(mods,'modules','enable')
+				modules_enable = delve(mods,'modules','enable')
 				if not 'lmod' in modules_enable:
 					delveset(mods,'modules','enable',
 						value=list(modules_enable)+['lmod'])
