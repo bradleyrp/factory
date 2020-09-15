@@ -1,14 +1,14 @@
 #!/usr/bin/env python
 
-import yaml
-import ortho
-
 def yaml_do_select(what,name=None,debug=False,**kwargs):
 	"""
 	This function executes a portion of a YAML file.
 	We moved it outside of the cli.py Interface(Parser) object to generalize
 	it further and allow other command-line arguments.
 	"""
+	# import here for other use of ortho without yaml
+	import yaml
+	import ortho
 	#!!! issue: incorrect kwargs are routed into yaml and there is no warning
 	#!!!   that they are invalid. this is an inherent downside possibly
 	with open(what) as fp: text = fp.read()
