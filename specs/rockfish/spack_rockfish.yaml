@@ -16,9 +16,34 @@ arch: &arch "arch=linux-centos8-zen"
 gcc-back-compiler: &gcc-back-compiler gcc@8.3.1
 gcc-back: &gcc-back !strflush ["%", *gcc-back-compiler]
 gcc-8-compiler: &gcc-8-compiler gcc@8.4.0
+gcc-8: &gcc-8 !strflush ["%", *gcc-8-compiler, " ", *arch]
+cuda-sm-here: &cuda-sm-here "75" # using an NVidia 2060
 
 # whitelists
-wl01: &wl01 [openmpi, gromacs]
+wl01: &wl01 [gcc, openmpi, gromacs, python, py-tensorflow, py-pip]
+
+# pinned versions
+python3: &python-3 >-
+  python@3.8.5 +bz2 +ctypes +dbm +debug 
+  +libxml2 +lzma +optimizations +pic +pyexpat +pythoncmd 
+  +readline +shared +sqlite3 +ssl +uuid +zlib
+cuda-10-2: &cuda-10-2 cuda@10.2.89
+r402: &r402 !chain
+  - r@4.0.2 +memory_profiling
+  - *python-3
+r-packages: &r-packages [r-rcpp, r-devtools] #! pending spack version issue fix
+openmpi-31: &openmpi-31 !strcat
+  - openmpi@3.1.5 +cuda +cxx_exceptions 
+  - !strflush ['^', *cuda-10-2]
+  - *gcc-8 
+# lining up tensorflow supports here
+cudnn-765-102: &cudnn-765-102 cudnn@7.6.5.32-10.2-linux-x64
+nccl-2781: &nccl-2781 nccl@2.7.8-1
+#! openmpi on a cluster might require:
+#! fabrics=verbs +legacylaunchers +pmi +vt schedulers=slurm 
+#! ^slurm@17.11.12 
+hdf5-1106: &hdf5-1106 >-
+  hdf5@1.10.6 ~cxx ~debug ~fortran +hl +mpi +pic +shared +szip ~threadsafe
 
 ### TEMPLATES
 
@@ -80,7 +105,7 @@ gmxdemo:
     Tested: heartland on 2020.09.05.
     Note that openmpi for GROMACS retains a hash.
     As of 2020.09.09 gromacs has an issue with cuda and fftw
-      which you must fix with a patch, see specs/rockfish/README.md
+      which you must fix with a patch, see specs/rockfish/README.md.
   envs:
     - find_compilers: null
     #! dev: check the major gcc version i.e. detect the native and use MAJ.MIN
@@ -98,7 +123,7 @@ gmxdemo:
 
 ### SERIES A
 
-# step 1: compile a compiler
+# series A, step 1a: compile a compiler
 gcc-8-compiler:
   envs:
     - find_compilers: null
@@ -110,3 +135,63 @@ gcc-8-compiler:
         - !str &gcc-8-out [*gcc-8-compiler, *gcc-back, *arch]
     - find: *gcc-8-compiler 
       name: *env-gcc-8-compiler
+
+# series A, step 1b: openmpi
+gcc-8-openmpi-31:
+  envs:
+    - name: &env-gcc-8-ompi env-ompi
+      via: template_basic
+      mods: *mc01
+      specs: [*openmpi-31]
+
+# series A, step 2: standard programs
+stage_a2:
+  envs:
+    - name: &env-stage-a02 env-series-a
+      via: template_basic
+      mods: *mc01
+      specs: &stage-a02-specs !merge_lists
+        - [*gcc-8-out]
+        # base python
+        - [!str [*python-3, *gcc-8]]
+        - [!strflush [py-pip, " ^", *python-3, *gcc-8]]
+        # cuda
+        - [*cuda-10-2]
+    - lmod_refresh: null
+      name: *env-stage-a02
+
+#!!! dev: serious issue with merge_lists and loopcat tags but this works:
+#! specs: &stage-a03-specs !loopcat
+#!     base: !strflush ["^", *r402, *gcc-8]
+#!     loop: *r-packages
+
+# series A, step 3: specials
+stage_a3:
+  envs:
+    - name: &env-stage-a03 env-series-a
+      via: template_basic
+      mods: *mc01
+      specs: &stage-a03-specs
+        - !strcat ["intel-mkl threads=tbb", *gcc-8]
+        - !strcat 
+          - !strflush [*hdf5-1106]
+          - !strflush ["^", *openmpi-31] # depends on *gcc-8
+
+# series A, step 4: tensorflow
+stage_a4:
+  envs:
+    - name: &env-stage-a04 env-series-a
+      via: template_basic
+      mods: *mc01
+      specs: &stage-a04-specs
+        - !strcat &bazel-310-tf ["bazel ^jdk@11.0.8", *gcc-8]
+        - !strcat 
+          - !strflush ["py-tensorflow@2.3.0 cuda_arch=", *cuda-sm-here]
+          - !strflush ["^", *bazel-310-tf]
+          - !strflush ["^", *python-3]
+          - !strflush ["^", *hdf5-1106]
+          - !strflush ["^", *openmpi-31] # already depends on cuda-10-2
+          - !strflush ["^", *cudnn-765-102]
+          - !strflush ["^", *nccl-2781]
+          - *gcc-8
+

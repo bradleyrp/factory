@@ -47,6 +47,24 @@ select: !select
   # RECIPE: deploy to an install location
   # usage: make spack specs/rockfish.yaml deploy do=<name>
   deploy:
+    # build the cache
+    - !!python/object/apply:lib.spack.spack_env_cache
+      kwds:
+        spec: *spec
+        cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
+          kwds: *mirror
+        # cli argument to select the environment name in the spec
+        do: !cli do
+    # deploy to the location
+    - !!python/object/apply:lib.spack.spack_install_cache
+      kwds:
+        spec: *spec
+        target: *prefix
+        do: !cli do
+
+  # RECIPE: install without cchecking cache
+  # usage: make spack specs/rockfish.yaml reinstall do=<name>
+  reinstall:
     # deploy to the location
     - !!python/object/apply:lib.spack.spack_install_cache
       kwds:

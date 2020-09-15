@@ -2,7 +2,7 @@
 
 #! manually pick up the overloaded print
 from __future__ import print_function
-import os,copy,re,sys,glob
+import os,copy,re,sys,glob,pprint
 import ortho
 import multiprocessing
 import tempfile
@@ -74,6 +74,26 @@ specs = [re.match('^.+\\^(.+)$',i).group(1)
 for spec in specs: 
 	os.system(
 		'spack buildcache create -m %(mirror)s -a %%s'%%spec)
+"""
+
+spack_mirror_complete = """
+import subprocess,re,os
+proc = subprocess.Popen('spack -e . concretize -f'.split(),
+	stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+stdout,stderr = proc.communicate()
+if stderr: raise ValueError
+specs = [re.match('^.+\\^(.+)$',i).group(1) 
+	for i in stdout.decode().splitlines() if re.match('^.+\\^(.+)$',i)]
+def specbuild(spec=None,cmd=None):
+	if not bool(spec) ^ bool(cmd): raise ValueError
+	print('[STATUS] buildcache for spec: %%s'%%spec)
+	cmd = 'spack buildcache create -m rfcache -a %%s'%%spec
+	proc = subprocess.Popen(cmd.split())
+	proc.communicate()
+	if proc.returncode:
+		raise Exception('spack error above')
+for spec in specs: specbuild(spec)
+specbuild(cmd='spack buildcache create -m %(mirror)s -a %%s'%%spec)
 """
 
 def spack_clone(where=None):
@@ -166,26 +186,43 @@ class SpackEnvMaker(Handler):
 			command = 'spack --env . buildcache create -a -m %s'%cache_mirror
 			# write a temporary file to perform this
 			#! is this inefficient?
-			fn = tempfile.NamedTemporaryFile(delete=False)
-			with fn as fp:
-				fp.write((spack_mirror_complete%
-					dict(mirror=cache_mirror)).encode())
-				# we must also add the target here
-				fp.write(("os.system('%s')\n"%command).encode())
-				fp.close()
-			# somewhat redundant with the _run_via_spack above
-			starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
-			#! requires python3
-			result = ortho.bash('source %s && python3 %s'%
-				(starter,fn.name),announce=True,
-				cwd=where,scroll=True)
-			os.remove(fn.name)
+			if 0:
+				fn = tempfile.NamedTemporaryFile(delete=False)
+				with fn as fp:
+					fp.write((spack_mirror_complete%
+						dict(mirror=cache_mirror)).encode())
+					# we must also add the target here
+					fp.write(("os.system('%s')\n"%command).encode())
+					fp.close()
+				# somewhat redundant with the _run_via_spack above
+				starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
+				#! requires python3
+				result = ortho.bash('source %s && python3 %s'%
+					(starter,fn.name),announce=True,
+					cwd=where,scroll=True)
+				os.remove(fn.name)
+			# run the code directly
+			result_concretize = bash('spack -e . concretize -f',
+				cwd=where,scroll=False)
+			stdout,stderr = [result_concretize[k] for k in ['stdout','stderr']]
+			if stderr: raise ValueError
+			specs = [re.match(r'^.+\^(.+)$',i).group(1) 
+				for i in stdout.splitlines() 
+				if re.match(r'^.+\^(.+)$',i)]
+			print('[STATUS] collecting the following specs:\n%s'%
+				pprint.pformat(specs))
+			for spec in specs: 
+				bash('spack --env . buildcache create -a -m %s %s'%(
+					cache_mirror,spec),cwd=where,scroll=True)
+			bash('spack -e . buildcache create -a -m %s'%
+				cache_mirror,cwd=where,scroll=True)
 			return
 		# standard installation
 		else:
 			command = "spack --env . install %s-j %d"%(extras,cpu_count_opt)
+		# make fetch happen below because this catches exceptions
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-			command=command)
+			command=command,fetch=False)
 
 class SpackLmodHooks(Handler):
 	def write_lua_file(self,modulefile,contents,moduleroot):

@@ -113,6 +113,8 @@ make set spack_prefix $SPACK_PREFIX
 make config
 # install the spack extensions to the factory
 make use specs/cli_spack.yaml
+# issue: we divert misc_cache in most cases but not all
+mkdir ~/.spack && chmod -rwx ~/.spack
 ~~~
 
 ### GPG keys
@@ -137,8 +139,14 @@ cd $SPACK_FACTORY
 # make a log because screen prevents scrolling up to see elaborate errors
 time make rf go do=setup 2>&1 | tee log
 # make the demo
-time make rf go do=gmxdemo 2>&1 | tee -a log
+# patch before the demo (temporary until we pull request)
+patch $SPACK_CENTRAL/var/spack/repos/builtin/packages/gromacs/package.py specs/rockfish/spack-gromacs-patch.txt
+time make rf go do=gmxdemo 2>&1 | tee log
 ~~~
+
+If you need to erase everything and start over: `rm -rf $SPACK_PREFIX $SPACK_MIRROR_PATH $SPACK_ENVS $SPACK_CENTRAL`.
+
+Timings: 21m59s for the setup.
 
 # Rockfish buildout
 
@@ -146,5 +154,27 @@ time make rf go do=gmxdemo 2>&1 | tee -a log
 
 ~~~
 cd $SPACK_FACTORY
-time make rf go do=gcc-8-compiler 2>&1 | tee -a log
+time make rf go do=gcc-8-compiler 2>&1 | tee log
 ~~~
+
+Compiler builds take about 45 minutes. More software should be built on this compiler. Further testing should include as much of the Blue Crab software as possible. Note that testing on a workstation does not include the following critical items:
+
+1. Connection to infinidband drivers.
+2. Intel compilers or external compilers.
+
+We are using the following testing loop to add packages.
+
+~~~
+make rf live do=stage_a2 2>&1 | tee log
+# inspect things, possibly with a visit to the env
+make rf build do=stage_a2 2>&1
+make rf deploy do=stage_a2 2>&1
+# updates to lmod require a second deploy
+make rf deploy do=stage_a2 2>&1
+~~~
+
+Modules (Lmod) design considerations:
+
+- `py-pip` should load when users load Python because they expect `pip` as well
+
+Continued building tensorflow which requires hdf5 so we might as well start pinning openmpi, hdf5, and related versions. Testing will continue on this workstation until we move to the test cluster.
