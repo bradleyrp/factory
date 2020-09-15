@@ -1,26 +1,18 @@
-# Rockfish Software Stack via Spack
-# USAGE: `make do specs/rockfish.yaml name=test` except where otherwise
+# SPACK ROUTER
+# USAGE: `make do specs/spack_router.yaml name=test` except where otherwise
 select: !select 
 
   # variables
   vars:
-    spec: &spec specs/rockfish/spack_rockfish.yaml
+    # pointer to the recipes
+    spec: &spec !orthoconf [spack_recipes, specs/spack_recipes.yaml
     mirror: &mirror 
-      name: !orthoconf [spack_mirror_name, local-mirror]
+      name: !orthoconf [spack_mirror_name, local/local-mirror]
       spot: !orthoconf [spack_mirror_path, local/spack/mirror-spot]
-    prefix: &prefix !orthoconf [spack_prefix, ~/local/stack]
-
-  # RECIPE: create GPG keys
-  #! onetime only. needs automated
-  #! spack gpg has bugs. clear gpg by removing spack/opt/spack/gpg
-  #! this might touch ~/.spack which we disallow
-  gpg:
-    - !!python/object/apply:os.system ["spack gpg init"]
-    - !!python/object/apply:os.system [
-      'spack gpg create "Ryan Bradley" "bradleyrp@gmail.com"']
+    prefix: &prefix !orthoconf [spack_prefix, local/prefix]
 
   # RECIPE: build only
-  # usage: make spack specs/rockfish.yaml build do=<name>
+  # usage: make spack specs/spack_router.yaml build do=<name>
   build: 
     - !!python/object/apply:lib.spack.spack_env_install
       kwds:
@@ -29,7 +21,7 @@ select: !select
         do: !cli do
 
   # RECIPE: build with cache
-  # usage: make spack specs/rockfish.yaml cache do=<name>
+  # usage: make spack specs/spack_router.yaml cache do=<name>
   cache: 
     - !!python/object/apply:lib.spack.spack_env_install
       kwds:
@@ -45,7 +37,7 @@ select: !select
         do: !cli do
 
   # RECIPE: deploy to an install location
-  # usage: make spack specs/rockfish.yaml deploy do=<name>
+  # usage: make spack specs/spack_router.yaml deploy do=<name>
   deploy:
     # build the cache
     - !!python/object/apply:lib.spack.spack_env_cache
@@ -63,7 +55,7 @@ select: !select
         do: !cli do
 
   # RECIPE: install without cchecking cache
-  # usage: make spack specs/rockfish.yaml reinstall do=<name>
+  # usage: make spack specs/spack_router.yaml reinstall do=<name>
   reinstall:
     # deploy to the location
     - !!python/object/apply:lib.spack.spack_install_cache
@@ -74,8 +66,8 @@ select: !select
 
   # RECIPE: full build including: build, cache, and deploy
   # setup should be run with the following command
-  # usage: make spack specs/rockfish.yaml full do=setup
-  # usage: make spack specs/rockfish.yaml deploy do=<name>
+  # usage: make spack specs/spack_router.yaml full do=setup
+  # usage: make spack specs/spack_router.yaml deploy do=<name>
   #!!! lots of redundancy and repeated commands as the environment is rerun
   go:
     # compile the code
