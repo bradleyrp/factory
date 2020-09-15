@@ -436,7 +436,7 @@ class Parser:
 				# customizations to the function call
 				if special_subcommander:
 					# inject kwargs into a function call
-					if special_subcommander.keys()=={'kwargs','function'}:
+					if set(special_subcommander.keys())=={'kwargs','function'}:
 						kwargs_out = special_subcommander['kwargs']
 						func_target = self.specials[name]
 						#! @functools.wraps
@@ -449,7 +449,9 @@ class Parser:
 							return decorated_command
 						# decorate the function
 						self.specials[name] = inject_kwargs(self.specials[name])
-					else: raise KeyError
+					else: 
+						raise KeyError('subcommander spcial keys are: %s'%str(
+							special_subcommander.keys()))
 		collide_special = [i for i in self.specials if i in subcommand_names]
 		if any(collide_special):
 			raise Exception(
