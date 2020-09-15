@@ -5,7 +5,7 @@ select: !select
   # variables
   vars:
     # pointer to the recipes
-    spec: &spec !orthoconf [spack_recipes, specs/spack_recipes.yaml
+    spec: &spec !orthoconf [spack_recipes, specs/spack_recipes.yaml]
     mirror: &mirror 
       name: !orthoconf [spack_mirror_name, local/local-mirror]
       spot: !orthoconf [spack_mirror_path, local/spack/mirror-spot]
