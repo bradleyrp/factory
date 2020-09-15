@@ -184,14 +184,10 @@ stage_a4:
       via: template_basic
       mods: *mc01
       specs: &stage-a04-specs
-        - !strcat &bazel-310-tf ["bazel ^jdk@11.0.8", *gcc-8]
         - !strcat 
-          - !strflush ["py-tensorflow@2.3.0 cuda_arch=", *cuda-sm-here]
-          - !strflush ["^", *bazel-310-tf]
+          - !strflush ["py-tensorflow@2.1.1 cuda_arch=", *cuda-sm-here]
+          - !strflush ["^", *cuda-10-2]
           - !strflush ["^", *python-3]
-          - !strflush ["^", *hdf5-1106]
-          - !strflush ["^", *openmpi-31] # already depends on cuda-10-2
           - !strflush ["^", *cudnn-765-102]
           - !strflush ["^", *nccl-2781]
           - *gcc-8
-
