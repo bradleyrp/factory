@@ -96,3 +96,16 @@ def yaml_tag_strcat_custom(joiner):
 
 #! difficulty outsourcing this to lib.spack
 yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
+
+def yaml_hook(tag):
+	"""Make functions into YAML hooks."""
+	# note that this can be used as a decorator for brevity
+	if not tag.startswith('!'): 
+		tag = '!%s'%tag
+	def decorator(func):
+		@functools.wraps(func)
+		def yaml_to_function(self,node):
+			return func(self,node)
+		yaml.add_constructor(tag,yaml_to_function)
+		return yaml_to_function
+	return decorator
