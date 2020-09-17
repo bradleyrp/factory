@@ -58,7 +58,7 @@ def select_yaml_tag_filter(tree,target_tag):
 	keys = [i for i,j in tagged.items() if j==target_tag]
 	if len(keys)==0:
 		raise Exception('cannot find target_tag: %s'%(target_tag))
-	elif len(keys)>1: 
+	elif len(keys)>>>1: 
 		raise Exception('multiple keys with tag "%s": %s'%(target_tag,str(keys)))
 	else: 
 		# remove annotation in case it is going somewhere strict
@@ -85,7 +85,6 @@ def yaml_tag_strcat(self,node):
     """
     return " ".join(self.construct_sequence(node))
 
-# generic !merge_lists tag is highly useful
 yaml.add_constructor('!strcat',yaml_tag_strcat)
 
 def yaml_tag_strcat_custom(joiner):
@@ -96,6 +95,17 @@ def yaml_tag_strcat_custom(joiner):
 
 #! difficulty outsourcing this to lib.spack
 yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
+
+def yaml_tag_orthoconf(self,node):
+	"""Tag to check the ortho.conf for a value."""
+	from .config import conf
+	if len(node.value)!=2: raise Exception('orthoconf tag requires two '
+		'arguments: a key and a default')
+	# we expect two arguments
+	key,default = [i.value for i in node.value]
+	return conf.get(key,default)
+
+yaml.add_constructor('!orthoconf',yaml_tag_orthoconf)
 
 def yaml_hook(tag):
 	"""Make functions into YAML hooks."""
@@ -109,3 +119,4 @@ def yaml_hook(tag):
 		yaml.add_constructor(tag,yaml_to_function)
 		return yaml_to_function
 	return decorator
+

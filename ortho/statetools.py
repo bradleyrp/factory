@@ -425,7 +425,7 @@ class Parser:
 				special_subcommander = False
 				if isinstance(target,dict):
 					special_subcommander = target
-					target = special_subcommander.pop('function')
+					target = special_subcommander.get('function',None)
 				try: 
 					mod_target,func_name = re.match(
 						r'^(.+)\.(.*?)$',target).groups()
@@ -436,17 +436,22 @@ class Parser:
 				# customizations to the function call
 				if special_subcommander:
 					# inject kwargs into a function call
-					if special_subcommander.keys()=={'kwargs'}:
+					if set(special_subcommander.keys())=={'kwargs','function'}:
 						kwargs_out = special_subcommander['kwargs']
 						func_target = self.specials[name]
 						#! @functools.wraps
 						def inject_kwargs(func):
 							def decorated_command(*args,**kwargs):
-								return func(*args,**kwargs_out,**kwargs)
+								kwargs_out_this = copy.deepcopy(kwargs_out)
+								# kwargs can be overridden
+								kwargs_out_this.update(**kwargs)
+								return func(*args,**kwargs_out_this)
 							return decorated_command
 						# decorate the function
 						self.specials[name] = inject_kwargs(self.specials[name])
-					else: raise KeyError
+					else: 
+						raise KeyError('subcommander spcial keys are: %s'%str(
+							special_subcommander.keys()))
 		collide_special = [i for i in self.specials if i in subcommand_names]
 		if any(collide_special):
 			raise Exception(

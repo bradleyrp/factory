@@ -4,44 +4,29 @@ select: !select
 
   # variables
   vars:
-    spec: &spec specs/spack_rockfish.yaml
+    spec: &spec specs/rockfish/spack_rockfish.yaml
     mirror: &mirror 
-      name: testbed
-      spot: local/spack/mirror-spot
-    prefix: &prefix ~/local/stack
+      name: !orthoconf [spack_mirror_name, local-mirror]
+      spot: !orthoconf [spack_mirror_path, local/spack/mirror-spot]
+    prefix: &prefix !orthoconf [spack_prefix, ~/local/stack]
 
-  # DEMO: preliminary setup
-  # usage: make spack specs/rockfish.yaml setup_explicit
-  # this demo creates spack environments directly from this file
-  # see alternate setup: make specs/rockfish.yaml go do=full 
-  setup_explicit:
-    # talk directly to lib.spack in the same format as spack_tree.yaml
-    # the first step compilest the code however the setup select deploys
-    - !!python/object/apply:lib.spack.spack_seq_alt
-      kwds:
-        ref: *spec
-        envs:
-          - find_compilers: null
-          - name: env_lmod
-            via: template_basic
-            specs: ['lmod']
-    # repeat to the cache mirror
-    - !!python/object/apply:lib.spack.spack_seq_alt
-      kwds:
-        ref: *spec
-        envs:
-          - find_compilers: null
-          - name: env_lmod
-            via: template_basic
-            specs: ['lmod']
-            cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
-              kwds: *mirror
-    # this do item is redundant with the lmod spec above
-    - !!python/object/apply:lib.spack.spack_install_cache
+  # RECIPE: create GPG keys
+  #! onetime only. needs automated
+  #! spack gpg has bugs. clear gpg by removing spack/opt/spack/gpg
+  #! this might touch ~/.spack which we disallow
+  gpg:
+    - !!python/object/apply:os.system ["spack gpg init"]
+    - !!python/object/apply:os.system [
+      'spack gpg create "Ryan Bradley" "bradleyrp@gmail.com"']
+
+  # RECIPE: build only
+  # usage: make spack specs/rockfish.yaml build do=<name>
+  build: 
+    - !!python/object/apply:lib.spack.spack_env_install
       kwds:
         spec: *spec
-        target: *prefix
-        do: lmod_base
+        # cli argument to select the environment name in the spec
+        do: !cli do
 
   # RECIPE: build with cache
   # usage: make spack specs/rockfish.yaml cache do=<name>
@@ -62,6 +47,24 @@ select: !select
   # RECIPE: deploy to an install location
   # usage: make spack specs/rockfish.yaml deploy do=<name>
   deploy:
+    # build the cache
+    - !!python/object/apply:lib.spack.spack_env_cache
+      kwds:
+        spec: *spec
+        cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
+          kwds: *mirror
+        # cli argument to select the environment name in the spec
+        do: !cli do
+    # deploy to the location
+    - !!python/object/apply:lib.spack.spack_install_cache
+      kwds:
+        spec: *spec
+        target: *prefix
+        do: !cli do
+
+  # RECIPE: install without cchecking cache
+  # usage: make spack specs/rockfish.yaml reinstall do=<name>
+  reinstall:
     # deploy to the location
     - !!python/object/apply:lib.spack.spack_install_cache
       kwds:
@@ -105,3 +108,4 @@ select: !select
         spec: *spec
         # cli argument to select the environment name in the spec
         do: !cli do
+        visit: !cli [visit, true]

@@ -2,7 +2,7 @@
 
 #! manually pick up the overloaded print
 from __future__ import print_function
-import os,copy,re,sys,glob
+import os,copy,re,sys,glob,pprint
 import ortho
 import multiprocessing
 import tempfile
@@ -71,7 +71,29 @@ stdout,stderr = proc.communicate()
 if stderr: raise ValueError
 specs = [re.match('^.+\\^(.+)$',i).group(1) 
 	for i in stdout.decode().splitlines() if re.match('^.+\\^(.+)$',i)]
-for spec in specs: os.system('spack buildcache create -m testbed -a %s'%spec)
+for spec in specs: 
+	os.system(
+		'spack buildcache create -m %(mirror)s -a %%s'%%spec)
+"""
+
+spack_mirror_complete = """
+import subprocess,re,os
+proc = subprocess.Popen('spack -e . concretize -f'.split(),
+	stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+stdout,stderr = proc.communicate()
+if stderr: raise ValueError
+specs = [re.match('^.+\\^(.+)$',i).group(1) 
+	for i in stdout.decode().splitlines() if re.match('^.+\\^(.+)$',i)]
+def specbuild(spec=None,cmd=None):
+	if not bool(spec) ^ bool(cmd): raise ValueError
+	print('[STATUS] buildcache for spec: %%s'%%spec)
+	cmd = 'spack buildcache create -m rfcache -a %%s'%%spec
+	proc = subprocess.Popen(cmd.split())
+	proc.communicate()
+	if proc.returncode:
+		raise Exception('spack error above')
+for spec in specs: specbuild(spec)
+specbuild(cmd='spack buildcache create -m %(mirror)s -a %%s'%%spec)
 """
 
 def spack_clone(where=None):
@@ -155,31 +177,52 @@ class SpackEnvMaker(Handler):
 		# inspect the concretize output
 		if live:
 			command = 'spack --env . concretize %s-f'%(extras)
+			#! register this globally for later. somewhat clumsy
+			global _LAST_SPACK_ENV
+			_LAST_SPACK_ENV = where
 		# build for cache by selecting a mirror
 		elif cache_mirror:
 			# command for the target after we add buildcache dependencies
 			command = 'spack --env . buildcache create -a -m %s'%cache_mirror
 			# write a temporary file to perform this
 			#! is this inefficient?
-			fn = tempfile.NamedTemporaryFile(delete=False)
-			with fn as fp:
-				fp.write(spack_mirror_complete.encode())
-				# we must also add the target here
-				fp.write(("os.system('%s')\n"%command).encode())
-				fp.close()
-			# somewhat redundant with the _run_via_spack above
-			starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
-			#! requires python3
-			result = ortho.bash('source %s && python3 %s'%
-				(starter,fn.name),announce=True,
-				cwd=where,scroll=True)
-			os.remove(fn.name)
+			if 0:
+				fn = tempfile.NamedTemporaryFile(delete=False)
+				with fn as fp:
+					fp.write((spack_mirror_complete%
+						dict(mirror=cache_mirror)).encode())
+					# we must also add the target here
+					fp.write(("os.system('%s')\n"%command).encode())
+					fp.close()
+				# somewhat redundant with the _run_via_spack above
+				starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
+				#! requires python3
+				result = ortho.bash('source %s && python3 %s'%
+					(starter,fn.name),announce=True,
+					cwd=where,scroll=True)
+				os.remove(fn.name)
+			# run the code directly
+			result_concretize = bash('spack -e . concretize -f',
+				cwd=where,scroll=False)
+			stdout,stderr = [result_concretize[k] for k in ['stdout','stderr']]
+			if stderr: raise ValueError
+			specs = [re.match(r'^.+\^(.+)$',i).group(1) 
+				for i in stdout.splitlines() 
+				if re.match(r'^.+\^(.+)$',i)]
+			print('[STATUS] collecting the following specs:\n%s'%
+				pprint.pformat(specs))
+			for spec in specs: 
+				bash('spack --env . buildcache create -a -m %s %s'%(
+					cache_mirror,spec),cwd=where,scroll=True)
+			bash('spack -e . buildcache create -a -m %s'%
+				cache_mirror,cwd=where,scroll=True)
 			return
 		# standard installation
 		else:
 			command = "spack --env . install %s-j %d"%(extras,cpu_count_opt)
+		# make fetch happen below because this catches exceptions
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-			command=command)
+			command=command,fetch=False)
 
 class SpackLmodHooks(Handler):
 	def write_lua_file(self,modulefile,contents,moduleroot):
@@ -194,8 +237,14 @@ class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
 	def _run_via_spack(self,command,fetch=False,site_force=True):
 		"""Route commands to spack."""
-		if site_force and os.path.isdir(os.path.expanduser('~/.spack')):
-			raise Exception('cannot allow ~/.spack')
+		home_spack = os.path.expanduser('~/.spack')
+		if site_force and os.path.isdir(home_spack):
+			if os.access(home_spack,os.X_OK | os.W_OK): 
+				raise Exception('cannot allow ~/.spack')
+			# if spack exists but is not writable we continue
+			# we added this feature to identify parts of the workflow that
+			#   write to ~/.spack in order to prevent this
+			else: pass
 		return SpackEnvMaker()._run_via_spack(
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
@@ -236,7 +285,7 @@ class SpackEnvItem(Handler):
 			delveset(mods,'config','install_tree',value=install_tree)
 		if lmod_spot:
 			try: 
-				modules_enable: delve(mods,'modules','enable')
+				modules_enable = delve(mods,'modules','enable')
 				if not 'lmod' in modules_enable:
 					delveset(mods,'modules','enable',
 						value=list(modules_enable)+['lmod'])
@@ -760,6 +809,53 @@ def spack_hpc_run(run=None,deploy=None,
 
 ### Refactor Spack on Rockfish 
 
+## detritus
+
+def spack_seq_alt(envs,ref=None):
+	"""Use a spack_tree recipe in a parent yaml file."""
+	"""
+	retired this method from rockfish.yaml but here is the spec for posterity
+	  # DEMO: preliminary setup
+	  # usage: make spack specs/rockfish.yaml setup_explicit
+	  # this demo creates spack environments directly from this file
+	  # see alternate setup: make specs/rockfish.yaml go do=full 
+	  setup_explicit:
+	    # talk directly to lib.spack in the same format as spack_tree.yaml
+	    # the first step compilest the code however the setup select deploys
+	    - !!python/object/apply:lib.spack.spack_seq_alt
+	      kwds:
+	        ref: *spec
+	        envs:
+	          - find_compilers: null
+	          - name: env_lmod
+	            via: template_basic
+	            specs: ['lmod']
+	    # repeat to the cache mirror
+	    - !!python/object/apply:lib.spack.spack_seq_alt
+	      kwds:
+	        ref: *spec
+	        envs:
+	          - find_compilers: null
+	          - name: env_lmod
+	            via: template_basic
+	            specs: ['lmod']
+	            cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
+	              kwds: *mirror
+	    # this do item is redundant with the lmod spec above
+	    - !!python/object/apply:lib.spack.spack_install_cache
+	      kwds:
+	        spec: *spec
+	        target: *prefix
+	        do: lmod_base
+	"""
+	# we use the SpackSeqSub not for subselecting but to get other variables 
+	#   from the spack_rockfish.yaml file with another pointer for modularity
+	tree = dict(only=dict(envs=envs))
+	# refer to a file to use a config in a via
+	if ref:
+		with open(ref) as fp: tree.update(**yaml.load(fp))
+	SpackSeqSub(name='only',tree=tree)
+
 ## router functions
 
 """
@@ -791,11 +887,14 @@ def spack_env_install(spec,do,target=None):
 	print('status building environment %s from %s'%(do,spec))
 	spack_tree(what=spec,name=do,install_tree=target)
 
-def spack_env_concretize(spec,do,target=None):
+def spack_env_concretize(spec,do,target=None,visit=False):
 	print('status building environment %s from %s'%(do,spec))
 	tree = spack_tree(what=spec,name=do,install_tree=target,live=True)
-	raise Exception('need a way to return the environment location for '
-		'inspection and modification')
+	#!! dev: hack to get the environment from globals. note that we need
+	#!!   a minor refactor to make this more elegant
+	if '_LAST_SPACK_ENV' in globals():
+		#! can we change directory? probably not but it would be useful
+		print('status spack environment spot: %s'%_LAST_SPACK_ENV)
 
 @incoming_handlers
 def spack_env_cache(spec,do,cache_mirror=None):
@@ -828,14 +927,3 @@ class SpackMirror(Handler):
 		SpackSeqSub(name='only',tree=dict(only=dict(envs=[dict(
 			mirror_name=name,spot=spot)])))
 		return name
-
-def spack_seq_alt(envs,ref=None):
-	"""Use a spack_tree recipe in a parent yaml file."""
-	# we use the SpackSeqSub not for subselecting but to get other variables 
-	#   from the spack_rockfish.yaml file with another pointer for modularity
-	tree = dict(only=dict(envs=envs))
-	# refer to a file to use a config in a via
-	if ref:
-		with open(ref) as fp: tree.update(**yaml.load(fp))
-	SpackSeqSub(name='only',tree=tree)
-

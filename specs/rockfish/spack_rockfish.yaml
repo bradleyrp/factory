@@ -1,0 +1,193 @@
+### SPACK on ROCKFISH deployment
+### This file builds the software stack.
+### See specs/rockfish/README.md for instructions.
+
+### SETTINGS
+
+# paths for the spack source and environments
+# defaults are in local otherwise use "make set (spack|spack_envs) <path>"
+#! dev: centralize all configurations
+spot: !orthoconf [spack, local/spack]
+spot_envs: !orthoconf [spack_envs, local/envs-spack]
+
+### DEFS
+
+arch: &arch "arch=linux-centos8-zen"
+gcc-back-compiler: &gcc-back-compiler gcc@8.3.1
+gcc-back: &gcc-back !strflush ["%", *gcc-back-compiler]
+gcc-8-compiler: &gcc-8-compiler gcc@8.4.0
+gcc-8: &gcc-8 !strflush ["%", *gcc-8-compiler, " ", *arch]
+cuda-sm-here: &cuda-sm-here "75" # using an NVidia 2060
+
+# whitelists
+wl01: &wl01 [gcc, openmpi, gromacs, python, py-tensorflow, py-pip]
+
+# pinned versions
+python3: &python-3 >-
+  python@3.8.5 +bz2 +ctypes +dbm +debug 
+  +libxml2 +lzma +optimizations +pic +pyexpat +pythoncmd 
+  +readline +shared +sqlite3 +ssl +uuid +zlib
+cuda-10-2: &cuda-10-2 cuda@10.2.89
+r402: &r402 !chain
+  - r@4.0.2 +memory_profiling
+  - *python-3
+r-packages: &r-packages [r-rcpp, r-devtools] #! pending spack version issue fix
+openmpi-31: &openmpi-31 !strcat
+  - openmpi@3.1.5 +cuda +cxx_exceptions 
+  - !strflush ['^', *cuda-10-2]
+  - *gcc-8 
+# lining up tensorflow supports here
+cudnn-765-102: &cudnn-765-102 cudnn@7.6.5.32-10.2-linux-x64
+nccl-2781: &nccl-2781 nccl@2.7.8-1
+#! openmpi on a cluster might require:
+#! fabrics=verbs +legacylaunchers +pmi +vt schedulers=slurm 
+#! ^slurm@17.11.12 
+hdf5-1106: &hdf5-1106 >-
+  hdf5@1.10.6 ~cxx ~debug ~fortran +hl +mpi +pic +shared +szip ~threadsafe
+
+### TEMPLATES
+
+# spack environment build template
+# note that the via tag refers to this by key not reference
+#! dev: convert the via flag to pure yaml
+template_basic: 
+  concretization: separately
+  mirrors: {}
+  repos: []
+  upstreams: {}
+  modules:
+    enable: []
+  definitions: []
+  packages: {}
+  config: 
+    checksum: false
+    # avoid the default cache in the home directory
+    misc_cache: $spack/misc_cache
+  specs: []
+  view: false
+
+# modules templates
+modules_templates:
+  s01: &mod-stage-01
+    enable: 
+      - lmod
+    lmod:
+      all:
+        conflict: []
+        environment:
+          unset: []
+        filter:
+          environment_blacklist: []
+        load: []
+      blacklist_implicits: true
+      whitelist: *wl01
+      core_compilers:
+      - *gcc-back-compiler
+      hash_length: 0
+      hierarchy:
+      - compiler
+      - mpi
+      verbose: false  
+
+### SUPPORT
+
+setup:
+  envs:
+    - name: env-lmod
+      via: template_basic
+      specs: ['lmod']
+
+### DEMO
+
+gmxdemo:
+  notes: |
+    Install GROMACS with native GCC 8 on CentOS8 and CUDA.
+    Tested: heartland on 2020.09.05.
+    Note that openmpi for GROMACS retains a hash.
+    As of 2020.09.09 gromacs has an issue with cuda and fftw
+      which you must fix with a patch, see specs/rockfish/README.md.
+  envs:
+    - find_compilers: null
+    #! dev: check the major gcc version i.e. detect the native and use MAJ.MIN
+    - check_compiler: gcc@8.3.1
+    #! dev: create a naming scheme
+    #! make the environment names programmatic or use tmpdir
+    - name: &env-gmxdemo env-gmxdemo
+      via: template_basic
+      specs: &specs-gmxdemo ['gromacs@2020.3%gcc@8.3.1+cuda+mpi^cuda@10.2.89']
+      mods: &mc01
+        modules: *mod-stage-01
+    #! are hashes necessary on openmpi supporting gromacs?
+    - lmod_refresh: null
+      name: *env-gmxdemo
+
+### SERIES A
+
+# series A, step 1a: compile a compiler
+gcc-8-compiler:
+  envs:
+    - find_compilers: null
+    - check_compiler: *gcc-back-compiler
+    - name: &env-gcc-8-compiler env-gcc-8-compiler
+      via: template_basic
+      mods: *mc01
+      specs:
+        - !str &gcc-8-out [*gcc-8-compiler, *gcc-back, *arch]
+    - find: *gcc-8-compiler 
+      name: *env-gcc-8-compiler
+
+# series A, step 1b: openmpi
+gcc-8-openmpi-31:
+  envs:
+    - name: &env-gcc-8-ompi env-ompi
+      via: template_basic
+      mods: *mc01
+      specs: [*openmpi-31]
+
+# series A, step 2: standard programs
+stage_a2:
+  envs:
+    - name: &env-stage-a02 env-series-a
+      via: template_basic
+      mods: *mc01
+      specs: &stage-a02-specs !merge_lists
+        - [*gcc-8-out]
+        # base python
+        - [!str [*python-3, *gcc-8]]
+        - [!strflush [py-pip, " ^", *python-3, *gcc-8]]
+        # cuda
+        - [*cuda-10-2]
+    - lmod_refresh: null
+      name: *env-stage-a02
+
+#!!! dev: serious issue with merge_lists and loopcat tags but this works:
+#! specs: &stage-a03-specs !loopcat
+#!     base: !strflush ["^", *r402, *gcc-8]
+#!     loop: *r-packages
+
+# series A, step 3: specials
+stage_a3:
+  envs:
+    - name: &env-stage-a03 env-series-a
+      via: template_basic
+      mods: *mc01
+      specs: &stage-a03-specs
+        - !strcat ["intel-mkl threads=tbb", *gcc-8]
+        - !strcat 
+          - !strflush [*hdf5-1106]
+          - !strflush ["^", *openmpi-31] # depends on *gcc-8
+
+# series A, step 4: tensorflow
+stage_a4:
+  envs:
+    - name: &env-stage-a04 env-series-a
+      via: template_basic
+      mods: *mc01
+      specs: &stage-a04-specs
+        - !strcat 
+          - !strflush ["py-tensorflow@2.1.1 cuda_arch=", *cuda-sm-here]
+          - !strflush ["^", *cuda-10-2]
+          - !strflush ["^", *python-3]
+          - !strflush ["^", *cudnn-765-102]
+          - !strflush ["^", *nccl-2781]
+          - *gcc-8

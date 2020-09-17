@@ -4,6 +4,7 @@ config.json
 docs_*
 env
 logs
+log
 pack
 *.pyc
 connections
