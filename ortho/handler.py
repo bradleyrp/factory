@@ -3,6 +3,7 @@
 import inspect,sys
 from .misc import str_types
 from .misc import treeview
+import functools
 
 def introspect_function(func,**kwargs):
 	"""
@@ -54,6 +55,7 @@ def introspect_function(func,**kwargs):
 		return packed
 
 class Handler(object):
+	_is_Handler = True
 	_taxonomy = {}
 	# internals map to special structures in the Handler level
 	_internals = {'name':'name','meta':'meta'}
@@ -260,3 +262,24 @@ class Handler(object):
 		# instantiating a Handler subclass runs the function
 		# the solve, result properties return the result
 		return self.solution
+
+def solver_handler(arg):
+	"""Check if an object is a Handler and if so, solve it."""
+	if getattr(arg,'_is_Handler',False):
+		return arg.solve
+	else: return arg
+
+def incoming_handlers(func):
+	"""
+	Decorator which ensures that any incoming arguments or kwargs values
+	which are Handlers are solved before they reach the function.
+	This feature is very useful when connecting YAML object/apply tags to
+	Handler subclasses.
+	"""
+	@functools.wraps(func)
+	def func_out(*args,**kwargs):
+		args = (solver_handler(arg) for arg in args)
+		kwargs = dict([(i,solver_handler(j)) for i,j in kwargs.items()])
+		return func(*args,**kwargs)
+	func_out.__name__ = func.__name__
+	return func_out
