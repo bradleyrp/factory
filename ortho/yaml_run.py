@@ -12,7 +12,7 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 	#!!! issue: incorrect kwargs are routed into yaml and there is no warning
 	#!!!   that they are invalid. this is an inherent downside possibly
 	with open(what) as fp: text = fp.read()
-	from lib.yaml_mods import YAMLTagIgnorer,YAMLTagCat
+	from .yaml_mods import YAMLTagIgnorer,YAMLTagCat
 	# the YAMLTagIgnorer decorates a placeholder tree with _has_tag
 	spec = yaml.load(text,Loader=YAMLTagIgnorer)
 	# special keyword passes through but we protect against collisions
