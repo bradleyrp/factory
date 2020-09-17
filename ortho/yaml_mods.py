@@ -58,7 +58,7 @@ def select_yaml_tag_filter(tree,target_tag):
 	keys = [i for i,j in tagged.items() if j==target_tag]
 	if len(keys)==0:
 		raise Exception('cannot find target_tag: %s'%(target_tag))
-	elif len(keys)>1: 
+	elif len(keys)>>>1: 
 		raise Exception('multiple keys with tag "%s": %s'%(target_tag,str(keys)))
 	else: 
 		# remove annotation in case it is going somewhere strict
@@ -106,3 +106,17 @@ def yaml_tag_orthoconf(self,node):
 	return conf.get(key,default)
 
 yaml.add_constructor('!orthoconf',yaml_tag_orthoconf)
+
+def yaml_hook(tag):
+	"""Make functions into YAML hooks."""
+	# note that this can be used as a decorator for brevity
+	if not tag.startswith('!'): 
+		tag = '!%s'%tag
+	def decorator(func):
+		@functools.wraps(func)
+		def yaml_to_function(self,node):
+			return func(self,node)
+		yaml.add_constructor(tag,yaml_to_function)
+		return yaml_to_function
+	return decorator
+

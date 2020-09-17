@@ -53,7 +53,8 @@ expose = {
 #   which means that we have to update these internal imports if we later move around some of the functions
 
 # use `python -c "import ortho"` to bootstrap the makefile
-if (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.isdir('ortho')): 
+if os.environ.get('ORTHO_REMOTE',False)=='1': pass
+elif (os.path.splitext(os.path.basename(__file__))[0]!='__init__' or not os.path.isdir('ortho')): 
 	if not os.path.isdir('ortho'):
 		# check site packages
 		reqs = subprocess.check_output([sys.executable, '-m', 'pip', 'freeze'])
