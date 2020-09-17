@@ -30,6 +30,7 @@ dependencies:
   # vim for checking plugins
   - vim
   - conda-forge::ncurses
+  - conda-forge::eigen
   # note that I later installed vtk via pip2 for python2, possibly in this environment
   - pip: 
     # documentation tools
@@ -54,3 +55,5 @@ dependencies:
     - py_d3
     #! testing. takes a very long time
     - ipyslurm
+    #! export CPLUS_INCLUDE_PATH=/Users/rpb/worker/heart/factory/local/conda/envs/dev/include/eigen3:$CPLUS_INCLUDE_PATH
+    - pygalmesh

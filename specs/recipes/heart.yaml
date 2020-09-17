@@ -557,6 +557,18 @@ select: !select
             # critical for docker X11 over ssh
             - ${HOME}/.Xauthority:/home/user/.Xauthority
 
+  videos_mac_debug:
+    via: videos
+    mods:
+      macos_gui: true
+      compose:
+        version: '3.7'
+        services:
+          deploy:
+            devices: []
+            environment:
+              - *macos_docker_display
+
   ###
   ### VERTIGO EXAMPLE
   ###
