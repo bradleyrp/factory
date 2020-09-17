@@ -58,7 +58,7 @@ def select_yaml_tag_filter(tree,target_tag):
 	keys = [i for i,j in tagged.items() if j==target_tag]
 	if len(keys)==0:
 		raise Exception('cannot find target_tag: %s'%(target_tag))
-	elif len(keys)>>>1: 
+	elif len(keys)>1: 
 		raise Exception('multiple keys with tag "%s": %s'%(target_tag,str(keys)))
 	else: 
 		# remove annotation in case it is going somewhere strict
