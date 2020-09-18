@@ -35,8 +35,9 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 		#   other tags that lie outside of our selection
 		raw = yaml.load(text,Loader=YAMLTagCat)
 		cat = list(ortho.catalog(raw))
-		tags_found = [(path[-2],val) for path,val in cat
-			if path[-1]=='_tag_name']
+		# use of selector at the root level results in None below
+		tags_found = [(path[-2] if len(path)>1 else None,val) 
+			for path,val in cat if path[-1]=='_tag_name']
 		# standard execution of yaml tags
 		if '!select' not in list(zip(*tags_found))[1]:
 			if name:
@@ -60,7 +61,8 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 			# check to be sure we have exactly one !select in this 
 			#   yaml document and also get the key so we can find
 			#   valid names for the call
-			select_keys = [key[-2] for key,val in cat if val=='!select']
+			select_keys = [key[-2] if len(key)>2 else None 
+				for key,val in cat if val=='!select']
 			if len(select_keys)==0:
 				# possibly redundant with the check above
 				raise Exception('no !select tag')
@@ -69,7 +71,9 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 				raise Exception(
 					'found multiple !select tags in %s'%what)
 			select_key_name = select_keys[0]
-			names = [i for i in raw[select_key_name].keys() 
+			# None represents the root key
+			if select_key_name==None: names = raw.keys()
+			else: names = [i for i in raw[select_key_name].keys() 
 				if i!='_tag_name'] 
 			if name not in names:
 				raise Exception(('target %s only accepts '
@@ -146,3 +150,4 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 		if name: spec['name'] = name
 		#! previously tried to add **kwargs from do to spec['kwargs']
 		Action(**spec).solve
+	return spec
