@@ -119,7 +119,8 @@ prepare_print()
 
 # skip imports and exit if we only want the environment
 import json,sys
-if os.environ.get('ENV_PROBE',False):
+if (os.environ.get('ENV_PROBE',False) 
+	and not os.environ.get('ORTHO_REMOTE',False)=='1'):
 	if not os.path.isfile('config.json'): sys.exit()
 	conf = json.load(open('config.json','r'))
 	env_cmd = conf.get('activate_env','')
@@ -144,7 +145,9 @@ config_fn = 'config.json'
 default_config = {}
 
 # pylint: disable=undefined-variable
-conf = config.read_config(config_fn,default=default_config)
+if not os.environ.get('ORTHO_REMOTE',False)=='1':
+	conf = config.read_config(config_fn,default=default_config)
+else: conf = {}
 
 # distribute configuration to submodules
 for key in ['conf','config_fn']:

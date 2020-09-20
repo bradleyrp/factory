@@ -36,6 +36,25 @@ class YAMLTagIgnorer(yaml.SafeLoader):
 # the YAMLTagIgnorer is constructed on any tag.
 YAMLTagIgnorer.add_multi_constructor('',YAMLTagIgnorer.check_tags)
 
+class YAMLTagSkipper(yaml.SafeLoader):
+	"""
+	Skip tags. Note that the Ignorer just tells you if you have tags so it
+	is really a detector.
+	"""
+	def skipper(self,suffix,node):
+		name_class = node.__class__.__name__
+		if name_class=='MappingNode':
+			return self.construct_mapping(node)
+		elif name_class=='ScalarNode':
+			return self.construct_scalar(node)
+		elif name_class=='SequenceNode':
+			return self.construct_sequence(node)
+		else: raise Exception(
+			'development: YAMLTagSkipper cannot interpret %s'%name_class)
+
+# skip all tags
+YAMLTagSkipper.add_multi_constructor('!',YAMLTagSkipper.skipper)
+
 class YAMLTagCat(yaml.SafeLoader):
     """
     Collect all tags in a YAML file.
