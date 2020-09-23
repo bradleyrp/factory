@@ -242,8 +242,6 @@ select: !select
       Shutdown: 
         docker stop ldap_admin ; docker stop ldap ; docker rm ldap_admin ; docker rm ldap
       Via: https://medium.com/better-programming/ldap-docker-image-with-populated-users-3a5b4d090aa4
-      #!! Removed from dockerfile:
-        COPY bootstrap.ldif /container/service/slapd/assets/config/bootstrap/ldif/50-bootstrap.ldif
     visit: True
     image_name: &marcc-hpc-image-openldap marcc-hpc:ldap
     command: docker-compose up 
@@ -315,7 +313,7 @@ select: !select
         ldap_data:
         ldap_config:
     files:
-      - source: specs/slurm-docker/bootstrap.ldif
+      - source: specs/slurm-docker/bootstrap.eg01.ldif
         target: bootstrap.ldif
   testcluster_combo:
     site: !spots root

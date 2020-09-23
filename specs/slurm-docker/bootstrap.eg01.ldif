@@ -1,0 +1,81 @@
+# extended LDIF
+#
+# LDAPv3
+# base <dc=rockfish,dc=intern> with scope subtree
+# filter: (&(objectclass=*))
+# requesting: ALL
+#
+
+# rockfish.intern
+dn: dc=rockfish,dc=intern
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: Rockfish
+dc: rockfish
+
+# admin, rockfish.intern
+dn: cn=admin,dc=rockfish,dc=intern
+objectClass: simpleSecurityObject
+objectClass: organizationalRole
+cn: admin
+description: LDAP administrator
+userPassword:: e1NTSEF9bTBjTE52RisxTldJVG9Uc3lHZ3NHb2JOVnVWQTVaTlM=
+
+# rbradle8, rockfish.intern
+dn: cn=rbradle8,dc=rockfish,dc=intern
+cn: rbradle8
+gidNumber: 501
+objectClass: posixGroup
+objectClass: top
+
+# Ryan Bradley, rockfish.intern
+dn: cn=Ryan Bradley,dc=rockfish,dc=intern
+givenName: Ryan
+sn: Bradley
+cn: Ryan Bradley
+uid: rbradle8
+uidNumber: 1001
+gidNumber: 501
+homeDirectory: /home/users/rbradle8
+loginShell: /bin/sh
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+userPassword:: e01ENX1GdGVrL0tkRUxkbzYyVHlhY21XWDVBPT0=
+
+# RockfishGroup, rockfish.intern
+dn: ou=RockfishGroup,dc=rockfish,dc=intern
+ou: RockfishGroup
+objectClass: organizationalUnit
+objectClass: top
+
+# mwang131, rockfish.intern
+dn: cn=mwang131,dc=rockfish,dc=intern
+cn: mwang131
+gidNumber: 502
+objectClass: posixGroup
+objectClass: top
+
+# Matthew Wang, rockfish.intern
+dn: cn=Matthew Wang,dc=rockfish,dc=intern
+givenName: Matthew
+sn: Wang
+cn: Matthew Wang
+uid: mwang131
+userPassword:: e01ENX1IWHE2TnFIcjMvdnVSRklDNUNNWjV3PT0=
+uidNumber: 1002
+gidNumber: 502
+homeDirectory: /home/users/mwang131
+loginShell: /bin/sh
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+ou: RockfishGroup
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 8
+# numEntries: 7

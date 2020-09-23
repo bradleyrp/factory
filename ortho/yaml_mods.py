@@ -19,6 +19,12 @@ class YAMLObjectInit(yaml.YAMLObject):
         arg_dict = loader.construct_mapping(node, deep=True)
         return cls(**arg_dict)
 
+# note that the YAMLTagIgnorer and specifically YAMLTagCat were moved here
+#   from lib/yaml_mods.py and were only being used at the time by 
+#   the make-do-select feature in yaml_run. the multi_constructor is the
+#   method for applying the specific ignorer or catalog feature to the loader
+#   but they should not touch other yaml features in the meantime
+
 class YAMLTagIgnorer(yaml.SafeLoader):
     """
     Detect yaml recipes with Tags. Works with the constructor below.
@@ -29,6 +35,26 @@ class YAMLTagIgnorer(yaml.SafeLoader):
 
 # the YAMLTagIgnorer is constructed on any tag.
 YAMLTagIgnorer.add_multi_constructor('',YAMLTagIgnorer.check_tags)
+
+class YAMLTagCat(yaml.SafeLoader):
+    """
+    Collect all tags in a YAML file.
+    """
+    def namecat(self,suffix,node):
+        # note that you cannot subclass yaml.Loader to build YAMLTagCat and 
+        #   then expect to use yaml.SafeLoader below because it still runs 
+        #   any code in object/apply tags so be sure to subclass the loader
+        #   that you want. in this case we just want the tag names so we have
+        #   subclassed the SafeLoader, and yaml.Loader is therefore safe
+        try: this = yaml.Loader.construct_mapping(self,node)
+        # if the child is not a mapping we stop recursion
+        except: this = {}
+        has_tag = getattr(node,'tag',None)
+        if has_tag: this['_tag_name'] = has_tag
+        return this
+
+# catalog of tags in a yaml file
+YAMLTagCat.add_multi_constructor('',YAMLTagCat.namecat)
 
 def YAMLTagFilter(*tags):
 	"""
@@ -106,3 +132,17 @@ def yaml_tag_orthoconf(self,node):
 	return conf.get(key,default)
 
 yaml.add_constructor('!orthoconf',yaml_tag_orthoconf)
+
+def yaml_hook(tag):
+	"""Make functions into YAML hooks."""
+	# note that this can be used as a decorator for brevity
+	if not tag.startswith('!'): 
+		tag = '!%s'%tag
+	def decorator(func):
+		@functools.wraps(func)
+		def yaml_to_function(self,node):
+			return func(self,node)
+		yaml.add_constructor(tag,yaml_to_function)
+		return yaml_to_function
+	return decorator
+
