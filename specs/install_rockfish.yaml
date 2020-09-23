@@ -1,0 +1,6 @@
+_: !!python/module:lib.generic
+automacs: !ortho_sync
+  spack:
+    spot: "./rockfish"
+    address: https://github.com/marcc-hpc/rockfish
+    branch: dev

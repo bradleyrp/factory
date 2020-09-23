@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-from lib.yaml_mods import YAMLObjectInit
 from ortho import Handler,requires_python_check
+from ortho.yaml_mods import YAMLObjectInit
 import copy,sys,os
 
 class OrthoSync(YAMLObjectInit):
