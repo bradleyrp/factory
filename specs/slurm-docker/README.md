@@ -189,9 +189,11 @@ python manage.py runserver 0.0.0.0:5000
 <a id="ldap-interface"></a>
 ## LDAP Connections [2020.09.04]
 
+In the instructions above we are tracking `marcc-hpc/portal` which has the following LDAP connections.
+
 ### Connect Coldfront to LDAP
 
-In order to search for users in the LDAP database from coldfront, you must make the following changes to the config, which is not currently tracked on git because it might contain secrets later.
+In order to search for users in the LDAP database from coldfront, you must make the following changes to the config. Note that we have folded these changes into the private repository which tracks the portal development for our site.
 
 ~~~
 diff coldfront/config/local_settings.py.sample coldfront/config/local_settings.py
@@ -206,7 +208,7 @@ diff coldfront/config/local_settings.py.sample coldfront/config/local_settings.p
 
 ### Use LDAP to authenticate
 
-The feature above is useful because it allows us to query the LDAP database when adding users to a group. It would be even better to use LDAP to login directly that way *every single user* can log on to the system. The following changes to the settings will make this possible. Note the extra authentication is required, or you will get missing object errors. Again we are keeping this out of version control for now.
+The feature above is useful because it allows us to query the LDAP database when adding users to a group. It would be even better to use LDAP to login directly that way *every single user* can log on to the system. The following changes to the settings will make this possible. Note the extra authentication is required, or you will get missing object errors.
 
 ~~~
 import ldap
@@ -237,7 +239,7 @@ AUTH_LDAP_BIND_DN = 'cn=admin,dc=rockfish,dc=intern'
 AUTH_LDAP_BIND_PASSWORD = 'test1234'
 ~~~
 
-This avoids the process of having to set a password in LDAP admin
+This avoids the process of having to set a password in LDAP admin.
 
 ### Forthcoming development
 
@@ -260,3 +262,7 @@ The components above are designed to address the allocations and reporting. We h
 Ongoing development should answer the question of user management along with assistance from the systems team. One method for keeping user management and coldfront as modular as possible would be to include all users on the system in a special LDAP distinguished name or attribute that says whether they are part of the system.
 
 *Note that it is critical that we maintain complete activate and deactivate user lists for cradle-to-grave user management on Rockfish.*
+
+## Closing status
+
+As of 2020.09.23 development of the portal itself has moved to a [private repository for our site](https://github.com/marcc-hpc/portal). The factory code will remain here for testing purposes, specifically as we populate an LDAP database to simulate a production environment. Further testing instructions will be tracked in this readme until this code is added to integration tests for the final product.
