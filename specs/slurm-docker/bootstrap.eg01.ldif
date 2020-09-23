@@ -29,7 +29,7 @@ gidNumber: 501
 objectClass: posixGroup
 objectClass: top
 
-# Ryan Bradley, rockfish.intern
+# Ryan Bradley, rockfish.intern (pw is test1234)
 dn: cn=Ryan Bradley,dc=rockfish,dc=intern
 givenName: Ryan
 sn: Bradley
@@ -57,7 +57,7 @@ gidNumber: 502
 objectClass: posixGroup
 objectClass: top
 
-# Matthew Wang, rockfish.intern
+# Matthew Wang, rockfish.intern (pw is test9876)
 dn: cn=Matthew Wang,dc=rockfish,dc=intern
 givenName: Matthew
 sn: Wang
