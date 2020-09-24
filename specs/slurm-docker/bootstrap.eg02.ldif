@@ -1,0 +1,116 @@
+# extended LDIF
+#
+# LDAPv3
+# base <dc=rockfish,dc=intern> with scope subtree
+# filter: (&(objectclass=*))
+# requesting: ALL
+#
+
+# rockfish.intern
+dn: dc=rockfish,dc=intern
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+o: Rockfish
+dc: rockfish
+
+# admin, rockfish.intern
+dn: cn=admin,dc=rockfish,dc=intern
+objectClass: simpleSecurityObject
+objectClass: organizationalRole
+cn: admin
+description: LDAP administrator
+userPassword:: e1NTSEF9M3VBM2FIK2lyUTlVUDNGaHJQS2ZPR2pNdCs2cy9FblM=
+
+# rbradle8, rockfish.intern
+dn: cn=rbradle8,dc=rockfish,dc=intern
+cn: rbradle8
+gidNumber: 501
+objectClass: posixGroup
+objectClass: top
+
+# Ryan Bradley, rockfish.intern (pw is test1234)
+dn: cn=Ryan Bradley,dc=rockfish,dc=intern
+givenName: Ryan
+sn: Bradley
+cn: Ryan Bradley
+uid: rbradle8
+uidNumber: 1001
+gidNumber: 501
+homeDirectory: /home/users/rbradle8
+loginShell: /bin/sh
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+userPassword:: e01ENX1GdGVrL0tkRUxkbzYyVHlhY21XWDVBPT0=
+
+# RockfishGroup, rockfish.intern
+dn: ou=RockfishGroup,dc=rockfish,dc=intern
+ou: RockfishGroup
+objectClass: organizationalUnit
+objectClass: top
+
+# mwang131, rockfish.intern
+dn: cn=mwang131,dc=rockfish,dc=intern
+cn: mwang131
+gidNumber: 502
+objectClass: posixGroup
+objectClass: top
+
+# Matthew Wang, rockfish.intern (pw is test9876)
+dn: cn=Matthew Wang,dc=rockfish,dc=intern
+givenName: Matthew
+sn: Wang
+cn: Matthew Wang
+uid: mwang131
+userPassword:: e01ENX1IWHE2TnFIcjMvdnVSRklDNUNNWjV3PT0=
+uidNumber: 1002
+gidNumber: 502
+homeDirectory: /home/users/mwang131
+loginShell: /bin/sh
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+ou: RockfishGroup
+
+### critical note about the following example
+# in coldfront, the only way to get jbiondo2 to login is if you include both 
+#   the cn and ou in the base as in the following example. this is because 
+#   inside the PHP ldap admin we see that the jbiondo2 group is nested in the 
+#   ou and the user is nested in the group. in contrast, the users above and
+#   the contents of eg01 do not have this nesting but they can still be 
+#   filtered in coldfront by the ou attached to their user
+# here is the coldfront example for accessing this group, however it is 
+#   exclusive and hides the users above
+#   AUTH_LDAP_USER_SEARCH_BASE = 'cn=jbiondo2,ou=RockfishGroup,dc=rockfish,dc=intern'
+#   AUTH_LDAP_USER_SEARCH = LDAPSearch(
+#       AUTH_LDAP_USER_SEARCH_BASE, ldap.SCOPE_ONELEVEL, '(&(uid=%(user)s))')
+
+# jbiondo2, RockfishGroup, rockfish.intern (pw is test5678)
+dn: cn=jbiondo2,ou=RockfishGroup,dc=rockfish,dc=intern
+cn: jbiondo2
+gidNumber: 503
+objectClass: posixGroup
+objectClass: top
+
+# Joe Biondo, jbiondo2, RockfishGroup, rockfish.intern
+dn: cn=Joe Biondo,cn=jbiondo2,ou=RockfishGroup,dc=rockfish,dc=intern
+givenName: Joe
+sn: Biondo
+cn: Joe Biondo
+uid: jbiondo2
+userPassword:: e01ENX0rSWx3bTNXbHU4U2FQQVVvSGY0TzdnPT0=
+uidNumber: 1003
+gidNumber: 503
+homeDirectory: /home/users/jbiondo2
+loginShell: /bin/sh
+objectClass: inetOrgPerson
+objectClass: posixAccount
+objectClass: top
+
+# search result
+search: 2
+result: 0 Success
+
+# numResponses: 10
+# numEntries: 9
