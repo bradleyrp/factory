@@ -1,0 +1,22 @@
+# you probably need to rebuild the environment every time you add to it for some reason
+name: dev_heart_11
+dependencies:
+  - python==3.8.3
+  - scipy
+  - conda-forge::paraview
+  - ipdb
+  - h5py
+  - pip
+  - pip:
+    - numpy
+    - meshio
+    - pillow
+    - scikit-learn
+    - matplotlib
+    - networkx
+    - "--editable=git+https://github.com/enthought/mayavi#egg=mayavi"
+    - sqlalchemy
+    - sphinx
+    - recommonmark
+    - numpydoc
+    - joblib
