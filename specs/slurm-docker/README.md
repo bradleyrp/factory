@@ -1,12 +1,6 @@
-The following documentation is hosted on the [factory github](https://github.com/bradleyrp/factory/tree/bluecrab/specs/slurm-docker) however the portal code will point elsewhere (possibly a private repository [here](https://github.com/marcc-hpc/portal)).
+The following documentation is hosted on the [factory github](https://github.com/bradleyrp/factory/tree/bluecrab/specs/slurm-docker). The notes below will explain how to use the factory code for testing SLURM and LDAP and Coldfront inside of a docker cluster. Preliminary development of a user portal occurs in a fork of Coldfront located in a private repository for MARCC at [`https://github.com/marcc-hpc/portal`](https://github.com/marcc-hpc/portal).
 
-# Setup Instructions
-
-1. Build docker volumes and containers with the [latest instructions](#setup-latest).
-2. Deploy either [stock coldfront](#coldfront-quickstart) or our [custom configuration](#coldfront).
-3. Connect coldfront to LDAP with [these instructions](#ldap-interface).
-
-See ongoing development notes at the bottom of this text.
+To set up a development environment for the portal, follow [the latest instructions below](#setup-latest).
 
 # Historical Notes
 
@@ -146,6 +140,8 @@ Now we can run everything from `/opt/coldfront_app/portal` in the accounts volum
 <a id="setup-latest"></a>
 ## Setup notes [2020.09.04] 
 
+These instructions will set up a testing environment so you can use all three components at once (SLURM, LDAP, Coldfront). After you complete these instructions, portal development can continue at the portal repository at [`https://github.com/marcc-hpc/portal`](https://github.com/marcc-hpc/portal).
+
 ~~~
 git clone https://github.com/bradleyrp/factory -b bluecrab
 cd factory
@@ -169,7 +165,11 @@ docker exec -it accounts bash
 cd /opt
 mkdir coldfront_app
 cd coldfront_app
-# you can either clone coldfront directly or use the "forking coldfront privately" instructions above
+# we forked coldfront privately to continue development
+# you may need to get permission to access this repository
+# note that ALL PORTAL development will proceed from this repo
+# changes to the factory required for testing can be sent to ryan
+# later we should set up a shared fork of the factory code
 git clone https://github.com/marcc-hpc/portal -b dev 
 python3.8 -m venv venv
 source venv/bin/activate
@@ -261,8 +261,8 @@ The components above are designed to address the allocations and reporting. We h
 
 Ongoing development should answer the question of user management along with assistance from the systems team. One method for keeping user management and coldfront as modular as possible would be to include all users on the system in a special LDAP distinguished name or attribute that says whether they are part of the system.
 
-*Note that it is critical that we maintain complete activate and deactivate user lists for cradle-to-grave user management on Rockfish.*
-
-## Closing status
+## Portal development continues elsewhere
 
 As of 2020.09.23 development of the portal itself has moved to a [private repository for our site](https://github.com/marcc-hpc/portal). The factory code will remain here for testing purposes, specifically as we populate an LDAP database to simulate a production environment. Further testing instructions will be tracked in this readme until this code is added to integration tests for the final product.
+
+*The instructions [above](#setup-latest) will help you set up the development environment for the portal until we move it to the cluster itself. Changes to the factory required for testing should go to Ryan Bradley or we can fork this repo later. 

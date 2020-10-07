@@ -10,7 +10,7 @@ import tempfile
 #! we typically use the requirement function to load yaml in each function
 try:
 	import yaml
-	from lib.yaml_mods import YAMLObjectInit
+	from ortho.yaml_mods import YAMLObjectInit
 	# loading yaml_mods adds extra tags and constructors
 	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_list
 	# chain feature for handling dependencies
