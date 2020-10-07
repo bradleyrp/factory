@@ -152,7 +152,8 @@ def config_or_make(config_key,builder,where=None):
 		if False and config_key=='spack':
 			# spack clone subdirectory is hardcoded here
 			target = os.path.join(where,'spack')
-		if os.path.realpath(target)!=os.path.realpath(where):
+		# removed the following message
+		if os.path.realpath(target)!=os.path.realpath(where) and 0:
 			print(('warning registered target for "%s" is "%s" which is '
 				'different than the request "%s"')%(config_key,target,where))
 		return target
@@ -185,37 +186,26 @@ class SpackEnvMaker(Handler):
 			# command for the target after we add buildcache dependencies
 			command = 'spack --env . buildcache create -a -m %s'%cache_mirror
 			# write a temporary file to perform this
-			#! is this inefficient?
-			if 0:
-				fn = tempfile.NamedTemporaryFile(delete=False)
-				with fn as fp:
-					fp.write((spack_mirror_complete%
-						dict(mirror=cache_mirror)).encode())
-					# we must also add the target here
-					fp.write(("os.system('%s')\n"%command).encode())
-					fp.close()
-				# somewhat redundant with the _run_via_spack above
-				starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
-				#! requires python3
-				result = ortho.bash('source %s && python3 %s'%
-					(starter,fn.name),announce=True,
-					cwd=where,scroll=True)
-				os.remove(fn.name)
-			# run the code directly
-			result_concretize = bash('spack -e . concretize -f',
-				cwd=where,scroll=False)
+			result_concretize = self._run_via_spack(
+				spack_spot=spack_spot,env_spot=where,
+				command='spack -e . concretize -f',fetch=True)
 			stdout,stderr = [result_concretize[k] for k in ['stdout','stderr']]
-			if stderr: raise ValueError
+			if stderr: 
+				if stdout: print(stdout)
+				print(stderr)
+				raise Exception('see stderr above')
 			specs = [re.match(r'^.+\^(.+)$',i).group(1) 
 				for i in stdout.splitlines() 
 				if re.match(r'^.+\^(.+)$',i)]
 			print('[STATUS] collecting the following specs:\n%s'%
 				pprint.pformat(specs))
 			for spec in specs: 
-				bash('spack --env . buildcache create -a -m %s %s'%(
-					cache_mirror,spec),cwd=where,scroll=True)
-			bash('spack -e . buildcache create -a -m %s'%
-				cache_mirror,cwd=where,scroll=True)
+				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
+					command='spack --env . buildcache create -a -m %s %s'%(
+						cache_mirror,spec))
+			self._run_via_spack(spack_spot=spack_spot,env_spot=where,
+				command='spack -e . buildcache create -a -m %s'%
+					cache_mirror)
 			return
 		# standard installation
 		else:
@@ -239,6 +229,7 @@ class SpackEnvItem(Handler):
 		"""Route commands to spack."""
 		home_spack = os.path.expanduser('~/.spack')
 		if site_force and os.path.isdir(home_spack):
+			# disable this due to various issues. this appears to be required
 			if os.access(home_spack,os.X_OK | os.W_OK): 
 				raise Exception('cannot allow ~/.spack')
 			# if spack exists but is not writable we continue
@@ -282,7 +273,9 @@ class SpackEnvItem(Handler):
 		# custom modifications to the environment
 		if not mods: mods = {}
 		if install_tree:
-			delveset(mods,'config','install_tree',value=install_tree)
+			# this was updated to include root subkey for a recent spack config
+			#   change otherwise you get a "deprecated" error
+			delveset(mods,'config','install_tree','root', value=install_tree)
 		if lmod_spot:
 			try: 
 				modules_enable = delve(mods,'modules','enable')
