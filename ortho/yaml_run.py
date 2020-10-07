@@ -73,7 +73,8 @@ def yaml_do_select(what,name=None,debug=False,**kwargs):
 				if i!='_tag_name'] 
 			if name not in names:
 				raise Exception(('target %s only accepts '
-					'the following selections: %s')%(what,str(names)))
+					'the following selections: %s. you might '
+					'need to load python3.')%(what,str(names)))
 			# we prevent code outside of the select loop to ensure
 			#   that the user does not sneak in any unintended side
 			#   effects that might also run alongside our code however
