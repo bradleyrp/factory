@@ -10,6 +10,8 @@ def sync(**kwargs):
 	"""
 	Ensure modules are fresh.
 	"""
+	#! note that git -C requires a later git but we do not have
+	#!   a generic version-checker yet
 	modules = kwargs.pop('modules',{})
 	current = kwargs.pop('current',False)
 	if kwargs: raise Exception(kwargs)
@@ -22,11 +24,16 @@ def sync(**kwargs):
 		#! check address?
 		address = mod.pop('address')
 		# clone if missing
-		if not os.path.isdir(spot): bash('git clone %s %s'%(address,spot),scroll=True,tag='[BASH] | ')
+		if not os.path.isdir(spot): 
+			cmd = 'git clone %s %s'%(address,spot)
+			print('bash',cmd)
+			bash(cmd,scroll=True,tag='[BASH] | ')
 		# check branch
 		branch = mod.pop('branch',None)
 		if branch:
-			branch_result = bash('git -C %s rev-parse --abbrev-ref HEAD'%spot,scroll=False)
+			cmd = 'git -C %s rev-parse --abbrev-ref HEAD'%spot
+			print('bash',cmd)
+			branch_result = bash(cmd,scroll=False)
 			stderr = branch_result['stderr']
 			if stderr: raise Exception(stderr)
 			this_branch = branch_result['stdout'].strip()
