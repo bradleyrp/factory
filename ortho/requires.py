@@ -53,9 +53,11 @@ def _requires_python_check(req,msg):
 					op,version,version_this)))
 
 def requires_python_check(*reqs):
+	#! activate_env is deprecated
 	msg = ('we expect python module "%s"%s. '
 		'you may need to point to an environment by running: '
 		'make set activate_env="~/path/to/bin/activate env_name"')
+	msg = ('we expect python module "%s"%s.')
 	for req in reqs: _requires_python_check(req,msg)
 
 def requires_python(*reqs):
