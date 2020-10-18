@@ -170,7 +170,8 @@ class SpackEnvMaker(Handler):
 		os.makedirs(where,exist_ok=True)
 		with open(os.path.join(where,'spack.yaml'),'w') as fp:
 			yaml.dump({'spack':spack},fp)
-		cpu_count_opt = min(multiprocessing.cpu_count(),6)
+		cpu_count_opt = min(multiprocessing.cpu_count(),
+			int(os.environ.get('SPACK_MORE_CPUS',6)))
 		# flags from CLI passed via meta
 		live = self.meta.get('live',False)
 		extras = ''
