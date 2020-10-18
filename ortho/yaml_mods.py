@@ -99,6 +99,8 @@ def yaml_tag_merge_list(self,node):
     """
     # this solution was too complex: https://stackoverflow.com/a/29620234
     this = [self.construct_sequence(i) for i in node.value]
+    # when using !loopcat we need to sometimes unwrap a list
+    if isinstance(this,list) and len(this)==1: this = this[0]
     return [i for j in this for i in j]	
 
 # generic !merge_lists tag is highly useful
