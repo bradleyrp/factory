@@ -92,26 +92,35 @@ def select_yaml_tag_filter(tree,target_tag):
 		this.pop('_has_tag')
 		return this
 
+def flatten_recursive(this):
+	"""Recursively flatten a list."""
+	# via: https://stackoverflow.com/a/35415963
+	out = []
+	for item in this:
+		if not isinstance(item,list):
+			out.append(item)
+		else:
+			out.extend(flatten_recursive(item))
+	return out
+
 def yaml_tag_merge_list(self,node):
-    """
-    Flatten a list in YAML. Note that this a much-requested and highly useful
-    non-native YAML feature. 
-    """
-    # this solution was too complex: https://stackoverflow.com/a/29620234
-    this = [self.construct_sequence(i) for i in node.value]
-    # when using !loopcat we need to sometimes unwrap a list
-    if isinstance(this,list) and len(this)==1: this = this[0]
-    return [i for j in this for i in j]	
+	"""
+	Flatten a list in YAML. Note that this a much-requested and highly useful
+	non-native YAML feature. 
+	"""
+	# this solution was too complex: https://stackoverflow.com/a/29620234
+	this = [self.construct_sequence(i) for i in node.value]
+	return flatten_recursive(this)
 
 # generic !merge_lists tag is highly useful
 yaml.add_constructor('!merge_lists',yaml_tag_merge_list)
 
 def yaml_tag_strcat(self,node):
-    """
+	"""
 	Concatenate strings.
 	Originally developed to concatenate spack specs and avoid redundancy.	
-    """
-    return " ".join(self.construct_sequence(node))
+	"""
+	return " ".join(self.construct_sequence(node))
 
 yaml.add_constructor('!strcat',yaml_tag_strcat)
 
