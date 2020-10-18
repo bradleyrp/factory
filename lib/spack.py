@@ -18,12 +18,12 @@ try:
 	# additional shorthand
 	yaml.add_constructor('!str',yaml_tag_strcat_custom(" "))
 	yaml.add_constructor('!strflush',yaml_tag_strcat_custom(""))
-	def yaml_tag_loop_r_packages(self,node):
-		this = self.construct_mapping(node)
+	def yaml_tag_loop_packages(self,node):
+		this = self.construct_mapping(node,deep=True)
 		if this.keys()!={'base','loop'}:
 			raise Exception('invalid format: %s'%str(this))
 		return ['%s %s'%(i,this['base']) for i in this['loop']]
-	yaml.add_constructor('!loopcat',yaml_tag_loop_r_packages)
+	yaml.add_constructor('!loopcat',yaml_tag_loop_packages)
 except Exception as e: 
 	#! yaml error here if you raise
 	#! hence this is loaded twice. consider fixing? or explicate
