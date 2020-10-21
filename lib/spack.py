@@ -6,6 +6,7 @@ import os,copy,re,sys,glob,pprint
 import ortho
 import multiprocessing
 import tempfile
+import shutil
 # several functions below use yaml 
 #! we typically use the requirement function to load yaml in each function
 try:
@@ -20,9 +21,11 @@ try:
 	yaml.add_constructor('!strflush',yaml_tag_strcat_custom(""))
 	def yaml_tag_loop_packages(self,node):
 		this = self.construct_mapping(node,deep=True)
-		if this.keys()!={'base','loop'}:
+		if set(this.keys())>set(['base','loop','suffix']):
 			raise Exception('invalid format: %s'%str(this))
-		return ['%s %s'%(i,this['base']) for i in this['loop']]
+		suffix = this.get('suffix','')
+		if suffix: suffix = ' '+suffix
+		return ['%s %s%s'%(i,this['base'],suffix) for i in this['loop']]
 	yaml.add_constructor('!loopcat',yaml_tag_loop_packages)
 except Exception as e: 
 	#! yaml error here if you raise
@@ -185,7 +188,9 @@ class SpackEnvMaker(Handler):
 		# build for cache by selecting a mirror
 		elif cache_mirror:
 			# command for the target after we add buildcache dependencies
-			command = 'spack --env . buildcache create -a -m %s'%cache_mirror
+			command_base = 'spack --env . buildcache create -a -m %s'%cache_mirror
+			key_this = ortho.conf.get('spack_buildcache_gpg',None)
+			if key_this: command_base += ' -k %s'%key_this
 			# write a temporary file to perform this
 			result_concretize = self._run_via_spack(
 				spack_spot=spack_spot,env_spot=where,
@@ -202,11 +207,9 @@ class SpackEnvMaker(Handler):
 				pprint.pformat(specs))
 			for spec in specs: 
 				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-					command='spack --env . buildcache create -a -m %s %s'%(
-						cache_mirror,spec))
+					command=command_base+' '+spec)
 			self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-				command='spack -e . buildcache create -a -m %s'%
-					cache_mirror)
+				command=command_base)
 			return
 		# standard installation
 		else:
@@ -466,6 +469,75 @@ class SpackEnvItem(Handler):
 		self._run_via_spack('spack mirror add --scope site %s %s'%(
 			mirror_name,spot_dn))
 		return mirror_name
+	def lmod_simplify(self,lmod_simplify,
+		compiler,compiler_version,arch_val,targets):
+		"""
+		Lmod simplification designed for Rockfish.
+		STATUS: this method has two benefits
+		  1. swappable python-dependent modules
+			 for example, if you load python/3.8.6 and then py-numpy, you can switch python versions
+			 and switching to python/3.7.9 will reload the *correct* py-numpy (otherwise module error)
+			 and it will also deactivate any modules that do not exist
+		  2. retains the autoload feature from spack
+		  3. ml spider still tells you which packages to load
+		  3. cleaner module tree with a separate section for python-dependent modules to reduce clutter
+		raise Exception('buhhhh')
+		"""
+		if lmod_simplify: raise Exception('lmod_refresh must be null')
+		print('status simplify lmod tree')
+		prefix = ortho.conf.get('spack_prefix',None)
+		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
+		if not os.path.isdir(prefix):
+			raise Exception('%s is not a directory'%prefix)
+		base = os.path.join(prefix,'lmod',arch_val,compiler,compiler_version)
+		dest = os.path.join(prefix,'lmod',arch_val,'alt')
+		if not os.path.isdir(base):
+			raise Exception('cannot find %s'%base)
+		print('status base is %s'%base)
+		if not os.path.isdir(dest):
+			print('status making %s'%dest)
+			os.makedirs(dest)
+		for target_spec in targets:
+			name,version = target_spec.split('@')
+			target = os.path.join(base,name,version)
+			# step 1: remove the complicated tree from 
+			# move the targets (anythin in the e.g. python/3.8.6 directory) to an alt location 
+			# note that this does not move python/3.8.6.lua which remains in the main tree
+			dest_this = os.path.join(dest,name)
+			if not os.path.isdir(dest_this):
+				os.makedirs(dest_this)
+			print('status moving %s to %s'%(target,dest_this))
+			shutil.move(target,dest_this)
+			# step 2: when parent is loaded we add the moved tree to the MODULEPATH
+			fn_parent = target+'.lua'
+			print('status customizing %s'%fn_parent)
+			with open(fn_parent,'a') as fp:
+				fp.write('-- customization: move the view projection for subordinate packages\n')
+				fp.write('-- then add the moved tree to the MODULEPATH\n')
+				dn_parent_root = os.path.join(dest_this,version)
+				fp.write('append_path("MODULEPATH","%s")\n'%dn_parent_root)	
+				fp.write('family("%s")'%name)
+			# step 3: walk the moved tree and replace items
+			dest_this = os.path.join(dest,name,version)
+			print('status walking %s'%dest_this)
+			lua_fns = []
+			for root,dn,fns in os.walk(dest_this,topdown=False):
+				lua_fns.extend([os.path.join(root,i) for i in fns if re.match('^.+\.lua$',i)])
+			for fn in lua_fns:
+				print('status modifying %s'%fn)
+				with open(fn) as fp: text = fp.read()
+				# pattern to find the parent which must be loaded already anyway since we moved
+				#   the tree out of the way. we replace with a prereq to enforce this
+				regex_parent_load = 'if not isloaded\("%s\/%s"\) then.*?end'%(name,version)
+				repl = '-- customize: ensure parent is loaded\nprereq("%s/%s")'%(name,version)
+				found = re.findall(regex_parent_load,text,flags=re.M+re.DOTALL)
+				text_out = re.sub(regex_parent_load,repl,text,flags=re.M+re.DOTALL)
+				# most upstream modules from autoload: direct or all in spack will now have 
+				#   the wrong path since after the move so we remove the nesting
+				# note that the nesting is created by a view projection in spack to enable 
+				#   this separation between supporting modules
+				text_out = re.sub('"%s\/%s\/'%(name,version),'"',text_out,flags=re.M+re.DOTALL)
+				with open(fn,'w') as fp: fp.write(text_out)
 
 def spack_env_maker(what):
 	"""
