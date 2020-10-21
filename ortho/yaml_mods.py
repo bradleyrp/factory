@@ -109,6 +109,8 @@ def yaml_tag_merge_list(self,node):
 	non-native YAML feature. 
 	"""
 	# this solution was too complex: https://stackoverflow.com/a/29620234
+	# note that we have been able to do recursive yaml tags
+	#   but this would be a useful feature 
 	this = [self.construct_sequence(i) for i in node.value]
 	return flatten_recursive(this)
 

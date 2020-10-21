@@ -21,20 +21,28 @@ try:
 	yaml.add_constructor('!strflush',yaml_tag_strcat_custom(""))
 	def yaml_tag_loop_packages(self,node):
 		this = self.construct_mapping(node,deep=True)
-		if set(this.keys())>set(['base','loop','suffix']):
+		if set(this.keys())!=set(['base','loop']):
 			raise Exception('invalid format: %s'%str(this))
-		suffix = this.get('suffix','')
-		if suffix: suffix = ' '+suffix
-		return ['%s %s%s'%(i,this['base'],suffix) for i in this['loop']]
+		return ['%s %s'%(i,this['base']) for i in this['loop']]
 	yaml.add_constructor('!loopcat',yaml_tag_loop_packages)
 	def yaml_tag_looper(self,node):
 		"""
 		Add a value to many keys.
 		"""
-		this = self.construct_mapping(node,deep=True)
-		if this.keys()!={'base','loop'}:
-			raise Exception('invalid format: %s'%str(this))
-		return dict([(i,this['item']) for i in this['keys']])
+		# we automatically squence these because we often have to 
+		#   combine longer lists and we failed to use this under
+		#   a !merge_lists tag. probably need a yield. handling
+		#   lists here instead
+		outer = self.construct_sequence(node,deep=True)
+		result = {}
+		for this in outer:
+			if this.keys()>{'item','keys','suffix'}:
+				raise Exception('invalid format: %s'%str(this))
+			suffix = this.get('suffix','')
+			if suffix: suffix = ' '+suffix
+			up = dict([(i,this['item']+suffix) for i in this['keys']])
+			result.update(**up)
+		return result
 	# generic !merge_lists tag is highly useful
 	yaml.add_constructor('!looper',yaml_tag_looper)
 except Exception as e: 
