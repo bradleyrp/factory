@@ -24,6 +24,16 @@ try:
 			raise Exception('invalid format: %s'%str(this))
 		return ['%s %s'%(i,this['base']) for i in this['loop']]
 	yaml.add_constructor('!loopcat',yaml_tag_loop_packages)
+	def yaml_tag_looper(self,node):
+		"""
+		Add a value to many keys.
+		"""
+		this = self.construct_mapping(node,deep=True)
+		if this.keys()!={'base','loop'}:
+			raise Exception('invalid format: %s'%str(this))
+		return dict([(i,this['item']) for i in this['keys']])
+	# generic !merge_lists tag is highly useful
+	yaml.add_constructor('!looper',yaml_tag_looper)
 except Exception as e: 
 	#! yaml error here if you raise
 	#! hence this is loaded twice. consider fixing? or explicate
