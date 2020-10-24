@@ -221,8 +221,9 @@ class SpackEnvMaker(Handler):
 			specs = [re.match(r'^.+\^(.+)$',i).group(1) 
 				for i in stdout.splitlines() 
 				if re.match(r'^.+\^(.+)$',i)]
-			print('[STATUS] collecting the following specs:\n%s'%
-				pprint.pformat(specs))
+			if specs:
+				print('[STATUS] collecting the following specs:\n%s'%
+					pprint.pformat(specs))
 			for spec in specs: 
 				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 					command=command_base+' '+spec)
@@ -244,6 +245,23 @@ class SpackLmodHooks(Handler):
 	def mkdir(self,mkdir):
 		print('status creating: %s'%mkdir)
 		os.makedirs(mkdir,exist_ok=True)	
+	def copy_lua_fule(self,custom_modulefile,destination,arch_val,repl={}):
+		"""Copy a local lua file into the tree."""
+		prefix = ortho.conf.get('spack_prefix',None)
+		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
+		recipes = ortho.conf.get('spack_recipes',None)
+		# assume modulefiles are adjacent to the spack_recipes
+		fn = os.path.realpath(os.path.join(os.path.dirname(
+			recipes),custom_modulefile))
+		if not os.path.isdir(prefix):
+			raise Exception('%s is not a directory'%prefix)
+		dest = os.path.join(prefix,'lmod',arch_val,destination)
+		with open(fn) as fp: text = fp.read()
+		for k,v in repl.items():
+			text = re.sub('REPL_%s'%k,str(v),text)
+		print('status writing %s'%destination)
+		os.makedirs(os.path.dirname(dest))
+		with open(dest,'w') as fp: fp.write(text)
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
@@ -499,7 +517,7 @@ class SpackEnvItem(Handler):
 		  2. retains the autoload feature from spack
 		  3. ml spider still tells you which packages to load
 		  3. cleaner module tree with a separate section for python-dependent modules to reduce clutter
-		raise Exception('buhhhh')
+        Further modification with `hash_s` below allows us to also move openmpi/3.1.6-xyzxyzx.
 		"""
 		if lmod_simplify: raise Exception('lmod_refresh must be null')
 		print('status simplify lmod tree')
@@ -516,8 +534,19 @@ class SpackEnvItem(Handler):
 			print('status making %s'%dest)
 			os.makedirs(dest)
 		for target_spec in targets:
-			name,version = target_spec.split('@')
+			# we allow some extra customizations so we can also move openmpi
+			is_mpi = False
+			if isinstance(target_spec,dict):
+				name = target_spec['name']
+				version = target_spec['version']
+				hash_s = target_spec['hash']
+				is_mpi = target_spec.get('is_mpi',False)
+			else: 
+				name,version = target_spec.split('@')
+				family = name
+				hash_s = None
 			target = os.path.join(base,name,version)
+			if hash_s: target += '-%s'%hash_s
 			# step 1: remove the complicated tree from 
 			# move the targets (anythin in the e.g. python/3.8.6 directory) to an alt location 
 			# note that this does not move python/3.8.6.lua which remains in the main tree
@@ -525,16 +554,36 @@ class SpackEnvItem(Handler):
 			if not os.path.isdir(dest_this):
 				os.makedirs(dest_this)
 			print('status moving %s to %s'%(target,dest_this))
-			shutil.move(target,dest_this)
+			if not hash_s: shutil.move(target,dest_this)
+			# if we are moving something with a hash we remove the hash
+			else: os.rename(target,os.path.join(dest_this,version))
 			# step 2: when parent is loaded we add the moved tree to the MODULEPATH
 			fn_parent = target+'.lua'
+			# custom move instructions for openmpi/3.1.6-xyzxyzx
+			if is_mpi:
+				tree_new = os.path.join(dest_this,version)
+				fn_parent = os.path.join(base,name,version+'.lua')
+				with open(fn_parent) as fp: text = fp.read()
+				#! pattern = 'prepend_path\("MODULEPATH",.+)\n'
+				pattern = '^prepend_path\("MODULEPATH",.*?\)$'
+				prepend_modulepath = '-- custom relocation\nprepend_path("MODULEPATH","%s")'%tree_new
+				text_out = re.sub(pattern,prepend_modulepath,text,flags=re.M+re.DOTALL)
+				with open(fn_parent,'w') as fp: fp.write(text_out)
+				# we do not need to do the regex replacements that were
+				#   necessary for packages like Python and R which used projections
+				#   because openmpi is automatically projected to a special hashed path
+				# however we must be very careful to avoid openmpi collisions
+				continue
 			print('status customizing %s'%fn_parent)
 			with open(fn_parent,'a') as fp:
 				fp.write('-- customization: move the view projection for subordinate packages\n')
 				fp.write('-- then add the moved tree to the MODULEPATH\n')
 				dn_parent_root = os.path.join(dest_this,version)
-				fp.write('append_path("MODULEPATH","%s")\n'%dn_parent_root)	
-				fp.write('family("%s")'%name)
+				# we prepend as a matter of taste. spack prepends too which means the most 
+				#   important features, including the compiler and base apps are at the bottom
+				#   which sometimes makes them easier to see. like an inverted pyramid
+				fp.write('prepend_path("MODULEPATH","%s")\n'%dn_parent_root)	
+				fp.write('family("%s")'%family)
 			# step 3: walk the moved tree and replace items
 			dest_this = os.path.join(dest,name,version)
 			print('status walking %s'%dest_this)
@@ -966,6 +1015,32 @@ def spack_hpc_shortcut(sub,debug=False,slurm=False,**kwargs):
 	"""Shortcut to call the router with a spec set by a make use operation."""
 	# see specs/cli_spack.yaml rockfish recipe for an example
 	return spack_router(sub=sub,debug=False,slurm=False,**kwargs)
+
+def conda_shared(reqs,target_ortho_key):
+	"""Build a shared conda environment. Useful for HPC admins."""
+	spot = ortho.conf.get(target_ortho_key,None)
+	if not spot: 
+		raise Exception(('you must set `make set %s <path>`'
+			'to point to the anaconda installation')%target_ortho_key)
+	if not os.path.isfile(reqs):
+		raise Exception('argument must be a conda requirements file')	
+	spot_envs = os.path.join(spot,'envs')
+	# note that the name is set in the reqs file but the path is the same
+	#   as the conda requirements base file name
+	print('warning you may need to set permissions:')
+	print(('export CONDA_SPOT=%s && '
+		'sudo find $CONDA_SPOT -type f -exec chmod g+rw {} \; &&'
+		'sudo find $CONDA_SPOT -type d -exec chmod g+rwx {} \; ')%spot_envs)
+	print('warning if you get permission denied you must fix permissions')
+	if not os.path.isdir(spot_envs):
+		raise Exception('cannot find %s'%spot_envs)
+	print('status building environment from %s'%reqs)
+	init_sh = os.path.join(spot,'etc','profile.d','conda.sh')
+	env_path = os.path.join(spot_envs,
+		re.sub('\.(.*?)$','',os.path.basename(reqs)))
+	print('status env path is %s'%env_path)
+	bash('source %s && conda env update --file %s -p %s'%(
+		init_sh,reqs,env_path),announce=True)
 
 def spack_env_install(spec,do,target=None):
 	print('status building environment %s from %s'%(do,spec))
