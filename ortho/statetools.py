@@ -192,6 +192,15 @@ def logger(cache):
 		return logger
 	return intermediate
 
+def inject_kwargs(func,kwargs_out):
+	"""A simple decorator function for defining shortcuts with default kwargs."""
+	def decorated_command(*args,**kwargs):
+		kwargs_out_this = copy.deepcopy(kwargs_out)
+		# kwargs can be overridden
+		kwargs_out_this.update(**kwargs)
+		return func(*args,**kwargs_out_this)
+	return decorated_command
+
 class Parser:
 	"""
 	Convert all methods in a subclass into argparse and run with cacher.
@@ -439,16 +448,12 @@ class Parser:
 					if set(special_subcommander.keys())=={'kwargs','function'}:
 						kwargs_out = special_subcommander['kwargs']
 						func_target = self.specials[name]
-						#! @functools.wraps
-						def inject_kwargs(func):
-							def decorated_command(*args,**kwargs):
-								kwargs_out_this = copy.deepcopy(kwargs_out)
-								# kwargs can be overridden
-								kwargs_out_this.update(**kwargs)
-								return func(*args,**kwargs_out_this)
-							return decorated_command
 						# decorate the function
-						self.specials[name] = inject_kwargs(self.specials[name])
+						# lesson: absolutely do not define a decorator factory here
+						#   because if you do this, the result of the decorator factory
+						#   i.e. the return value of inject_kwargs will be the same function
+						#   every time which completely defeats the purpose of the loop
+						self.specials[name] = inject_kwargs(self.specials[name],kwargs_out)
 					else: 
 						raise KeyError('subcommander spcial keys are: %s'%str(
 							special_subcommander.keys()))
