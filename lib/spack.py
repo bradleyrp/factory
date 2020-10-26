@@ -260,7 +260,8 @@ class SpackLmodHooks(Handler):
 		for k,v in repl.items():
 			text = re.sub('REPL_%s'%k,str(v),text)
 		print('status writing %s'%destination)
-		os.makedirs(os.path.dirname(dest))
+		if not os.path.isdir(os.path.dirname(dest)):
+			os.makedirs(os.path.dirname(dest))
 		with open(dest,'w') as fp: fp.write(text)
 
 class SpackEnvItem(Handler):
