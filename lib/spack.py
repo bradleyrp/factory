@@ -220,14 +220,14 @@ class SpackEnvMaker(Handler):
 				raise Exception('see stderr above')
 			regex_dep_hash = r'^\[.\]\s+(.*?)\s+\^(.+)$'
 			# get dependencies by hash to avoid collisions when building cache
-			specs = [re.match(regex_dep_hash,i).group(1) 
+			specs = [re.match(regex_dep_hash,i).groups() 
 				for i in stdout.splitlines() if re.match(regex_dep_hash,i)]
 			if specs:
 				print('[STATUS] collecting the following specs:\n%s'%
 					pprint.pformat(specs))
-			for spec in specs: 
+			for hash_s,spec in specs: 
 				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-					command=command_base+' '+spec)
+					command=command_base+' /'+spec)
 			self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 				command=command_base)
 			return
