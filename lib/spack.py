@@ -554,10 +554,10 @@ class SpackEnvItem(Handler):
 			dest_this = os.path.join(dest,name)
 			if not os.path.isdir(dest_this):
 				os.makedirs(dest_this)
-			print('status moving %s to %s'%(target,dest_this))
-			if not hash_s: shutil.move(target,dest_this)
-			# if we are moving something with a hash we remove the hash
-			else: os.rename(target,os.path.join(dest_this,version))
+			print('status moving %s to %s'%(target,os.path.join(dest_this,version)))
+			#! path dependency problem here; the directory already exists
+			if not os.path.isdir(os.path.join(dest_this,version)):
+				os.rename(target,os.path.join(dest_this,version))
 			# step 2: when parent is loaded we add the moved tree to the MODULEPATH
 			fn_parent = target+'.lua'
 			# custom move instructions for openmpi/3.1.6-xyzxyzx
