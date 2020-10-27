@@ -218,9 +218,10 @@ class SpackEnvMaker(Handler):
 				if stdout: print(stdout)
 				print(stderr)
 				raise Exception('see stderr above')
-			specs = [re.match(r'^.+\^(.+)$',i).group(1) 
-				for i in stdout.splitlines() 
-				if re.match(r'^.+\^(.+)$',i)]
+			regex_dep_hash = r'^\[.\]\s+(.*?)\s+\^(.+)$'
+			# get dependencies by hash to avoid collisions when building cache
+			specs = [re.match(regex_dep_hash,i).group(1) 
+				for i in stdout.splitlines() if re.match(regex_dep_hash,i)]
 			if specs:
 				print('[STATUS] collecting the following specs:\n%s'%
 					pprint.pformat(specs))
