@@ -227,7 +227,7 @@ class SpackEnvMaker(Handler):
 					pprint.pformat(specs))
 			for hash_s,spec in specs: 
 				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-					command=command_base+' /'+spec)
+					command=command_base+' /'+hash_s)
 			self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 				command=command_base)
 			return
