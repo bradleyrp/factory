@@ -222,10 +222,36 @@ class SpackEnvMaker(Handler):
 			# get dependencies by hash to avoid collisions when building cache
 			specs = [re.match(regex_dep_hash,i).groups() 
 				for i in stdout.splitlines() if re.match(regex_dep_hash,i)]
+			# we see lots of warnings about existing specs and now there are 2000
+			#   for some R pacakages so before we try to build the cache we see if
+			#   it already exists. note that this should change if we decide we want
+			#   to start overwriteing
+			# warning is: ==> Warning: file:///X.spack exists. Use -f option to overwrite.
 			if specs:
+				# whittle the specs to those that are missing from the build cache
+				mirror_dn = ortho.conf.get('spack_mirror_path',None)
+				if not mirror_dn:
+					raise Exception('spack_mirror_path is not defined in the conf')
+				# catalog of all existing tarballs
+				tarballs = []  
+				for root,dns,fns in os.walk(mirror_dn):
+					tarballs.extend([fn for fn in fns
+						if re.match('.+\.spack$',fn)])
+				# lookup table of all existing specs by hash
+				lookup = {}
+				for hash_s,spec in specs:
+					targets = [i for i in tarballs if re.findall(hash_s,i)]
+					if len(targets)==1: lookup[hash_s] = (targets[0],spec)
+					elif len(targets)==0: lookup[hash_s] = None
+					else: raise Exception('collision on %s,%s'%(hash_s,spec))
+				# whittle the specs here
+				specs_redux = [(hash_s,spec) for hash_s,spec in specs
+					if not (hash_s in lookup and lookup[hash_s])]
+				# somehow we have duplicates
+				specs_redux = list(set(specs_redux))
 				print('[STATUS] collecting the following specs:\n%s'%
-					pprint.pformat(specs))
-			for hash_s,spec in specs: 
+					pprint.pformat(specs_redux))
+			for hash_s,spec in specs_redux: 
 				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 					command=command_base+' /'+hash_s)
 			self._run_via_spack(spack_spot=spack_spot,env_spot=where,
