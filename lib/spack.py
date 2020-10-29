@@ -272,7 +272,7 @@ class SpackLmodHooks(Handler):
 	def mkdir(self,mkdir):
 		print('status creating: %s'%mkdir)
 		os.makedirs(mkdir,exist_ok=True)	
-	def copy_lua_fule(self,custom_modulefile,destination,arch_val,repl={}):
+	def copy_lua_file(self,custom_modulefile,destination,arch_val,repl=None):
 		"""Copy a local lua file into the tree."""
 		prefix = ortho.conf.get('spack_prefix',None)
 		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
@@ -284,6 +284,12 @@ class SpackLmodHooks(Handler):
 			raise Exception('%s is not a directory'%prefix)
 		dest = os.path.join(prefix,'lmod',arch_val,destination)
 		with open(fn) as fp: text = fp.read()
+		if not repl: repl = {}
+		# add the spack_prefix to the repl
+		if 'spack_prefix' in repl:
+			raise Exception('you cannot use "spack_prefix" in the repl because '
+				'it is replaced automatically')
+		repl['spack_prefix'] = os.path.join(prefix,'lmod',arch_val)
 		for k,v in repl.items():
 			text = re.sub('REPL_%s'%k,str(v),text)
 		print('status writing %s'%destination)
@@ -421,7 +427,7 @@ class SpackEnvItem(Handler):
 		#! this is deprecated from spack and should be removed
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
-	def lmod_refresh(self,lmod_refresh,name=None,spack_lmod_hook=None):
+	def lmod_refresh(self,lmod_refresh,name=None,spack_lmod_hook=None,delete=True):
 		"""
 		Find a compiler, possibly also installed by spack.
 		"""
@@ -430,7 +436,7 @@ class SpackEnvItem(Handler):
 		chdir_cmd = self._env_chdir(name)
 		self._run_via_spack(command=chdir_cmd+\
 			# always delete and rebuild the entire tree
-			"spack -e . module lmod refresh --delete-tree -y")
+			"spack -e . module lmod refresh %s-y"%('--delete-tree ' if delete else ''))
 	def lmod_hooks(self,lmod_hooks):
 		"""Look over lmod hook objects."""
 		for item in lmod_hooks: SpackLmodHooks(**item).solve
@@ -590,7 +596,8 @@ class SpackEnvItem(Handler):
 			# custom move instructions for openmpi/3.1.6-xyzxyzx
 			if is_mpi:
 				tree_new = os.path.join(dest_this,version)
-				fn_parent = os.path.join(base,name,version+'.lua')
+				version_this = target_spec.get('version_alt',version)
+				fn_parent = os.path.join(base,name,version_this+'.lua')
 				with open(fn_parent) as fp: text = fp.read()
 				#! pattern = 'prepend_path\("MODULEPATH",.+)\n'
 				pattern = '^prepend_path\("MODULEPATH",.*?\)$'
