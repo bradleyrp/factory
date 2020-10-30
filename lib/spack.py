@@ -290,6 +290,7 @@ class SpackLmodHooks(Handler):
 			raise Exception('you cannot use "spack_prefix" in the repl because '
 				'it is replaced automatically')
 		repl['spack_prefix'] = os.path.join(prefix,'lmod',arch_val)
+		repl['spack_prefix_base'] = os.path.join(prefix)
 		for k,v in repl.items():
 			text = re.sub('REPL_%s'%k,str(v),text)
 		print('status writing %s'%destination)
@@ -640,6 +641,19 @@ class SpackEnvItem(Handler):
 				#   this separation between supporting modules
 				text_out = re.sub('"%s\/%s\/'%(name,version),'"',text_out,flags=re.M+re.DOTALL)
 				with open(fn,'w') as fp: fp.write(text_out)
+	def copy(self,source,prefix_subpath):
+		"""
+		Copy files into the spack prefix.
+		"""
+		#! lazy, possibly unsafe
+		src = os.path.join(source,'')
+		# destination is relative to the prefix
+		prefix = ortho.conf.get('spack_prefix',None)
+		if not prefix: raise Exception('cannot find spack_prefix')
+		dest = os.path.join(prefix,prefix_subpath,'')
+		cmd = 'rsync -arivP %s %s'%(src,dest)
+		print('status running: %s'%cmd)
+		os.system(cmd)
 
 def spack_env_maker(what):
 	"""
