@@ -181,11 +181,19 @@ def config_or_make(config_key,builder,where=None):
 
 class SpackEnvMaker(Handler):
 	def blank(self): pass
-	def _run_via_spack(self,spack_spot,env_spot,command,fetch=False):
+	def _run_via_spack(self,spack_spot,env_spot,command,lmod_decoy_ok=False,fetch=False):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
-		result = ortho.bash('source %s && %s'%
-			(starter,command),announce=True,cwd=env_spot,scroll=not fetch)
+		cmd = 'source %s && %s'%(starter,command)
+		# when decoy is set and we get the signal from the consumer 
+		#   then we proot the lmod location so no changes really apply
+		decoy = ortho.conf.get('spack_lmod_decoy',{})
+		lmod_decoy = decoy.get('lmod_decoy',None)
+		lmod_real = decoy.get('lmod_real',None)
+		proot_bin = decoy.get('proot','proot')
+		if lmod_decoy_ok and decoy: cmd = '%s -b %s:%s bash -c \'%s\''%(
+			proot_bin,lmod_decoy,lmod_real,cmd)
+		result = ortho.bash(cmd,announce=True,cwd=env_spot,scroll=not fetch)
 		return result
 	def std(self,spack,where,spack_spot,cache_mirror=None,cache_only=False):
 		os.makedirs(where,exist_ok=True)
@@ -267,30 +275,43 @@ class SpackEnvMaker(Handler):
 class SpackLmodHooks(Handler):
 	def write_lua_file(self,modulefile,contents,moduleroot):
 		"""Write a custom lua file into the tree."""
+		# this recipe does not use spack_lmod_decoy
 		with open(os.path.join(moduleroot,modulefile),'w') as fp:
 			fp.write(contents)
 	def mkdir(self,mkdir):
+		# this recipe does not use spack_lmod_decoy
 		print('status creating: %s'%mkdir)
 		os.makedirs(mkdir,exist_ok=True)	
 	def copy_lua_file(self,custom_modulefile,destination,arch_val,repl=None):
 		"""Copy a local lua file into the tree."""
 		prefix = ortho.conf.get('spack_prefix',None)
 		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
+		# apply the lmod decoy
+		lmod_decoy = ortho.conf.get('spack_lmod_decoy',{})
+		if lmod_decoy:
+			prefix_lmod = lmod_decoy['lmod_decoy']
+			prefix_lmod_real = lmod_decoy['lmod_real']
+		else: prefix_mod = prefix_lmod_real = os.path.join(prefix,'lmod')
 		recipes = ortho.conf.get('spack_recipes',None)
 		# assume modulefiles are adjacent to the spack_recipes
 		fn = os.path.realpath(os.path.join(os.path.dirname(
 			recipes),custom_modulefile))
 		if not os.path.isdir(prefix):
 			raise Exception('%s is not a directory'%prefix)
-		dest = os.path.join(prefix,'lmod',arch_val,destination)
+		if not os.path.isdir(prefix_lmod):
+			raise Exception('%s is not a directory'%prefix_lmod)
+		dest = os.path.join(prefix_lmod,arch_val,destination)
 		with open(fn) as fp: text = fp.read()
 		if not repl: repl = {}
 		# add the spack_prefix to the repl
 		if 'spack_prefix' in repl:
 			raise Exception('you cannot use "spack_prefix" in the repl because '
 				'it is replaced automatically')
-		repl['spack_prefix'] = os.path.join(prefix,'lmod',arch_val)
-		repl['spack_prefix_base'] = os.path.join(prefix)
+		repl['spack_prefix'] = os.path.join(prefix_lmod_real,arch_val)
+		# the REPL_spack_base_prefix should be the root path to spack itself, not Lmod
+		#   we use the base for setting paths to the helpers in this case
+		#   while the spack prefix is purely for pointing modulefiles to other modulefiles
+		repl['spack_base_prefix'] = os.path.join(prefix)
 		for k,v in repl.items():
 			text = re.sub('REPL_%s'%k,str(v),text)
 		print('status writing %s'%destination)
@@ -300,7 +321,7 @@ class SpackLmodHooks(Handler):
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
-	def _run_via_spack(self,command,fetch=False,site_force=True):
+	def _run_via_spack(self,command,fetch=False,site_force=True,lmod_decoy_ok=False):
 		"""Route commands to spack."""
 		home_spack = os.path.expanduser('~/.spack')
 		if site_force and os.path.isdir(home_spack):
@@ -314,6 +335,7 @@ class SpackEnvItem(Handler):
 		return SpackEnvMaker()._run_via_spack(
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
+			lmod_decoy_ok=lmod_decoy_ok,
 			command=command,fetch=fetch)
 	def make_env(self,name,specs,mods=None,via=None,
 		cache_only=False,cache_mirror=None):
@@ -428,7 +450,7 @@ class SpackEnvItem(Handler):
 		#! this is deprecated from spack and should be removed
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
-	def lmod_refresh(self,lmod_refresh,name=None,spack_lmod_hook=None,delete=True):
+	def lmod_refresh(self,lmod_refresh,name=None,decoy=False,spack_lmod_hook=None,delete=True):
 		"""
 		Find a compiler, possibly also installed by spack.
 		"""
@@ -437,7 +459,9 @@ class SpackEnvItem(Handler):
 		chdir_cmd = self._env_chdir(name)
 		self._run_via_spack(command=chdir_cmd+\
 			# always delete and rebuild the entire tree
-			"spack -e . module lmod refresh %s-y"%('--delete-tree ' if delete else ''))
+			"spack -e . module lmod refresh %s-y"%('--delete-tree ' if delete else ''),
+			# decoy asks the spack run to check spack_lmod_decoy
+			lmod_decoy_ok=decoy)
 	def lmod_hooks(self,lmod_hooks):
 		"""Look over lmod hook objects."""
 		for item in lmod_hooks: SpackLmodHooks(**item).solve
@@ -560,8 +584,15 @@ class SpackEnvItem(Handler):
 		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
 		if not os.path.isdir(prefix):
 			raise Exception('%s is not a directory'%prefix)
-		base = os.path.join(prefix,'lmod',arch_val,compiler,compiler_version)
-		dest = os.path.join(prefix,'lmod',arch_val,'alt')
+		# standard lmod prefix
+		prefix_lmod = os.path.join(prefix,'lmod')
+		# override if decoy
+		lmod_decoy = ortho.conf.get('spack_lmod_decoy',{})
+		if lmod_decoy: prefix_lmod = lmod_decoy['lmod_decoy']
+		base = os.path.join(prefix_lmod,arch_val,compiler,compiler_version)
+		dest = os.path.join(prefix_lmod,arch_val,'alt')
+		# retain the real name for substitutions if we are using decoy
+		dest_real = os.path.join(prefix,'lmod',arch_val,'alt')
 		if not os.path.isdir(base):
 			raise Exception('cannot find %s'%base)
 		print('status base is %s'%base)
@@ -586,6 +617,8 @@ class SpackEnvItem(Handler):
 			# move the targets (anythin in the e.g. python/3.8.6 directory) to an alt location 
 			# note that this does not move python/3.8.6.lua which remains in the main tree
 			dest_this = os.path.join(dest,name)
+			# real name in case decoy
+			dest_this_real = os.path.join(dest_real,name)
 			if not os.path.isdir(dest_this):
 				os.makedirs(dest_this)
 			print('status moving %s to %s'%(target,os.path.join(dest_this,version)))
@@ -596,7 +629,7 @@ class SpackEnvItem(Handler):
 			fn_parent = target+'.lua'
 			# custom move instructions for openmpi/3.1.6-xyzxyzx
 			if is_mpi:
-				tree_new = os.path.join(dest_this,version)
+				tree_new = os.path.join(dest_this_real,version)
 				version_this = target_spec.get('version_alt',version)
 				fn_parent = os.path.join(base,name,version_this+'.lua')
 				with open(fn_parent) as fp: text = fp.read()
@@ -614,7 +647,7 @@ class SpackEnvItem(Handler):
 			with open(fn_parent,'a') as fp:
 				fp.write('-- customization: move the view projection for subordinate packages\n')
 				fp.write('-- then add the moved tree to the MODULEPATH\n')
-				dn_parent_root = os.path.join(dest_this,version)
+				dn_parent_root = os.path.join(dest_this_real,version)
 				# we prepend as a matter of taste. spack prepends too which means the most 
 				#   important features, including the compiler and base apps are at the bottom
 				#   which sometimes makes them easier to see. like an inverted pyramid
@@ -651,9 +684,22 @@ class SpackEnvItem(Handler):
 		prefix = ortho.conf.get('spack_prefix',None)
 		if not prefix: raise Exception('cannot find spack_prefix')
 		dest = os.path.join(prefix,prefix_subpath,'')
-		cmd = 'rsync -arivP %s %s'%(src,dest)
+		cmd = 'rsync -arivP --delete %s %s'%(src,dest)
 		print('status running: %s'%cmd)
 		os.system(cmd)
+	def instruct_lmod_decoy(self,instruct_lmod_decoy):
+		"""Tell the admin how to deploy the tree if using a decoy.""" 
+		decoy = ortho.conf.get('spack_lmod_decoy',{})
+		if decoy:
+			print('status you have spack_lmod_decoy set, so we have build the '
+				'lmod tree at %s'%decoy['lmod_decoy'])
+			decoy_dn,real_dn = [os.path.join(decoy[k],'') for k in ['lmod_decoy','lmod_real']]
+			alt_dn = re.sub('lmod','bakup-lmod',real_dn)
+			print('status we recommend the following backup, deployment (and rescue) procedure:')
+			cmd = 'sudo rsync -arivP --delete %s %s'
+			lines = [cmd%(real_dn,alt_dn),cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
+			for line in lines: print(' '+line)
+			print('warning you should check your work before deploying in production')
 
 def spack_env_maker(what):
 	"""
