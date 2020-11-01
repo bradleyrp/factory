@@ -700,6 +700,24 @@ class SpackEnvItem(Handler):
 			lines = [cmd%(real_dn,alt_dn),cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
 			for line in lines: print(' '+line)
 			print('warning you should check your work before deploying in production')
+	def renviron_hpc_mods(self,env,specs,form,reps,renviron_mods=None):
+		"""Update the Renviron paths for HPC environments."""
+		if renviron_mods: raise Exception('renviron must be null')
+		spack_envs_dn = self.meta['spack_envs_dn']
+		spot = os.path.join(spack_envs_dn,env)
+		for spec in specs:
+			#! skipping _run_via_spack because not clear on how to handle cwd
+			#!   and anyway we only run this as admin with the spack command loaded
+			result = ortho.bash('spack env activate . && spack location -i %s'%spec,
+				scroll=False,cwd=spot)
+			if result['stderr']: raise Exception(result['stderr'])
+			fn = os.path.join(result['stdout'].strip('\n'),'rlib/R/etc/Renviron')
+			with open(fn) as fp: text = fp.read()
+			text_out = re.sub('^R_LIBS_USER.*?\n','# rockfish mods\n'
+				'R_LIBS_USER=${R_LIBS_USER-\'%s\'}\n'%
+				form,text,flags=re.M+re.DOTALL)
+			for k,v in reps.items(): text_out = re.sub(k,v,text_out,flags=re.M+re.DOTALL)
+			with open(fn,'w') as fp: fp.write(text_out)
 
 def spack_env_maker(what):
 	"""
