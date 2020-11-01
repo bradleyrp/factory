@@ -117,6 +117,9 @@ for spec in specs: specbuild(spec)
 specbuild(cmd='spack buildcache create -m %(mirror)s -a %%s'%%spec)
 """
 
+# save time by remembering spack locations
+spack_locations = {}
+
 def spack_clone(where=None):
 	"""
 	Clone a copy of spack for local use.
@@ -590,9 +593,10 @@ class SpackEnvItem(Handler):
 		lmod_decoy = ortho.conf.get('spack_lmod_decoy',{})
 		if lmod_decoy: prefix_lmod = lmod_decoy['lmod_decoy']
 		base = os.path.join(prefix_lmod,arch_val,compiler,compiler_version)
-		dest = os.path.join(prefix_lmod,arch_val,'alt')
+		# we hardcode an alt directory to avoid cluttered nesting
+		dest = os.path.join(prefix_lmod,arch_val,'alt',compiler,compiler_version)
 		# retain the real name for substitutions if we are using decoy
-		dest_real = os.path.join(prefix,'lmod',arch_val,'alt')
+		dest_real = os.path.join(prefix,'lmod',arch_val,'alt',compiler,compiler_version)
 		if not os.path.isdir(base):
 			raise Exception('cannot find %s'%base)
 		print('status base is %s'%base)
@@ -694,13 +698,13 @@ class SpackEnvItem(Handler):
 			print('status you have spack_lmod_decoy set, so we have build the '
 				'lmod tree at %s'%decoy['lmod_decoy'])
 			decoy_dn,real_dn = [os.path.join(decoy[k],'') for k in ['lmod_decoy','lmod_real']]
-			alt_dn = re.sub('lmod','bakup-lmod',real_dn)
+			alt_dn = re.sub('lmod','backup-lmod',real_dn)
 			print('status we recommend the following backup, deployment (and rescue) procedure:')
 			cmd = 'sudo rsync -arivP --delete %s %s'
 			lines = [cmd%(real_dn,alt_dn),cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
 			for line in lines: print(' '+line)
 			print('warning you should check your work before deploying in production')
-	def renviron_hpc_mods(self,env,specs,reps,renviron_mods=None):
+	def renviron_hpc_mods(self,env,specs,reps,rprofile_coda=None,renviron_mods=None):
 		"""Update the Renviron paths for HPC environments."""
 		if renviron_mods: raise Exception('renviron must be null')
 		spack_envs_dn = self.meta['spack_envs_dn']
@@ -711,13 +715,42 @@ class SpackEnvItem(Handler):
 			result = ortho.bash('spack env activate . && spack location -i %s'%spec,
 				scroll=False,cwd=spot)
 			if result['stderr']: raise Exception(result['stderr'])
-			fn = os.path.join(result['stdout'].strip('\n'),'rlib/R/etc/Renviron')
+			# modify the Renviron
+			prefix = result['stdout'].strip('\n')
+			if 'r' not in spack_locations: spack_locations['r'] = []
+			spack_locations['r'].append(prefix)
+			fn = os.path.join(prefix,'rlib/R/etc/Renviron')
 			with open(fn) as fp: text = fp.read()
 			text_out = re.sub('^R_LIBS_USER.*?\n','# rockfish mods\n'
 				'R_LIBS_USER=${R_LIBS_USER-\'%s\'}\n'%
 				form,text,flags=re.M+re.DOTALL)
+			# extra replacements
 			for k,v in reps.items(): text_out = re.sub(k,v,text_out,flags=re.M+re.DOTALL)
 			with open(fn,'w') as fp: fp.write(text_out)
+			# add to the Rprofile according to tags
+			fn = os.path.join(result['stdout'].strip('\n'),'rlib/R/library/base/R/Rprofile')
+			with open(fn) as fp: text = fp.read()
+			if not rprofile_coda: rprofile_coda = {}
+			for item in rprofile_coda:
+				tag = item['tag']
+				content = item['content']
+				if not re.search(tag,text):
+					text += tag+'\n'+content+'\n'
+			with open(fn,'w') as fp: fp.write(text)
+	def instruct_r_python_protect(self,instruct_r_python_protect=None,):
+		"""Update the Renviron paths for HPC environments."""
+		if instruct_r_python_protect: raise ValueError
+		# use this recipe after r_hpc_mods to produce some chomd commands
+		#   that help protect our R installations from accidental install.packages
+		#   from the admin who installed the software
+		lines = []
+		for item in spack_locations.get('r',[]):
+			lines.append('sudo find %s -name rlib -type d -exec chmod -R a-w {} \;'%item)
+			lines.append('sudo find %s -name Renviron -type f -exec chmod u+w {} \;'%item)
+			lines.append('sudo find %s -name Rprofile -type f -exec chmod u+w {} \;'%item)
+		print('warning do not install packages as admin')
+		print('\n'.join(lines))
+		print('warning use the chmod commands above to protect R libs paths')
 
 def spack_env_maker(what):
 	"""
