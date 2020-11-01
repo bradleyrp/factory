@@ -196,6 +196,10 @@ class SpackEnvMaker(Handler):
 		proot_bin = decoy.get('proot','proot')
 		if lmod_decoy_ok and decoy: cmd = '%s -b %s:%s bash -c \'%s\''%(
 			proot_bin,lmod_decoy,lmod_real,cmd)
+		if not os.path.isdir(lmod_decoy):
+			os.makedirs(lmod_decoy)
+		if not os.path.isdir(lmod_real):
+			os.makedirs(lmod_real)
 		result = ortho.bash(cmd,announce=True,cwd=env_spot,scroll=not fetch)
 		return result
 	def std(self,spack,where,spack_spot,cache_mirror=None,cache_only=False):
@@ -598,7 +602,8 @@ class SpackEnvItem(Handler):
 		# retain the real name for substitutions if we are using decoy
 		dest_real = os.path.join(prefix,'lmod',arch_val,'alt',compiler,compiler_version)
 		if not os.path.isdir(base):
-			raise Exception('cannot find %s'%base)
+			i#! raise Exception('cannot find %s'%base)
+			os.makedirs(base)
 		print('status base is %s'%base)
 		if not os.path.isdir(dest):
 			print('status making %s'%dest)
