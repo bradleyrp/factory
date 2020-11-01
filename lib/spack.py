@@ -700,12 +700,12 @@ class SpackEnvItem(Handler):
 			lines = [cmd%(real_dn,alt_dn),cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
 			for line in lines: print(' '+line)
 			print('warning you should check your work before deploying in production')
-	def renviron_hpc_mods(self,env,specs,form,reps,renviron_mods=None):
+	def renviron_hpc_mods(self,env,specs,reps,renviron_mods=None):
 		"""Update the Renviron paths for HPC environments."""
 		if renviron_mods: raise Exception('renviron must be null')
 		spack_envs_dn = self.meta['spack_envs_dn']
 		spot = os.path.join(spack_envs_dn,env)
-		for spec in specs:
+		for spec,form in specs.items():
 			#! skipping _run_via_spack because not clear on how to handle cwd
 			#!   and anyway we only run this as admin with the spack command loaded
 			result = ortho.bash('spack env activate . && spack location -i %s'%spec,
