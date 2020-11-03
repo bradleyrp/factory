@@ -52,7 +52,7 @@ dependencies:
     - pycrypto
     # for maths
     - scikit-learn
-    - py_d3
+    #! - py_d3
     #! testing. takes a very long time
     - ipyslurm
     #! export CPLUS_INCLUDE_PATH=/Users/rpb/worker/heart/factory/local/conda/envs/dev/include/eigen3:$CPLUS_INCLUDE_PATH

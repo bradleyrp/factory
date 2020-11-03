@@ -18,6 +18,8 @@ template_basic:
   packages: {}
   config: 
     checksum: false
+    misc_cache: $spack/misc_cache
+    source_cache: $spack/var/spack/source_cache
   specs: []
   view: false
 
@@ -67,16 +69,6 @@ macos_vmd:
         - tk
         - opengl@4.5
 
-macos_test:
-  notes: Tested 2020.02.02 after updating the clone and path configs.
-  envs:
-    - find_compilers: null
-    - bootstrap: null
-    - name: env-macos-test
-      via: template_basic
-      specs:
-        - curl
-
 tensorflow:
   notes: Testing the tensorflow build on CentOS 8.
   envs:
@@ -88,3 +80,24 @@ tensorflow:
       via: template_basic
       specs: 
         - py-tensorflow cuda_arch=75
+
+macos_test:
+  notes: Tested 2020.02.02 after updating the clone and path configs.
+  envs:
+    - find_compilers: null
+    - name: env-macos-test
+      via: template_basic
+      specs:
+        - curl
+
+paraview:
+  notes: |
+    Lots of problems. apple-clang@11.0.0 had no gfortran. GCC on mac cannot compile cmake.
+      "%gcc platform=darwin" conflicts with "cmake" [CMake does not compile with GCC on macOS yet, please use %apple-clang. See: https://gitlab.kitware.com/cmake/cmake/-/issues/21135]
+    
+  envs:
+    - find_compilers: null
+    - name: env-paraview
+      via: template_basic
+      specs:
+        - paraview +plugins +python3 +qt ~mpi ^netcdf-c ~mpi ^hdf5 ~mpi %gcc@9.3.0
