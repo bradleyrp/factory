@@ -94,8 +94,9 @@ def delveset(o,*k,**kwargs):
 	if len(k)==0: raise Exception('deepset needs a path')
 	elif len(k)==1: 
 		try: o[k[0]] = value
-		except:
-			import pdb;pdb.set_trace()
+		except Exception as e:
+			print('cannot make a delveset assignment of %s to %s'%(k[0],str(o)))
+			raise 
 	else:
 		if k[0] not in o: o[k[0]] = {}
 		delveset(o[k[0]],*k[1:],value=value)
