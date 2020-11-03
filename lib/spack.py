@@ -761,12 +761,18 @@ class SpackEnvItem(Handler):
 		#   from the admin who installed the software
 		lines = []
 		for item in spack_locations.get('r',[]):
-			lines.append('sudo find %s -name rlib -type d -exec chmod -R a-w {} \;'%item)
-			lines.append('sudo find %s -name Renviron -type f -exec chmod u+w {} \;'%item)
-			lines.append('sudo find %s -name Rprofile -type f -exec chmod u+w {} \;'%item)
+			lines.append(' sudo find %s -name rlib -type d -exec chmod -R a-w {} \;'%item)
+			lines.append(' sudo find %s -name Renviron -type f -exec chmod u+w {} \;'%item)
+			lines.append(' sudo find %s -name Rprofile -type f -exec chmod u+w {} \;'%item)
 		print('warning do not install packages as admin')
 		print('\n'.join(lines))
 		print('warning use the chmod commands above to protect R libs paths')
+	def instruct_custom(self,instruct_custom):
+		"""Print generic instructions."""
+		print('status generic instructions')
+		for item in instruct_custom:
+			print(' %s'%str(item))
+		print('warning see generic instructions above')
 
 def spack_env_maker(what):
 	"""
