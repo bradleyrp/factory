@@ -298,7 +298,7 @@ class SpackLmodHooks(Handler):
 		if lmod_decoy:
 			prefix_lmod = lmod_decoy['lmod_decoy']
 			prefix_lmod_real = lmod_decoy['lmod_real']
-		else: prefix_mod = prefix_lmod_real = os.path.join(prefix,'lmod')
+		else: prefix_lmod = prefix_lmod_real = os.path.join(prefix,'lmod')
 		recipes = ortho.conf.get('spack_recipes',None)
 		# assume modulefiles are adjacent to the spack_recipes
 		fn = os.path.realpath(os.path.join(os.path.dirname(
