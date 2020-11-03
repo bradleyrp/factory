@@ -1,4 +1,4 @@
-# you probably need to rebuild the environment every time you add to it for some reason
+# WARNING: you absolutely need to rebuild the environment every time you add to it for some reason
 name: dev_heart_11
 dependencies:
   - python==3.8.3
@@ -20,3 +20,4 @@ dependencies:
     - recommonmark
     - numpydoc
     - joblib
+    - psutil
