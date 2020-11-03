@@ -2,29 +2,42 @@
 
 #! manually pick up the overloaded print
 from __future__ import print_function
-import os,copy,re,sys
+import os,copy,re,sys,glob,pprint
 import ortho
 import multiprocessing
+import tempfile
 # several functions below use yaml 
 #! we typically use the requirement function to load yaml in each function
 try:
 	import yaml
 	from lib.yaml_mods import YAMLObjectInit
 	# loading yaml_mods adds extra tags and constructors
-	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_lists
-	#! the following is failing!
-	# yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
-	#! why are these not automatic
+	from ortho.yaml_mods import yaml_tag_strcat_custom,yaml_tag_merge_list
+	# chain feature for handling dependencies
+	yaml.add_constructor('!chain',yaml_tag_strcat_custom(" ^"))
+	# additional shorthand
+	yaml.add_constructor('!str',yaml_tag_strcat_custom(" "))
+	yaml.add_constructor('!strflush',yaml_tag_strcat_custom(""))
+	def yaml_tag_loop_r_packages(self,node):
+		this = self.construct_mapping(node)
+		if this.keys()!={'base','loop'}:
+			raise Exception('invalid format: %s'%str(this))
+		return ['%s %s'%(i,this['base']) for i in this['loop']]
+	yaml.add_constructor('!loopcat',yaml_tag_loop_r_packages)
 except Exception as e: 
 	#! yaml error here if you raise
 	#! hence this is loaded twice. consider fixing? or explicate
+	print(e)
 	pass
 from ortho import Handler
 from ortho import CacheChange
 from ortho import path_resolver
 from ortho import catalog
-from ortho import delveset
+from ortho import delveset,delve
 from ortho import requires_python_check
+from ortho import bash
+from ortho.yaml_run import yaml_do_select
+from ortho.handler import incoming_handlers
 
 """
 NOTES on path configuration and order of precedence
@@ -49,6 +62,39 @@ this file, but also provided for the yaml when it is loaded.
 spack_tree_defaults = {
 	'spot':'./local/spack',
 	'spot_envs':'./local/envs-spack',}
+
+spack_mirror_complete = """
+import subprocess,re,os
+proc = subprocess.Popen('spack -e . concretize -f'.split(),
+	stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+stdout,stderr = proc.communicate()
+if stderr: raise ValueError
+specs = [re.match('^.+\\^(.+)$',i).group(1) 
+	for i in stdout.decode().splitlines() if re.match('^.+\\^(.+)$',i)]
+for spec in specs: 
+	os.system(
+		'spack buildcache create -m %(mirror)s -a %%s'%%spec)
+"""
+
+spack_mirror_complete = """
+import subprocess,re,os
+proc = subprocess.Popen('spack -e . concretize -f'.split(),
+	stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+stdout,stderr = proc.communicate()
+if stderr: raise ValueError
+specs = [re.match('^.+\\^(.+)$',i).group(1) 
+	for i in stdout.decode().splitlines() if re.match('^.+\\^(.+)$',i)]
+def specbuild(spec=None,cmd=None):
+	if not bool(spec) ^ bool(cmd): raise ValueError
+	print('[STATUS] buildcache for spec: %%s'%%spec)
+	cmd = 'spack buildcache create -m rfcache -a %%s'%%spec
+	proc = subprocess.Popen(cmd.split())
+	proc.communicate()
+	if proc.returncode:
+		raise Exception('spack error above')
+for spec in specs: specbuild(spec)
+specbuild(cmd='spack buildcache create -m %(mirror)s -a %%s'%%spec)
+"""
 
 def spack_clone(where=None):
 	"""
@@ -117,42 +163,138 @@ class SpackEnvMaker(Handler):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
 		result = ortho.bash('source %s && %s'%
-			(starter,command),cwd=env_spot,scroll=not fetch)
+			(starter,command),announce=True,cwd=env_spot,scroll=not fetch)
 		return result
-	def std(self,spack,where,spack_spot):
+	def std(self,spack,where,spack_spot,cache_mirror=None,cache_only=False):
 		os.makedirs(where,exist_ok=True)
 		with open(os.path.join(where,'spack.yaml'),'w') as fp:
 			yaml.dump({'spack':spack},fp)
 		cpu_count_opt = min(multiprocessing.cpu_count(),6)
 		# flags from CLI passed via meta
 		live = self.meta.get('live',False)
-		if not live: command = 'spack install -j %d'%cpu_count_opt
-		else: command = 'spack concretize -f'
+		extras = ''
+		if cache_only and not live: extras += '--cache-only '
+		# inspect the concretize output
+		if live:
+			command = 'spack --env . concretize %s-f'%(extras)
+			#! register this globally for later. somewhat clumsy
+			global _LAST_SPACK_ENV
+			_LAST_SPACK_ENV = where
+		# build for cache by selecting a mirror
+		elif cache_mirror:
+			# command for the target after we add buildcache dependencies
+			command = 'spack --env . buildcache create -a -m %s'%cache_mirror
+			# write a temporary file to perform this
+			#! is this inefficient?
+			if 0:
+				fn = tempfile.NamedTemporaryFile(delete=False)
+				with fn as fp:
+					fp.write((spack_mirror_complete%
+						dict(mirror=cache_mirror)).encode())
+					# we must also add the target here
+					fp.write(("os.system('%s')\n"%command).encode())
+					fp.close()
+				# somewhat redundant with the _run_via_spack above
+				starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
+				#! requires python3
+				result = ortho.bash('source %s && python3 %s'%
+					(starter,fn.name),announce=True,
+					cwd=where,scroll=True)
+				os.remove(fn.name)
+			# run the code directly
+			result_concretize = bash('spack -e . concretize -f',
+				cwd=where,scroll=False)
+			stdout,stderr = [result_concretize[k] for k in ['stdout','stderr']]
+			if stderr: raise ValueError
+			specs = [re.match(r'^.+\^(.+)$',i).group(1) 
+				for i in stdout.splitlines() 
+				if re.match(r'^.+\^(.+)$',i)]
+			print('[STATUS] collecting the following specs:\n%s'%
+				pprint.pformat(specs))
+			for spec in specs: 
+				bash('spack --env . buildcache create -a -m %s %s'%(
+					cache_mirror,spec),cwd=where,scroll=True)
+			bash('spack -e . buildcache create -a -m %s'%
+				cache_mirror,cwd=where,scroll=True)
+			return
+		# standard installation
+		else:
+			command = "spack --env . install %s-j %d"%(extras,cpu_count_opt)
+		# make fetch happen below because this catches exceptions
 		self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-			command=command)
+			command=command,fetch=False)
 
 class SpackLmodHooks(Handler):
 	def write_lua_file(self,modulefile,contents,moduleroot):
 		"""Write a custom lua file into the tree."""
 		with open(os.path.join(moduleroot,modulefile),'w') as fp:
 			fp.write(contents)
+	def mkdir(self,mkdir):
+		print('status creating: %s'%mkdir)
+		os.makedirs(mkdir,exist_ok=True)	
 
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
-	def _run_via_spack(self,command,fetch=False):
+	def _run_via_spack(self,command,fetch=False,site_force=True):
 		"""Route commands to spack."""
+		home_spack = os.path.expanduser('~/.spack')
+		if site_force and os.path.isdir(home_spack):
+			if os.access(home_spack,os.X_OK | os.W_OK): 
+				raise Exception('cannot allow ~/.spack')
+			# if spack exists but is not writable we continue
+			# we added this feature to identify parts of the workflow that
+			#   write to ~/.spack in order to prevent this
+			else: pass
 		return SpackEnvMaker()._run_via_spack(
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
 			command=command,fetch=fetch)
-	def make_env(self,name,specs,mods=None,via=None):
+	def make_env(self,name,specs,mods=None,via=None,
+		cache_only=False,cache_mirror=None):
 		"""
 		Pass this item along to SpackEnvMaker
+		If you change the keys above, you must update them below to make sure
+		that SpackSeq does not run *other* items when live.
 		"""
+		# hook to allow cache_mirror from a Handler
+		if getattr(cache_mirror,'_is_Handler',False):
+			cache_mirror = cache_mirror.solve
+		#!!! write environments to a temporary location instead?
 		spack_envs_dn = self.meta['spack_envs_dn']
 		spack_dn = self.meta['spack_dn']
 		spot = os.path.join(spack_envs_dn,name)
 		env = {'specs':specs}
+
+		# CUSTOM environment options from the CLI or yaml are managed here
+		# supra arguments override the argument
+		cache_mirror = self.meta.get('supra',{}).get(
+			'cache_mirror',cache_mirror)
+		cache_only = self.meta.get('supra',{}).get(
+			'cache_only',cache_only)
+		# arguments unique to the supra call
+		# install_tree sets the target location to install the packages
+		install_tree = self.meta.get('supra',{}).get(
+			'install_tree',None)
+		# install_tree sets the target location to install the packages
+		lmod_spot = self.meta.get('supra',{}).get(
+			'lmod_spot',None)
+
+		# custom modifications to the environment
+		if not mods: mods = {}
+		if install_tree:
+			delveset(mods,'config','install_tree',value=install_tree)
+		if lmod_spot:
+			try: 
+				modules_enable = delve(mods,'modules','enable')
+				if not 'lmod' in modules_enable:
+					delveset(mods,'modules','enable',
+						value=list(modules_enable)+['lmod'])
+			except: 
+				delveset(mods,'modules','enable',value=['lmod'])
+			delveset(mods,'config','module_roots','lmod',
+				value=lmod_spot)
+		# end of customizations
+
 		# typically use a Handler here but we need meta so simplifying
 		if via:
 			# start with a template from the parent file in meta
@@ -165,7 +307,9 @@ class SpackEnvItem(Handler):
 			for route,val in catalog(mods):
 				delveset(instruct,*route,value=val)
 		print('status building spack environment at "%s"'%spot)
+		# continue to the spack environment interface
 		SpackEnvMaker(spack_spot=spack_dn,where=spot,spack=instruct,
+			cache_only=cache_only,cache_mirror=cache_mirror,
 			# pass through meta for flags e.g. "live" to visit the env
 			meta=self.meta)
 	def find_compilers(self,find_compilers):
@@ -213,6 +357,7 @@ class SpackEnvItem(Handler):
 	#!   this is unavoidable in the YAML list format when using Handler
 	def bootstrap(self,bootstrap):
 		"""Bootstrap installs modules."""
+		#! this is deprecated from spack and should be removed
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
 	def lmod_refresh(self,lmod_refresh,name=None,spack_lmod_hook=None):
@@ -224,7 +369,7 @@ class SpackEnvItem(Handler):
 		chdir_cmd = self._env_chdir(name)
 		self._run_via_spack(command=chdir_cmd+\
 			# always delete and rebuild the entire tree
-			"spack module lmod refresh --delete-tree -y")
+			"spack -e . module lmod refresh --delete-tree -y")
 	def lmod_hooks(self,lmod_hooks):
 		"""Look over lmod hook objects."""
 		for item in lmod_hooks: SpackLmodHooks(**item).solve
@@ -236,7 +381,7 @@ class SpackEnvItem(Handler):
 		"""
 		print('status cleaning nested modules')
 		# hardcoded 7-character hashes
-		regex_nested_hashed = '.+-[0-9a-z]{7}$'
+		regex_nested_hashed = '(.+)-[0-9a-z]{7}$'
 		spot = os.path.realpath(lmod_hide_nested)
 		if not os.path.isdir(spot):
 			raise Exception('cannot find %s'%spot)
@@ -255,6 +400,78 @@ class SpackEnvItem(Handler):
 				fp.write('#%Module\n')
 				for item in val:
 					fp.write('hide-version %s\n'%item)
+	def lmod_remove_nested_hashes(self,lmod_remove_nested_hashes):
+		"""
+		Incompatible with `lmod_hide_nested_hashes`. 
+		Make the openmpi modules more transparent.
+		DEPRECATED. This prevents the use of a default module. 
+		  This method likely deviates too far from the usual Lmod scheme.
+		Options: remove all of the nested openmpi or not. 
+		You cannot keep the nesting and remove the hashes while using defaults.
+    	via: lmod_remove_nested_hashes: *module-spot
+		"""
+		#! repeated from above
+		# hardcoded 7-character hashes
+		regex_nested_hashed = '(.+)-[0-9a-z]{7}$'
+		spot = os.path.realpath(lmod_remove_nested_hashes)
+		if not os.path.isdir(spot):
+			raise Exception('cannot find %s'%spot)
+		result = {}
+		for root,dns,fns in os.walk(spot):
+			path = root.split(os.path.sep)
+			if len(path)>=2 and re.match(regex_nested_hashed,path[-2]):
+				base = os.path.sep.join(path[:-3])
+				if base not in result: result[base] = []
+				result[base].extend([os.path.sep.join(path[-3:]+[
+					re.match(r'^(.+)\.lua$',f).group(1)]) for f in fns])
+		for key,vals in result.items():
+			root = list(set([os.path.sep.join(
+				val.split(os.path.sep)[:2]) for val in vals]))
+			if len(root)!=1: raise Exception('inconsistent roots')
+			target = vals[0].split(os.path.sep)[:2]
+			hashed_name = target[1]
+			simple_name = re.match(regex_nested_hashed,hashed_name).group(1)
+			dest = os.path.join(key,target[0],simple_name)
+			target_dn = os.path.join(key,os.path.sep.join(target))
+			bash('mv %s %s'%(target_dn,dest),scroll=False,v=True)
+			# replace the hash in the modulefile
+			fns_hashed = glob.glob(dest+'.lua')
+			if len(fns_hashed)!=1:
+				raise Exception('failed to replace hashes')
+			target = fns_hashed[0]
+			print('status replacing "%s" with "%s" in: %s'%(
+				hashed_name,simple_name,target))
+			with open(target) as fp: text = fp.read()
+			text = re.sub(hashed_name,simple_name,text)
+			with open(target,'w') as fp: fp.write(text)
+	def lmod_defaults(self,lmod_defaults):
+		"""Create links for lmod defaults."""
+		for fn in lmod_defaults:
+			if not os.path.isfile(fn):
+				raise Exception('cannot find %s'%fn)	
+			dirname = os.path.dirname(fn)
+			bash('ln -s %s %s'%(os.path.basename(fn),'default'),
+				cwd=dirname,scroll=False,v=True)
+	def _check_mirror(self,mirror_name,spot=None):
+		result = self._run_via_spack('spack mirror list',fetch=True)
+		if result['stderr']: raise OSError
+		mirrors = dict([i.split() for i in result['stdout'].splitlines()])
+		if mirror_name not in mirrors: return False
+		if spot:
+			spot_dn = os.path.realpath(spot)
+			spot_abs = 'file://%s'%spot_dn
+			if mirrors[mirror_name]!=spot_abs:
+				#! add html options
+				raise Exception('mirror %s exists but we cannot confirm it is '
+					'located at is at %s'%(mirror_name,spot_abs))
+		return True
+	def make_mirror(self,mirror_name,spot):
+		#! no spot checking so you cannot change the spot and thereby move it
+		if self._check_mirror(mirror_name,spot=spot): return
+		spot_dn = os.path.realpath(spot)
+		self._run_via_spack('spack mirror add --scope site %s %s'%(
+			mirror_name,spot_dn))
+		return mirror_name
 
 def spack_env_maker(what):
 	"""
@@ -283,8 +500,14 @@ class SpackSeq(Handler):
 		self.meta['spack_dn'] = spack_dn
 		self.meta['spack_envs_dn'] = spack_envs_dn
 		for env in envs: 
-			#! should we allow live only in certain cases?
 			# pass along the live flag via meta from CLI
+			# filter out anything that is not environment when live
+			# the following must match the make_env signature
+			keys_make_env = {'name','specs','mods',
+				'via','cache_only','cache_mirror'}
+			# skip items that are not routed to make_env
+			if self.meta.get('live',True) and not env.keys()<=keys_make_env:
+				continue
 			SpackEnvItem(meta=self.meta,**env)
 
 class SpackSeqSub(Handler):
@@ -304,9 +527,11 @@ class SpackSeqSub(Handler):
 		self.deploy = SpackSeq(meta=self.tree,**tree[name])
 		return self
 
-def spack_tree(what,name,live=False):
+def spack_tree(what,name,live=False,**meta):
 	"""
 	Install a sequence of spack environments.
+	Previously we linked this to `make spack` but this was retired to
+	`make spack_tree` in specs/cli_spack.yaml.
 	"""
 	notes = """
 		reqs:
@@ -335,25 +560,37 @@ def spack_tree(what,name,live=False):
 	print('status installing spack seq from %s with name %s'%(what,name))
 	with open(what) as fp: 
 		tree = yaml.load(fp,Loader=yaml.Loader)
+	# meta arguments percolate to downstream functions
+	#   however we already later use meta for the tree, so we add supra-meta
+	#   arguments here as supra
+	if meta:
+		if 'supra' in tree: raise KeyError
+		tree['supra'] = meta
 	spack = SpackSeqSub(name=name,tree=tree,live=live).solve
 	# assume no changes to the tree, it has a spot, and the spot is parent
 	spack_spot = ortho.path_resolver(tree['spot'])
 	# register the spack location
 	return CacheChange(spack=spack_spot)
 
-spack_hpc_singularity_deploy_script = """
-export TMPDIR=%(tmpdir)s
-export TMP_DIR=%(tmpdir)s
-cd %(factory_site)s
-# assume the min environment is available with yaml
-source env.sh min
-./fac spack %(spec)s %(target)s %(flags)s
-echo "[STATUS] you are inside singularity!"
-"""
+### Spack HPC deployment for Blue Crab
 
-def spack_hpc_singularity(spec,name=None,live=False,
-	tmpdir=None,factory_site=None,mounts=None,image=None):
-	"""Special functions for cluster deployment."""
+def spack_hpc_decoy(spec,name=None,live=False,
+	tmpdir=None,factory_site=None,mounts=None,image=None,decoy_method='proot'):
+	"""
+	Operate spack in a decoy environment
+	See `spack_hpc_run` for instructions.
+	This function can be called directly with `make do` or using the 
+	  wrapper function below via `make spack_hpc_deploy`.
+	"""
+	spack_hpc_singularity_deploy_script = '\n'.join([
+		'export TMPDIR=%(tmpdir)s',
+		'export TMP_DIR=%(tmpdir)s',
+		'cd %(factory_site)s',
+		'# assume the min environment is available with yaml',
+		#! make the env name flexible
+		'source env.sh min',
+		'./fac spack %(spec)s %(target)s %(flags)s',
+		'echo "[STATUS] you are inside the decoy environment!"'])
 	factory_site = os.getcwd() if not factory_site else factory_site
 	#! do not call this from the CLI. remove from cli_spack.yaml
 	# check if we are in a slurm job
@@ -365,6 +602,7 @@ def spack_hpc_singularity(spec,name=None,live=False,
 	if os.path.isfile(script_token):
 		raise Exception('cannot execute when %s exists'%script_token)
 	# ask user for the name
+	#! untested after major changes. moved to lib.generic.menu
 	if not name:
 		with open(spec) as fp:
 			text = yaml.load(fp,Loader=yaml.Loader)
@@ -405,22 +643,33 @@ def spack_hpc_singularity(spec,name=None,live=False,
 		mounts_out.append((this['host'],this['local']))
 	mounts_out.append((detail['tmpdir'],detail['tmpdir']))
 	mounts = ['%s:%s'%(i,j) for i,j in mounts_out]
+	absent_dns = [i for i,j in mounts_out 
+		if not os.path.isdir(i) and not os.path.isfile(i)]
+	if any(absent_dns):
+		raise Exception('missing: %s'%str(absent_dns))
 	print('status mounts follow')
 	print('\n'.join(mounts))
 	#! check existence of host directories and image or let singularity?
-	cmd = (
+	if decoy_method=='proot': cmd = (
+		#! need a flexible proot location
+		"/software/apps/proot/5.1.0/bin/proot "+
+		" ".join(['-b %s'%i for i in mounts])+" "
+		"/bin/bash -c 'cd %s && "%detail['factory_site'])
+	elif decoy_method=='singularity': cmd = (
 		"ml singularity && SINGULARITY_BINDPATH= "+
 		"singularity "+("shell " if live else "run ")+ 
 		" ".join(['-B %s'%i for i in mounts])+
 		" "+image+" "+"-c 'cd %s && "%detail['factory_site'])
+	else: raise Exception('invalid decoy method: %s'%decoy_method)
 	if live:
-		# go to the environments folder if we know it
 		spack_envs_dn = ortho.conf.get('spack_envs',None)
+		# to figure out the right env we would have to read the spec file here
+		#   so instead we just go to the environments folder
 		if spack_envs_dn: envs_cd = 'cd %s && '%os.path.realpath(spack_envs_dn)
 		else: envs_cd = ''
 		postscript = (" source env.sh spack && %s"%envs_cd+
 			"export TMPDIR=%s &&"%detail['tmpdir'])
-		cmd += ("/bin/bash %s &&%s /bin/bash'"%(script_token,postscript))
+		cmd += ("/bin/bash %s &&%s /bin/bash --norc'"%(script_token,postscript))
 	else: cmd += "/bin/bash %s'"%script_token
 	print('status running: %s'%cmd)
 	# execution loop
@@ -440,33 +689,241 @@ def spack_hpc_singularity(spec,name=None,live=False,
 	os.remove(script_token)
 	print('status exiting')
 
-def spack_hpc_deploy(deploy,name=None,live=False,spec=None):
-	"""
-	Run spack-via-singularity directly from a terminal.
-	Install via: `make use specs/cli_spack.yaml`
-	Usage: `make spack_hpc specs/spack_hpc_go.yaml <name>`
-	Note that the `live` and `spec` flags can override the defaults.
-	"""
-	if spec: raise Exception('dev')
+def read_deploy(deploy,entire=False):
+	"""Interpret a deploy file without directly executing it."""
 	# note that we cannot edit the deploy yaml in place so we read without tags
-	#   then manipulate, then pass the result to `spack_hpc_singularity`.
+	#   then apply overrides, then pass the result to `spack_hpc_decoy`.
 	with open(deploy) as fp: text = fp.read()
-	# use the correct python tag to subert the call to the function
+	# use the correct python tag to subvert the call to the function
 	# the following trick therefore accomplishes the override
-	target_tag = 'tag:yaml.org,2002:python/object/apply:lib.spack.spack_hpc_singularity'
+	target_tag = 'tag:yaml.org,2002:python/object/apply:lib.spack.spack_hpc_decoy'
 	# use safe loader otherwise reading the deploy yaml triggers the tag
 	from ortho.yaml_mods import YAMLTagFilter,select_yaml_tag_filter
 	tree = yaml.load(text,Loader=YAMLTagFilter(target_tag))
 	deliver = select_yaml_tag_filter(tree,target_tag)
-	# the deliver tree would normally go right to spack_hpc_singularity via `make do`
-	#   so we pick off kwds and send it there after modifications
-	if deliver.keys()!={'kwds'}:
+	# the deliver tree would normally go right to spack_hpc_decoy via `make do`
+	#   so we pick off kwds and send it there after overrides
+	if deliver.keys()>{'kwds','test'}:
 		raise Exception('invalid %s in %s with keys: %s'%(
 			target_tag,deploy,str(deliver.keys())))
+	return deliver
+
+def spack_hpc_deploy(deploy,name=None,live=False,spec=None):
+	"""
+	Run spack in a decoy environment. This can be called from `spack_hpc_run`.
+	We can run this directly via:
+	  ./fac spack_hpc_deploy specs/spack_hpc_deploy.yaml \
+	    --name=bc-std --decoy_method=proot --spec=specs/spack_hpc.yaml --live
+	"""
+	deliver = read_deploy(deploy)
 	kwargs = deliver['kwds']
-	# modify keys
+	# override the deploy file with incoming kwargs
 	kwargs['live'] = live
 	if name: kwargs['name'] = name
 	if spec: kwargs['spec'] = spec
-	spack_hpc_singularity(**kwargs)	
+	# run the decoy environment
+	print('status calling spack_decoy with: %s'%str(kwargs))
+	spack_hpc_decoy(**kwargs)	
 
+def spack_hpc_test_visit(deploy):
+	"""Test a spack build before production using deploy notes."""
+	deliver = read_deploy(deploy,entire=True)
+	# include the test command with keywords to decoy
+	cmd = deliver.get('test',None)
+	if not cmd: raise Exception('cannot find "test" in %s'%deploy)
+	print('status running: %s'%cmd)
+	os.system(cmd)
+
+def spack_hpc_run(run=None,deploy=None,
+	spec=None,live=False,test=False,**kwargs):
+	"""
+	Prepare a call to SLURM to build software with spack.
+	This script takes the place of a bash script to kickoff new jobs.
+	Usage:
+	  make spack_hpc_run \
+        run=specs/spack_hpc_run.yaml \
+	    deploy=specs/spack_hpc_deploy.yaml \
+        spec=specs/spack_hpc.yaml \
+        name=bc-std live
+	The run file can define the deploy file to supply the remaining arguments.
+	"""
+	print('status preparing to use spack')
+	# collapse flags at the CLI into a single decoy_method
+	# fold default kwargs into one object
+	kwargs.update(run=run,spec=spec,deploy=deploy,live=live)
+	if not run: raise Exception('we require a run file')
+	# a yaml tag allows the CLI to override the run file 
+	def yaml_tag_flag(self,node):
+		scalar = self.construct_scalar(node)
+		if scalar not in kwargs: 
+			if test and scalar=='name': return "testing"
+			raise Exception('cannot get this flag from the cli: %s'%scalar)
+		else: return kwargs[scalar]
+	yaml.add_constructor('!flag',yaml_tag_flag)
+	# load the run file
+	with open(run) as fp: 
+		detail = yaml.load(fp,Loader=yaml.Loader)
+	# contents check
+	if detail.keys()>{'docs','settings'}:
+		raise Exception('run file has invalid format: %s'%str(detail))
+	settings = detail['settings']
+	#! beware no use of kwargs unless you use the `!flag` tag in the run file
+	# prepare the script we will execute in SLURM
+	script = [
+		'cd %s'%os.getcwd(),
+		# use the venv to provide the environment or override
+		'source env.sh %s'%settings.get('env_name','venv')]
+	if 'sbatch' in settings:
+		script += ['module purge']
+	if not settings['deploy']: raise Exception('no deploy file')
+	# call the spack_hpc_deploy function with the deploy file and name
+	script += ['./fac spack_hpc_deploy %s --name=%s'%(settings['deploy'],settings['name'])]
+	# pass the spec through
+	if spec: script[-1] += ' --spec=%s'%spec
+	if live and test:
+		raise Exception('cannot use live and test at the same time')
+	# prepare an salloc command
+	if live:
+		cmd = ['salloc']
+		script[-1] += ' --live'
+		cmd.extend(['%s=%s'%(i,j) 
+			for i,j in settings.get('sbatch',{}).items()])
+		cmd.extend(["srun --pty /bin/bash -c '%s'"%' && '.join(script)])
+	# test the code by visiting 
+	elif test:
+		spack_hpc_test_visit(deploy=deploy)
+		return
+	else: 
+		cmd = ['sbatch']
+		cmd.extend(['%s=%s'%(i,j) 
+			for i,j in settings.get('sbatch',{}).items()])
+		script_fn = 'script-spack-build.sh'
+		script = ['#!/bin/bash',
+			'trap "{ rm -f %s; }" EXIT ERR'%script_fn]+script
+		with open(script_fn,'w') as fp: fp.write('\n'.join(script))
+		cmd += [script_fn]
+	cmd_out = ' '.join(cmd)
+	print('status running command: %s'%cmd_out)
+	# using os.system for the PTY
+	os.system(cmd_out)
+
+### Refactor Spack on Rockfish 
+
+## detritus
+
+def spack_seq_alt(envs,ref=None):
+	"""Use a spack_tree recipe in a parent yaml file."""
+	"""
+	retired this method from rockfish.yaml but here is the spec for posterity
+	  # DEMO: preliminary setup
+	  # usage: make spack specs/rockfish.yaml setup_explicit
+	  # this demo creates spack environments directly from this file
+	  # see alternate setup: make specs/rockfish.yaml go do=full 
+	  setup_explicit:
+	    # talk directly to lib.spack in the same format as spack_tree.yaml
+	    # the first step compilest the code however the setup select deploys
+	    - !!python/object/apply:lib.spack.spack_seq_alt
+	      kwds:
+	        ref: *spec
+	        envs:
+	          - find_compilers: null
+	          - name: env_lmod
+	            via: template_basic
+	            specs: ['lmod']
+	    # repeat to the cache mirror
+	    - !!python/object/apply:lib.spack.spack_seq_alt
+	      kwds:
+	        ref: *spec
+	        envs:
+	          - find_compilers: null
+	          - name: env_lmod
+	            via: template_basic
+	            specs: ['lmod']
+	            cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
+	              kwds: *mirror
+	    # this do item is redundant with the lmod spec above
+	    - !!python/object/apply:lib.spack.spack_install_cache
+	      kwds:
+	        spec: *spec
+	        target: *prefix
+	        do: lmod_base
+	"""
+	# we use the SpackSeqSub not for subselecting but to get other variables 
+	#   from the spack_rockfish.yaml file with another pointer for modularity
+	tree = dict(only=dict(envs=envs))
+	# refer to a file to use a config in a via
+	if ref:
+		with open(ref) as fp: tree.update(**yaml.load(fp))
+	SpackSeqSub(name='only',tree=tree)
+
+## router functions
+
+"""
+redundancy note. the typical spack_tree installation allows you to map simple 
+configuration files in yaml into a spack environment which we then either 
+inspect (concretize) or install. when developing more elaborate workflows, we
+would typically use the "via" flag in SpackEnvItem.make_env
+"""
+
+def spack_router(spec,sub,debug=False,slurm=False,**kwargs):
+	"""Catchall spack builds and deployment."""
+	#! example usage: make spack specs/rockfish.yaml t03 do=gromacs slurm
+	if not os.path.isfile(spec):
+		raise Exception('cannot find %s'%spec)
+	print('status received kwargs: %s'%kwargs)
+	# reformulate incomming command line arguments
+	yaml_do_select(
+		# standard arguments
+		what=spec,name=sub,debug=debug,
+		# custom arguments
+		slurm=slurm,**kwargs)
+
+def spack_hpc_shortcut(sub,debug=False,slurm=False,**kwargs):
+	"""Shortcut to call the router with a spec set by a make use operation."""
+	# see specs/cli_spack.yaml rockfish recipe for an example
+	return spack_router(sub=sub,debug=False,slurm=False,**kwargs)
+
+def spack_env_install(spec,do,target=None):
+	print('status building environment %s from %s'%(do,spec))
+	spack_tree(what=spec,name=do,install_tree=target)
+
+def spack_env_concretize(spec,do,target=None,visit=False):
+	print('status building environment %s from %s'%(do,spec))
+	tree = spack_tree(what=spec,name=do,install_tree=target,live=True)
+	#!! dev: hack to get the environment from globals. note that we need
+	#!!   a minor refactor to make this more elegant
+	if '_LAST_SPACK_ENV' in globals():
+		#! can we change directory? probably not but it would be useful
+		print('status spack environment spot: %s'%_LAST_SPACK_ENV)
+
+@incoming_handlers
+def spack_env_cache(spec,do,cache_mirror=None):
+	print('status making buildcache for environment %s from %s'%(do,spec))
+	#! the following is clumsy
+	if not cache_mirror: raise Exception('needs cache_mirror')
+	spack_tree(what=spec,name=do,
+		# custom supra-meta arguments
+		cache_mirror=cache_mirror)
+
+def spack_install_cache(spec,do,target,modules=None):
+	"""Deploy the code to another tree from a build cache."""
+	target = os.path.abspath(os.path.expanduser(target))
+	if not modules:
+		# place lmod files in a subdirectory
+		modules = os.path.join(target,'lmod')
+	print('status installing to %s'%target)
+	spack_tree(what=spec,name=do,
+		# custom supra-meta arguments
+		# we insist on a cache build, choose an alternate location, and 
+		#   ensure that the lmod modules are build nearby
+		cache_only=True,install_tree=target,lmod_spot=modules)
+
+## spack supervision
+
+class SpackMirror(Handler):
+	_protected = {'realname','meta'}
+	_internals = {'name':'realname','meta':'meta'}
+	def make_mirror(self,name,spot):
+		SpackSeqSub(name='only',tree=dict(only=dict(envs=[dict(
+			mirror_name=name,spot=spot)])))
+		return name
