@@ -196,9 +196,9 @@ class SpackEnvMaker(Handler):
 		proot_bin = decoy.get('proot','proot')
 		if lmod_decoy_ok and decoy: cmd = '%s -b %s:%s bash -c \'%s\''%(
 			proot_bin,lmod_decoy,lmod_real,cmd)
-		if not os.path.isdir(lmod_decoy):
+		if lmod_decoy and not os.path.isdir(lmod_decoy):
 			os.makedirs(lmod_decoy)
-		if not os.path.isdir(lmod_real):
+		if lmod_real and not os.path.isdir(lmod_real):
 			os.makedirs(lmod_real)
 		result = ortho.bash(cmd,announce=True,cwd=env_spot,scroll=not fetch)
 		return result
@@ -266,9 +266,9 @@ class SpackEnvMaker(Handler):
 				specs_redux = list(set(specs_redux))
 				print('[STATUS] collecting the following specs:\n%s'%
 					pprint.pformat(specs_redux))
-			for hash_s,spec in specs_redux: 
-				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-					command=command_base+' /'+hash_s)
+				for hash_s,spec in specs_redux: 
+					self._run_via_spack(spack_spot=spack_spot,env_spot=where,
+						command=command_base+' /'+hash_s)
 			self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 				command=command_base)
 			return
@@ -696,6 +696,17 @@ class SpackEnvItem(Handler):
 		cmd = 'rsync -arivP --delete %s %s'%(src,dest)
 		print('status running: %s'%cmd)
 		os.system(cmd)
+	def copyfile(self,filename,prefix_subpath):
+		"""
+		Copy files into the spack prefix.
+		"""
+		# destination is relative to the prefix
+		prefix = ortho.conf.get('spack_prefix',None)
+		if not prefix: raise Exception('cannot find spack_prefix')
+		dest = os.path.join(prefix,prefix_subpath,'')
+		if not os.path.isdir(dest):
+			os.makedirs(dest)
+		shutil.copyfile(filename,os.path.join(dest,os.path.basename(filename)))
 	def instruct_lmod_decoy(self,instruct_lmod_decoy):
 		"""Tell the admin how to deploy the tree if using a decoy.""" 
 		decoy = ortho.conf.get('spack_lmod_decoy',{})
@@ -706,7 +717,7 @@ class SpackEnvItem(Handler):
 			alt_dn = re.sub('lmod','backup-lmod',real_dn)
 			print('status we recommend the following backup, deployment (and rescue) procedure:')
 			cmd = 'sudo rsync -arivP --delete %s %s'
-			lines = [cmd%(real_dn,alt_dn),cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
+			lines = [cmd%(real_dn,alt_dn)+' && '+cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
 			for line in lines: print(' '+line)
 			print('warning you should check your work before deploying in production')
 	def renviron_hpc_mods(self,env,specs,reps,rprofile_coda=None,renviron_mods=None):
