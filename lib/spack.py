@@ -359,6 +359,46 @@ class SpackLmodHooks(Handler):
 		fn_dest = os.path.join(dn,'default')
 		#! validate this?
 		bash('ln -s %s %s'%(fn_src,fn_dest),scroll=False,v=True)
+	def lmod_move(self,arch_val,lmod_fn_src,lmod_fn_dest):
+		"""Rename a modulefile."""
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		base_dn = os.path.join(prefix_lmod,arch_val)
+		shutil.move(os.path.join(base_dn,lmod_fn_src),os.path.join(base_dn,lmod_fn_dest))	
+	def lmod_sub(self,arch_val,lmod_fn,subs):
+		#!!! check this before executing it in production 
+		#! see warnings above. make a backup of /data/apps/lmod beforehand
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		base_dn = os.path.join(prefix_lmod,arch_val)
+		target = os.path.join(base_dn,lmod_fn)
+		with open(target) as fp: text = fp.read()
+		for item in subs:
+			text = re.sub(item['k'],item['v'],text,flags=re.M+re.DOTALL)
+		with open(target,'w') as fp: fp.write(text)
+	def alias_lmod(self,arch_val,target,lmod_alias,hidden=False):
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		dn = os.path.dirname(os.path.join(prefix_lmod,arch_val,target))
+		fn_src = os.path.join(dn,os.path.basename(target))
+		if not lmod_alias.endswith('.lua'): lmod_alias += '.lua'
+		fn_dest = os.path.join(dn,lmod_alias)
+		#! validate this?
+		bash('ln -s %s %s'%(fn_src,fn_dest),scroll=False,v=True)
+		if hidden:
+			# rc is one level up
+			rc_fn = os.path.join(os.path.dirname(dn),'.modulerc')
+			if os.path.isfile(rc_fn):
+				with open(rc_fn) as fp: text = fp.read()
+			else: text = '#%Module\n'
+			# get the name of this module
+			name = os.path.relpath(fn_dest,os.path.dirname(
+				os.path.join(os.path.dirname(dn),'.modulerc')))
+			name = re.sub('\.lua$','',name)
+			hider = 'hide-version %s'%(name)
+			# if the hide-version command is absent, add it
+			if not re.search(hider,text):
+				text = text + '\n%s'%hider
+			with open(rc_fn,'w') as fp: fp.write(text)
 	
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
