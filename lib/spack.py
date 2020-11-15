@@ -289,8 +289,7 @@ class SpackLmodHooks(Handler):
 		# this recipe does not use spack_lmod_decoy
 		print('status creating: %s'%mkdir)
 		os.makedirs(mkdir,exist_ok=True)	
-	def copy_lua_file(self,custom_modulefile,destination,arch_val,repl=None):
-		"""Copy a local lua file into the tree."""
+	def _get_prefix(self):
 		prefix = ortho.conf.get('spack_prefix',None)
 		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
 		# apply the lmod decoy
@@ -299,6 +298,10 @@ class SpackLmodHooks(Handler):
 			prefix_lmod = lmod_decoy['lmod_decoy']
 			prefix_lmod_real = lmod_decoy['lmod_real']
 		else: prefix_lmod = prefix_lmod_real = os.path.join(prefix,'lmod')
+		return prefix,prefix_lmod,prefix_lmod_real
+	def copy_lua_file(self,custom_modulefile,destination,arch_val,repl=None):
+		"""Copy a local lua file into the tree."""
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
 		recipes = ortho.conf.get('spack_recipes',None)
 		# assume modulefiles are adjacent to the spack_recipes
 		fn = os.path.realpath(os.path.join(os.path.dirname(
@@ -325,7 +328,38 @@ class SpackLmodHooks(Handler):
 		if not os.path.isdir(os.path.dirname(dest)):
 			os.makedirs(os.path.dirname(dest))
 		with open(dest,'w') as fp: fp.write(text)
-
+	def intel_parallel_studio_move(self,arch_val,src,dest,clean,modulepath):
+		"""Reform the module tree for intel-parallel-studio."""
+		#! use more custom arguments to distinguish this from other handler targets
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		src_lua = os.path.join(prefix_lmod,arch_val,src)
+		dest_out = os.path.join(prefix_lmod,arch_val,dest)
+		dest_out_dn = os.path.dirname(os.path.join(prefix_lmod,arch_val,dest))
+		if not os.path.isdir(dest_out_dn): os.makedirs(dest_out_dn)
+		with open(src_lua) as fp: text = fp.read()
+		pattern = '^prepend_path\("MODULEPATH",.*?\)$'
+		# use the real path below for substitutions to the production paths if decoy
+		mod_dn = os.path.join(prefix_lmod_real,arch_val,modulepath)
+		if not os.path.isdir(mod_dn): raise Exception('cannot find %s'%mod_dn)
+		prepend_modulepath = '-- custom relocation\nprepend_path("MODULEPATH","%s")'%mod_dn
+		text_out = re.sub(pattern,prepend_modulepath,text,flags=re.M+re.DOTALL)
+		pattern = '^family\("mpi"\)$'
+		text_out = re.sub(pattern,'family("compiler")',text_out,flags=re.M+re.DOTALL)
+		with open(dest_out,'w') as fp: fp.write(text_out)
+		print('status wrote %s'%dest_out)
+		clean_dn = os.path.join(prefix_lmod,arch_val,clean)
+		print('status removing %s'%clean_dn)		
+		shutil.rmtree(clean_dn)
+	def default_link(self,arch_val,default):
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		dn = os.path.dirname(os.path.join(prefix_lmod,arch_val,default))
+		fn_src = os.path.join(dn,os.path.basename(default))
+		fn_dest = os.path.join(dn,'default')
+		#! validate this?
+		bash('ln -s %s %s'%(fn_src,fn_dest),scroll=False,v=True)
+	
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
 	def _run_via_spack(self,command,fetch=False,site_force=True,lmod_decoy_ok=False):
@@ -602,7 +636,7 @@ class SpackEnvItem(Handler):
 		# retain the real name for substitutions if we are using decoy
 		dest_real = os.path.join(prefix,'lmod',arch_val,'alt',compiler,compiler_version)
 		if not os.path.isdir(base):
-			i#! raise Exception('cannot find %s'%base)
+			#! raise Exception('cannot find %s'%base)
 			os.makedirs(base)
 		print('status base is %s'%base)
 		if not os.path.isdir(dest):
@@ -616,33 +650,43 @@ class SpackEnvItem(Handler):
 				version = target_spec['version']
 				hash_s = target_spec['hash']
 				is_mpi = target_spec.get('is_mpi',False)
+				if 'name_alt' in target_spec: 
+					name_out = target_spec['name_alt']
+				else: name_out = name
+				if 'version_alt' in target_spec:
+					version_out = target_spec['version_alt']
+				else: version_out = version
+				alt_module = target_spec.get('alt_module',False)
 			else: 
 				name,version = target_spec.split('@')
 				family = name
 				hash_s = None
+				name_out,version_out = name,version
+				alt_module = False
 			target = os.path.join(base,name,version)
 			if hash_s: target += '-%s'%hash_s
 			# step 1: remove the complicated tree from 
 			# move the targets (anythin in the e.g. python/3.8.6 directory) to an alt location 
 			# note that this does not move python/3.8.6.lua which remains in the main tree
-			dest_this = os.path.join(dest,name)
+			dest_this = os.path.join(dest,name_out)
 			# real name in case decoy
-			dest_this_real = os.path.join(dest_real,name)
+			dest_this_real = os.path.join(dest_real,name_out)
 			if not os.path.isdir(dest_this):
 				os.makedirs(dest_this)
 			print('status moving %s to %s'%(target,os.path.join(dest_this,version)))
 			#! path dependency problem here; the directory already exists
-			if not os.path.isdir(os.path.join(dest_this,version)):
-				os.rename(target,os.path.join(dest_this,version))
+			dn_out = os.path.join(dest_this,version_out)
+			if not os.path.isdir(dn_out):
+				if not os.path.isdir(os.path.dirname(dn_out)):
+					os.makedirs(os.path.dirname(dn_out))
+				os.rename(target,dn_out)
 			# step 2: when parent is loaded we add the moved tree to the MODULEPATH
 			fn_parent = target+'.lua'
 			# custom move instructions for openmpi/3.1.6-xyzxyzx
-			if is_mpi:
+			if is_mpi and not alt_module:
 				tree_new = os.path.join(dest_this_real,version)
-				version_this = target_spec.get('version_alt',version)
-				fn_parent = os.path.join(base,name,version_this+'.lua')
+				fn_parent = os.path.join(base,name,version_out+'.lua')
 				with open(fn_parent) as fp: text = fp.read()
-				#! pattern = 'prepend_path\("MODULEPATH",.+)\n'
 				pattern = '^prepend_path\("MODULEPATH",.*?\)$'
 				prepend_modulepath = '-- custom relocation\nprepend_path("MODULEPATH","%s")'%tree_new
 				text_out = re.sub(pattern,prepend_modulepath,text,flags=re.M+re.DOTALL)
@@ -652,22 +696,45 @@ class SpackEnvItem(Handler):
 				#   because openmpi is automatically projected to a special hashed path
 				# however we must be very careful to avoid openmpi collisions
 				continue
-			print('status customizing %s'%fn_parent)
-			with open(fn_parent,'a') as fp:
-				fp.write('-- customization: move the view projection for subordinate packages\n')
-				fp.write('-- then add the moved tree to the MODULEPATH\n')
-				dn_parent_root = os.path.join(dest_this_real,version)
-				# we prepend as a matter of taste. spack prepends too which means the most 
-				#   important features, including the compiler and base apps are at the bottom
-				#   which sometimes makes them easier to see. like an inverted pyramid
-				fp.write('prepend_path("MODULEPATH","%s")\n'%dn_parent_root)	
-				fp.write('family("%s")'%family)
+			# alternate modulefile for moving intel-parallel-studio
+			elif alt_module:
+				recipes = ortho.conf.get('spack_recipes',None)
+				tree_new = os.path.join(dest_this_real,version_out)
+				# assume modulefiles are adjacent to the spack_recipes
+				fn_src = os.path.realpath(os.path.join(os.path.dirname(
+					recipes),alt_module))
+				with open(fn_src) as fp: text = fp.read()
+				# lots of control flow here but this is unavoidable
+				repls = {'version':version_out,'mpi_version':'%s-%s'%(version,hash_s),'modulepath':tree_new}
+				for k,v in repls.items(): text = re.sub('REPL_%s'%k,v,text)
+				fn_out = os.path.join(base,name_out,version_out+'.lua')
+				dn_out = os.path.dirname(fn_out)
+				if not os.path.isdir(dn_out): os.makedirs(dn_out)
+				with open(fn_out,'w') as fp: fp.write(text)
+				print('status wrote %s'%fn_out)
+			# no need to customize the parent if we have alt module
+			if not alt_module:
+				print('status customizing %s'%fn_parent)
+				with open(fn_parent,'a') as fp:
+					fp.write('-- customization: move the view projection for subordinate packages\n')
+					fp.write('-- then add the moved tree to the MODULEPATH\n')
+					dn_parent_root = os.path.join(dest_this_real,version)
+					# we prepend as a matter of taste. spack prepends too which means the most 
+					#   important features, including the compiler and base apps are at the bottom
+					#   which sometimes makes them easier to see. like an inverted pyramid
+					fp.write('prepend_path("MODULEPATH","%s")\n'%dn_parent_root)	
+					fp.write('family("%s")'%family)
 			# step 3: walk the moved tree and replace items
-			dest_this = os.path.join(dest,name,version)
+			dest_this = os.path.join(dest,name_out,version_out)
 			print('status walking %s'%dest_this)
 			lua_fns = []
 			for root,dn,fns in os.walk(dest_this,topdown=False):
 				lua_fns.extend([os.path.join(root,i) for i in fns if re.match('^.+\.lua$',i)])
+			# the loader requirements ensure that prereq is correct when we move 
+			#   the intel-parallel-studio items into the correct place in the hierarchy
+			if 'loader_req' in target_spec:
+				name = target_spec['loader']['name']
+				version = target_spec['loader']['version']
 			for fn in lua_fns:
 				print('status modifying %s'%fn)
 				with open(fn) as fp: text = fp.read()
