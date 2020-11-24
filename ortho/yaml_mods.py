@@ -129,7 +129,10 @@ yaml.add_constructor('!strcat',yaml_tag_strcat)
 def yaml_tag_strcat_custom(joiner):
 	"""Custom string concatenation in yaml."""
 	def yaml_tag_strcat(self,node):
-		return joiner.join(self.construct_sequence(node))
+		try: return joiner.join(self.construct_sequence(node))
+		except: 
+			print('[ERROR] cannot strcat %s'%node)
+			raise
 	return yaml_tag_strcat
 
 #! difficulty outsourcing this to lib.spack

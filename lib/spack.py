@@ -117,6 +117,9 @@ for spec in specs: specbuild(spec)
 specbuild(cmd='spack buildcache create -m %(mirror)s -a %%s'%%spec)
 """
 
+# save time by remembering spack locations
+spack_locations = {}
+
 def spack_clone(where=None):
 	"""
 	Clone a copy of spack for local use.
@@ -181,11 +184,23 @@ def config_or_make(config_key,builder,where=None):
 
 class SpackEnvMaker(Handler):
 	def blank(self): pass
-	def _run_via_spack(self,spack_spot,env_spot,command,fetch=False):
+	def _run_via_spack(self,spack_spot,env_spot,command,lmod_decoy_ok=False,fetch=False):
 		starter = os.path.join(spack_spot,'share/spack/setup-env.sh')
 		#! replace this with a pointer like the ./fac pointer to conda?
-		result = ortho.bash('source %s && %s'%
-			(starter,command),announce=True,cwd=env_spot,scroll=not fetch)
+		cmd = 'source %s && %s'%(starter,command)
+		# when decoy is set and we get the signal from the consumer 
+		#   then we proot the lmod location so no changes really apply
+		decoy = ortho.conf.get('spack_lmod_decoy',{})
+		lmod_decoy = decoy.get('lmod_decoy',None)
+		lmod_real = decoy.get('lmod_real',None)
+		proot_bin = decoy.get('proot','proot')
+		if lmod_decoy_ok and decoy: cmd = '%s -b %s:%s bash -c \'%s\''%(
+			proot_bin,lmod_decoy,lmod_real,cmd)
+		if lmod_decoy and not os.path.isdir(lmod_decoy):
+			os.makedirs(lmod_decoy)
+		if lmod_real and not os.path.isdir(lmod_real):
+			os.makedirs(lmod_real)
+		result = ortho.bash(cmd,announce=True,cwd=env_spot,scroll=not fetch)
 		return result
 	def std(self,spack,where,spack_spot,cache_mirror=None,cache_only=False):
 		os.makedirs(where,exist_ok=True)
@@ -218,14 +233,42 @@ class SpackEnvMaker(Handler):
 				if stdout: print(stdout)
 				print(stderr)
 				raise Exception('see stderr above')
-			specs = [re.match(r'^.+\^(.+)$',i).group(1) 
-				for i in stdout.splitlines() 
-				if re.match(r'^.+\^(.+)$',i)]
-			print('[STATUS] collecting the following specs:\n%s'%
-				pprint.pformat(specs))
-			for spec in specs: 
-				self._run_via_spack(spack_spot=spack_spot,env_spot=where,
-					command=command_base+' '+spec)
+			regex_dep_hash = r'^\[.\]\s+(.*?)\s+\^(.+)$'
+			# get dependencies by hash to avoid collisions when building cache
+			specs = [re.match(regex_dep_hash,i).groups() 
+				for i in stdout.splitlines() if re.match(regex_dep_hash,i)]
+			# we see lots of warnings about existing specs and now there are 2000
+			#   for some R pacakages so before we try to build the cache we see if
+			#   it already exists. note that this should change if we decide we want
+			#   to start overwriteing
+			# warning is: ==> Warning: file:///X.spack exists. Use -f option to overwrite.
+			if specs:
+				# whittle the specs to those that are missing from the build cache
+				mirror_dn = ortho.conf.get('spack_mirror_path',None)
+				if not mirror_dn:
+					raise Exception('spack_mirror_path is not defined in the conf')
+				# catalog of all existing tarballs
+				tarballs = []  
+				for root,dns,fns in os.walk(mirror_dn):
+					tarballs.extend([fn for fn in fns
+						if re.match('.+\.spack$',fn)])
+				# lookup table of all existing specs by hash
+				lookup = {}
+				for hash_s,spec in specs:
+					targets = [i for i in tarballs if re.findall(hash_s,i)]
+					if len(targets)==1: lookup[hash_s] = (targets[0],spec)
+					elif len(targets)==0: lookup[hash_s] = None
+					else: raise Exception('collision on %s,%s'%(hash_s,spec))
+				# whittle the specs here
+				specs_redux = [(hash_s,spec) for hash_s,spec in specs
+					if not (hash_s in lookup and lookup[hash_s])]
+				# somehow we have duplicates
+				specs_redux = list(set(specs_redux))
+				print('[STATUS] collecting the following specs:\n%s'%
+					pprint.pformat(specs_redux))
+				for hash_s,spec in specs_redux: 
+					self._run_via_spack(spack_spot=spack_spot,env_spot=where,
+						command=command_base+' /'+hash_s)
 			self._run_via_spack(spack_spot=spack_spot,env_spot=where,
 				command=command_base)
 			return
@@ -239,15 +282,127 @@ class SpackEnvMaker(Handler):
 class SpackLmodHooks(Handler):
 	def write_lua_file(self,modulefile,contents,moduleroot):
 		"""Write a custom lua file into the tree."""
+		# this recipe does not use spack_lmod_decoy
 		with open(os.path.join(moduleroot,modulefile),'w') as fp:
 			fp.write(contents)
 	def mkdir(self,mkdir):
+		# this recipe does not use spack_lmod_decoy
 		print('status creating: %s'%mkdir)
 		os.makedirs(mkdir,exist_ok=True)	
-
+	def _get_prefix(self):
+		prefix = ortho.conf.get('spack_prefix',None)
+		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
+		# apply the lmod decoy
+		lmod_decoy = ortho.conf.get('spack_lmod_decoy',{})
+		if lmod_decoy:
+			prefix_lmod = lmod_decoy['lmod_decoy']
+			prefix_lmod_real = lmod_decoy['lmod_real']
+		else: prefix_lmod = prefix_lmod_real = os.path.join(prefix,'lmod')
+		return prefix,prefix_lmod,prefix_lmod_real
+	def copy_lua_file(self,custom_modulefile,destination,arch_val,repl=None):
+		"""Copy a local lua file into the tree."""
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		recipes = ortho.conf.get('spack_recipes',None)
+		# assume modulefiles are adjacent to the spack_recipes
+		fn = os.path.realpath(os.path.join(os.path.dirname(
+			recipes),custom_modulefile))
+		if not os.path.isdir(prefix):
+			raise Exception('%s is not a directory'%prefix)
+		if not os.path.isdir(prefix_lmod):
+			raise Exception('%s is not a directory'%prefix_lmod)
+		dest = os.path.join(prefix_lmod,arch_val,destination)
+		with open(fn) as fp: text = fp.read()
+		if not repl: repl = {}
+		# add the spack_prefix to the repl
+		if 'spack_prefix' in repl:
+			raise Exception('you cannot use "spack_prefix" in the repl because '
+				'it is replaced automatically')
+		repl['spack_prefix'] = os.path.join(prefix_lmod_real,arch_val)
+		# the REPL_spack_base_prefix should be the root path to spack itself, not Lmod
+		#   we use the base for setting paths to the helpers in this case
+		#   while the spack prefix is purely for pointing modulefiles to other modulefiles
+		repl['spack_base_prefix'] = os.path.join(prefix)
+		for k,v in repl.items():
+			text = re.sub('REPL_%s'%k,str(v),text)
+		print('status writing %s'%destination)
+		if not os.path.isdir(os.path.dirname(dest)):
+			os.makedirs(os.path.dirname(dest))
+		with open(dest,'w') as fp: fp.write(text)
+	def intel_parallel_studio_move(self,arch_val,src,dest,clean,modulepath):
+		"""Reform the module tree for intel-parallel-studio."""
+		#! use more custom arguments to distinguish this from other handler targets
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		src_lua = os.path.join(prefix_lmod,arch_val,src)
+		dest_out = os.path.join(prefix_lmod,arch_val,dest)
+		dest_out_dn = os.path.dirname(os.path.join(prefix_lmod,arch_val,dest))
+		if not os.path.isdir(dest_out_dn): os.makedirs(dest_out_dn)
+		with open(src_lua) as fp: text = fp.read()
+		pattern = '^prepend_path\("MODULEPATH",.*?\)$'
+		# use the real path below for substitutions to the production paths if decoy
+		mod_dn = os.path.join(prefix_lmod_real,arch_val,modulepath)
+		if not os.path.isdir(mod_dn): raise Exception('cannot find %s'%mod_dn)
+		prepend_modulepath = '-- custom relocation\nprepend_path("MODULEPATH","%s")'%mod_dn
+		text_out = re.sub(pattern,prepend_modulepath,text,flags=re.M+re.DOTALL)
+		pattern = '^family\("mpi"\)$'
+		text_out = re.sub(pattern,'family("compiler")',text_out,flags=re.M+re.DOTALL)
+		with open(dest_out,'w') as fp: fp.write(text_out)
+		print('status wrote %s'%dest_out)
+		clean_dn = os.path.join(prefix_lmod,arch_val,clean)
+		print('status removing %s'%clean_dn)		
+		shutil.rmtree(clean_dn)
+	def default_link(self,arch_val,default):
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		dn = os.path.dirname(os.path.join(prefix_lmod,arch_val,default))
+		fn_src = os.path.join(dn,os.path.basename(default))
+		fn_dest = os.path.join(dn,'default')
+		#! validate this?
+		bash('ln -s %s %s'%(fn_src,fn_dest),scroll=False,v=True)
+	def lmod_move(self,arch_val,lmod_fn_src,lmod_fn_dest):
+		"""Rename a modulefile."""
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		base_dn = os.path.join(prefix_lmod,arch_val)
+		shutil.move(os.path.join(base_dn,lmod_fn_src),os.path.join(base_dn,lmod_fn_dest))	
+	def lmod_sub(self,arch_val,lmod_fn,subs):
+		#!!! check this before executing it in production 
+		#! see warnings above. make a backup of /data/apps/lmod beforehand
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		base_dn = os.path.join(prefix_lmod,arch_val)
+		target = os.path.join(base_dn,lmod_fn)
+		with open(target) as fp: text = fp.read()
+		for item in subs:
+			text = re.sub(item['k'],item['v'],text,flags=re.M+re.DOTALL)
+		with open(target,'w') as fp: fp.write(text)
+	def alias_lmod(self,arch_val,target,lmod_alias,hidden=False):
+		#!!! check this before executing it in production 
+		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
+		dn = os.path.dirname(os.path.join(prefix_lmod,arch_val,target))
+		fn_src = os.path.join(dn,os.path.basename(target))
+		if not lmod_alias.endswith('.lua'): lmod_alias += '.lua'
+		fn_dest = os.path.join(dn,lmod_alias)
+		#! validate this?
+		bash('ln -s %s %s'%(fn_src,fn_dest),scroll=False,v=True)
+		if hidden:
+			# rc is one level up
+			rc_fn = os.path.join(os.path.dirname(dn),'.modulerc')
+			if os.path.isfile(rc_fn):
+				with open(rc_fn) as fp: text = fp.read()
+			else: text = '#%Module\n'
+			# get the name of this module
+			name = os.path.relpath(fn_dest,os.path.dirname(
+				os.path.join(os.path.dirname(dn),'.modulerc')))
+			name = re.sub('\.lua$','',name)
+			hider = 'hide-version %s'%(name)
+			# if the hide-version command is absent, add it
+			if not re.search(hider,text):
+				text = text + '\n%s'%hider
+			with open(rc_fn,'w') as fp: fp.write(text)
+	
 class SpackEnvItem(Handler):
 	_internals = {'name':'basename','meta':'meta'}
-	def _run_via_spack(self,command,fetch=False,site_force=True):
+	def _run_via_spack(self,command,fetch=False,site_force=True,lmod_decoy_ok=False):
 		"""Route commands to spack."""
 		home_spack = os.path.expanduser('~/.spack')
 		if site_force and os.path.isdir(home_spack):
@@ -261,6 +416,7 @@ class SpackEnvItem(Handler):
 		return SpackEnvMaker()._run_via_spack(
 			spack_spot=self.meta['spack_dn'],
 			env_spot=self.meta['spack_envs_dn'],
+			lmod_decoy_ok=lmod_decoy_ok,
 			command=command,fetch=fetch)
 	def make_env(self,name,specs,mods=None,via=None,
 		cache_only=False,cache_mirror=None):
@@ -375,7 +531,7 @@ class SpackEnvItem(Handler):
 		#! this is deprecated from spack and should be removed
 		if bootstrap!=None: raise Exception('boostrap must be null')
 		self._run_via_spack(command="spack bootstrap")
-	def lmod_refresh(self,lmod_refresh,name=None,spack_lmod_hook=None):
+	def lmod_refresh(self,lmod_refresh,name=None,decoy=False,spack_lmod_hook=None,delete=True):
 		"""
 		Find a compiler, possibly also installed by spack.
 		"""
@@ -384,7 +540,9 @@ class SpackEnvItem(Handler):
 		chdir_cmd = self._env_chdir(name)
 		self._run_via_spack(command=chdir_cmd+\
 			# always delete and rebuild the entire tree
-			"spack -e . module lmod refresh --delete-tree -y")
+			"spack -e . module lmod refresh %s-y"%('--delete-tree ' if delete else ''),
+			# decoy asks the spack run to check spack_lmod_decoy
+			lmod_decoy_ok=decoy)
 	def lmod_hooks(self,lmod_hooks):
 		"""Look over lmod hook objects."""
 		for item in lmod_hooks: SpackLmodHooks(**item).solve
@@ -499,7 +657,7 @@ class SpackEnvItem(Handler):
 		  2. retains the autoload feature from spack
 		  3. ml spider still tells you which packages to load
 		  3. cleaner module tree with a separate section for python-dependent modules to reduce clutter
-		raise Exception('buhhhh')
+        Further modification with `hash_s` below allows us to also move openmpi/3.1.6-xyzxyzx.
 		"""
 		if lmod_simplify: raise Exception('lmod_refresh must be null')
 		print('status simplify lmod tree')
@@ -507,40 +665,116 @@ class SpackEnvItem(Handler):
 		if not prefix: raise Exception('cannot find prefix in spack_prefix variable')
 		if not os.path.isdir(prefix):
 			raise Exception('%s is not a directory'%prefix)
-		base = os.path.join(prefix,'lmod',arch_val,compiler,compiler_version)
-		dest = os.path.join(prefix,'lmod',arch_val,'alt')
+		# standard lmod prefix
+		prefix_lmod = os.path.join(prefix,'lmod')
+		# override if decoy
+		lmod_decoy = ortho.conf.get('spack_lmod_decoy',{})
+		if lmod_decoy: prefix_lmod = lmod_decoy['lmod_decoy']
+		base = os.path.join(prefix_lmod,arch_val,compiler,compiler_version)
+		# we hardcode an alt directory to avoid cluttered nesting
+		dest = os.path.join(prefix_lmod,arch_val,'alt',compiler,compiler_version)
+		# retain the real name for substitutions if we are using decoy
+		dest_real = os.path.join(prefix,'lmod',arch_val,'alt',compiler,compiler_version)
 		if not os.path.isdir(base):
-			raise Exception('cannot find %s'%base)
+			#! raise Exception('cannot find %s'%base)
+			os.makedirs(base)
 		print('status base is %s'%base)
 		if not os.path.isdir(dest):
 			print('status making %s'%dest)
 			os.makedirs(dest)
 		for target_spec in targets:
-			name,version = target_spec.split('@')
+			# we allow some extra customizations so we can also move openmpi
+			is_mpi = False
+			if isinstance(target_spec,dict):
+				name = target_spec['name']
+				version = target_spec['version']
+				hash_s = target_spec['hash']
+				is_mpi = target_spec.get('is_mpi',False)
+				if 'name_alt' in target_spec: 
+					name_out = target_spec['name_alt']
+				else: name_out = name
+				if 'version_alt' in target_spec:
+					version_out = target_spec['version_alt']
+				else: version_out = version
+				alt_module = target_spec.get('alt_module',False)
+			else: 
+				name,version = target_spec.split('@')
+				family = name
+				hash_s = None
+				name_out,version_out = name,version
+				alt_module = False
 			target = os.path.join(base,name,version)
+			if hash_s: target += '-%s'%hash_s
 			# step 1: remove the complicated tree from 
 			# move the targets (anythin in the e.g. python/3.8.6 directory) to an alt location 
 			# note that this does not move python/3.8.6.lua which remains in the main tree
-			dest_this = os.path.join(dest,name)
+			dest_this = os.path.join(dest,name_out)
+			# real name in case decoy
+			dest_this_real = os.path.join(dest_real,name_out)
 			if not os.path.isdir(dest_this):
 				os.makedirs(dest_this)
-			print('status moving %s to %s'%(target,dest_this))
-			shutil.move(target,dest_this)
+			print('status moving %s to %s'%(target,os.path.join(dest_this,version)))
+			#! path dependency problem here; the directory already exists
+			dn_out = os.path.join(dest_this,version_out)
+			if not os.path.isdir(dn_out):
+				if not os.path.isdir(os.path.dirname(dn_out)):
+					os.makedirs(os.path.dirname(dn_out))
+				os.rename(target,dn_out)
 			# step 2: when parent is loaded we add the moved tree to the MODULEPATH
 			fn_parent = target+'.lua'
-			print('status customizing %s'%fn_parent)
-			with open(fn_parent,'a') as fp:
-				fp.write('-- customization: move the view projection for subordinate packages\n')
-				fp.write('-- then add the moved tree to the MODULEPATH\n')
-				dn_parent_root = os.path.join(dest_this,version)
-				fp.write('append_path("MODULEPATH","%s")\n'%dn_parent_root)	
-				fp.write('family("%s")'%name)
+			# custom move instructions for openmpi/3.1.6-xyzxyzx
+			if is_mpi and not alt_module:
+				tree_new = os.path.join(dest_this_real,version)
+				fn_parent = os.path.join(base,name,version_out+'.lua')
+				with open(fn_parent) as fp: text = fp.read()
+				pattern = '^prepend_path\("MODULEPATH",.*?\)$'
+				prepend_modulepath = '-- custom relocation\nprepend_path("MODULEPATH","%s")'%tree_new
+				text_out = re.sub(pattern,prepend_modulepath,text,flags=re.M+re.DOTALL)
+				with open(fn_parent,'w') as fp: fp.write(text_out)
+				# we do not need to do the regex replacements that were
+				#   necessary for packages like Python and R which used projections
+				#   because openmpi is automatically projected to a special hashed path
+				# however we must be very careful to avoid openmpi collisions
+				continue
+			# alternate modulefile for moving intel-parallel-studio
+			elif alt_module:
+				recipes = ortho.conf.get('spack_recipes',None)
+				tree_new = os.path.join(dest_this_real,version_out)
+				# assume modulefiles are adjacent to the spack_recipes
+				fn_src = os.path.realpath(os.path.join(os.path.dirname(
+					recipes),alt_module))
+				with open(fn_src) as fp: text = fp.read()
+				# lots of control flow here but this is unavoidable
+				repls = {'version':version_out,'mpi_version':'%s-%s'%(version,hash_s),'modulepath':tree_new}
+				for k,v in repls.items(): text = re.sub('REPL_%s'%k,v,text)
+				fn_out = os.path.join(base,name_out,version_out+'.lua')
+				dn_out = os.path.dirname(fn_out)
+				if not os.path.isdir(dn_out): os.makedirs(dn_out)
+				with open(fn_out,'w') as fp: fp.write(text)
+				print('status wrote %s'%fn_out)
+			# no need to customize the parent if we have alt module
+			if not alt_module:
+				print('status customizing %s'%fn_parent)
+				with open(fn_parent,'a') as fp:
+					fp.write('-- customization: move the view projection for subordinate packages\n')
+					fp.write('-- then add the moved tree to the MODULEPATH\n')
+					dn_parent_root = os.path.join(dest_this_real,version)
+					# we prepend as a matter of taste. spack prepends too which means the most 
+					#   important features, including the compiler and base apps are at the bottom
+					#   which sometimes makes them easier to see. like an inverted pyramid
+					fp.write('prepend_path("MODULEPATH","%s")\n'%dn_parent_root)	
+					fp.write('family("%s")'%family)
 			# step 3: walk the moved tree and replace items
-			dest_this = os.path.join(dest,name,version)
+			dest_this = os.path.join(dest,name_out,version_out)
 			print('status walking %s'%dest_this)
 			lua_fns = []
 			for root,dn,fns in os.walk(dest_this,topdown=False):
 				lua_fns.extend([os.path.join(root,i) for i in fns if re.match('^.+\.lua$',i)])
+			# the loader requirements ensure that prereq is correct when we move 
+			#   the intel-parallel-studio items into the correct place in the hierarchy
+			if 'loader_req' in target_spec:
+				name = target_spec['loader']['name']
+				version = target_spec['loader']['version']
 			for fn in lua_fns:
 				print('status modifying %s'%fn)
 				with open(fn) as fp: text = fp.read()
@@ -556,6 +790,96 @@ class SpackEnvItem(Handler):
 				#   this separation between supporting modules
 				text_out = re.sub('"%s\/%s\/'%(name,version),'"',text_out,flags=re.M+re.DOTALL)
 				with open(fn,'w') as fp: fp.write(text_out)
+	def copy(self,source,prefix_subpath):
+		"""
+		Copy files into the spack prefix.
+		"""
+		#! lazy, possibly unsafe
+		src = os.path.join(source,'')
+		# destination is relative to the prefix
+		prefix = ortho.conf.get('spack_prefix',None)
+		if not prefix: raise Exception('cannot find spack_prefix')
+		dest = os.path.join(prefix,prefix_subpath,'')
+		cmd = 'rsync -arivP --delete %s %s'%(src,dest)
+		print('status running: %s'%cmd)
+		os.system(cmd)
+	def copyfile(self,filename,prefix_subpath):
+		"""
+		Copy files into the spack prefix.
+		"""
+		# destination is relative to the prefix
+		prefix = ortho.conf.get('spack_prefix',None)
+		if not prefix: raise Exception('cannot find spack_prefix')
+		dest = os.path.join(prefix,prefix_subpath,'')
+		if not os.path.isdir(dest):
+			os.makedirs(dest)
+		shutil.copyfile(filename,os.path.join(dest,os.path.basename(filename)))
+	def instruct_lmod_decoy(self,instruct_lmod_decoy):
+		"""Tell the admin how to deploy the tree if using a decoy.""" 
+		decoy = ortho.conf.get('spack_lmod_decoy',{})
+		if decoy:
+			print('status you have spack_lmod_decoy set, so we have build the '
+				'lmod tree at %s'%decoy['lmod_decoy'])
+			decoy_dn,real_dn = [os.path.join(decoy[k],'') for k in ['lmod_decoy','lmod_real']]
+			alt_dn = re.sub('lmod','backup-lmod',real_dn)
+			print('status we recommend the following backup, deployment (and rescue) procedure:')
+			cmd = 'sudo rsync -arivP --delete %s %s'
+			lines = [cmd%(real_dn,alt_dn)+' && '+cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
+			for line in lines: print(' '+line)
+			print('warning you should check your work before deploying in production')
+	def renviron_hpc_mods(self,env,specs,reps,rprofile_coda=None,renviron_mods=None):
+		"""Update the Renviron paths for HPC environments."""
+		if renviron_mods: raise Exception('renviron must be null')
+		spack_envs_dn = self.meta['spack_envs_dn']
+		spot = os.path.join(spack_envs_dn,env)
+		for spec,form in specs.items():
+			#! skipping _run_via_spack because not clear on how to handle cwd
+			#!   and anyway we only run this as admin with the spack command loaded
+			result = ortho.bash('spack env activate . && spack location -i %s'%spec,
+				scroll=False,cwd=spot)
+			if result['stderr']: raise Exception(result['stderr'])
+			# modify the Renviron
+			prefix = result['stdout'].strip('\n')
+			if 'r' not in spack_locations: spack_locations['r'] = []
+			spack_locations['r'].append(prefix)
+			fn = os.path.join(prefix,'rlib/R/etc/Renviron')
+			with open(fn) as fp: text = fp.read()
+			text_out = re.sub('^R_LIBS_USER.*?\n','# rockfish mods\n'
+				'R_LIBS_USER=${R_LIBS_USER-\'%s\'}\n'%
+				form,text,flags=re.M+re.DOTALL)
+			# extra replacements
+			for k,v in reps.items(): text_out = re.sub(k,v,text_out,flags=re.M+re.DOTALL)
+			with open(fn,'w') as fp: fp.write(text_out)
+			# add to the Rprofile according to tags
+			fn = os.path.join(result['stdout'].strip('\n'),'rlib/R/library/base/R/Rprofile')
+			with open(fn) as fp: text = fp.read()
+			if not rprofile_coda: rprofile_coda = {}
+			for item in rprofile_coda:
+				tag = item['tag']
+				content = item['content']
+				if not re.search(tag,text):
+					text += tag+'\n'+content+'\n'
+			with open(fn,'w') as fp: fp.write(text)
+	def instruct_r_python_protect(self,instruct_r_python_protect=None,):
+		"""Update the Renviron paths for HPC environments."""
+		if instruct_r_python_protect: raise ValueError
+		# use this recipe after r_hpc_mods to produce some chomd commands
+		#   that help protect our R installations from accidental install.packages
+		#   from the admin who installed the software
+		lines = []
+		for item in spack_locations.get('r',[]):
+			lines.append(' sudo find %s -name rlib -type d -exec chmod -R a-w {} \;'%item)
+			lines.append(' sudo find %s -name Renviron -type f -exec chmod u+w {} \;'%item)
+			lines.append(' sudo find %s -name Rprofile -type f -exec chmod u+w {} \;'%item)
+		print('warning do not install packages as admin')
+		print('\n'.join(lines))
+		print('warning use the chmod commands above to protect R libs paths')
+	def instruct_custom(self,instruct_custom):
+		"""Print generic instructions."""
+		print('status generic instructions')
+		for item in instruct_custom:
+			print(' %s'%str(item))
+		print('warning see generic instructions above')
 
 def spack_env_maker(what):
 	"""
@@ -966,6 +1290,32 @@ def spack_hpc_shortcut(sub,debug=False,slurm=False,**kwargs):
 	"""Shortcut to call the router with a spec set by a make use operation."""
 	# see specs/cli_spack.yaml rockfish recipe for an example
 	return spack_router(sub=sub,debug=False,slurm=False,**kwargs)
+
+def conda_shared(reqs,target_ortho_key):
+	"""Build a shared conda environment. Useful for HPC admins."""
+	spot = ortho.conf.get(target_ortho_key,None)
+	if not spot: 
+		raise Exception(('you must set `make set %s <path>`'
+			'to point to the anaconda installation')%target_ortho_key)
+	if not os.path.isfile(reqs):
+		raise Exception('argument must be a conda requirements file')	
+	spot_envs = os.path.join(spot,'envs')
+	# note that the name is set in the reqs file but the path is the same
+	#   as the conda requirements base file name
+	print('warning you may need to set permissions:')
+	print(('export CONDA_SPOT=%s && '
+		'sudo find $CONDA_SPOT -type f -exec chmod g+rw {} \; &&'
+		'sudo find $CONDA_SPOT -type d -exec chmod g+rwx {} \; ')%spot_envs)
+	print('warning if you get permission denied you must fix permissions')
+	if not os.path.isdir(spot_envs):
+		raise Exception('cannot find %s'%spot_envs)
+	print('status building environment from %s'%reqs)
+	init_sh = os.path.join(spot,'etc','profile.d','conda.sh')
+	env_path = os.path.join(spot_envs,
+		re.sub('\.(.*?)$','',os.path.basename(reqs)))
+	print('status env path is %s'%env_path)
+	bash('source %s && conda env update --file %s -p %s'%(
+		init_sh,reqs,env_path),announce=True)
 
 def spack_env_install(spec,do,target=None):
 	print('status building environment %s from %s'%(do,spec))

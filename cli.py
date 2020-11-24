@@ -394,6 +394,11 @@ class Interface(Parser):
         # to use Cacher we manipulate the state, not ortho.conf
         state[name] = value
 
+    def unset(self,name):
+        """Remove a config value."""
+        if name in state: del state[name]
+        else: raise Exception('name "%s" is not in the state'%name)
+
 if __name__ == '__main__':
     # the ./fac script calls this interface
     Interface()
