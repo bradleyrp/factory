@@ -146,7 +146,7 @@ select: !select
       DEV!!! May require `docker volume prune` until we fix volume creep.
       Requires system prune or the rm before restarting named containers.
       Usage: docker system prune && make docker specs/recipes/marcc-hpc.yaml allocations
-      You must build volumes first: for name in etc_munge etc_slurm var_log_slurm var_lib_mysql slurm_jobdir; do docker volume create --name=$name; done
+      You must build volumes first: for name in etc_munge etc_slurm var_log_slurm var_lib_mysql slurm_jobdir var_lib_postgres; do docker volume create --name=$name; done
     site: !spots root
     #! the following: image_name,command,dockerfile are irrelevant but required
     image_name: *marcc-hpc-image
@@ -420,6 +420,23 @@ select: !select
           environment:
             PHPLDAPADMIN_LDAP_HOSTS: ldap_server
             PHPLDAPADMIN_HTTPS: 'false'
+        postgres:
+          image: postgres:11.10
+          hostname: coldfront_db
+          container_name: postgres
+          environment:
+            POSTGRES_PASSWORD: secretpassword
+          volumes:
+            - var_lib_postgres:/var/lib/postgresql/data
+          ports:
+            - 5432:5432
+        adminer:
+          # log in to the coldfront_db above with username postgres and password above
+          image: adminer
+          restart: always
+          container_name: adminer
+          ports:
+            - 8080:8080
       volumes:
         # set external volumes to avoid space creep
         etc_munge: {external: true}
@@ -430,3 +447,4 @@ select: !select
         opt_accounts: {external: true}
         ldap_data: {external: true}
         ldap_config: {external: true}
+        var_lib_postgres: {external: true}
