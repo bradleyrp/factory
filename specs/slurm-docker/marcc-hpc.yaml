@@ -380,6 +380,8 @@ select: !select
         accounts:
           build: .
           image: *marcc-hpc-image
+          # automatic deployment is bad for development because a syntax error will crash the container
+          #! automatic deployment: command: ["/opt/coldfront_app/portal/coldfront/config/dev_entry.sh"]
           command: ["slurmd"]
           # we must use a valid name so slurmd starts
           #! cannot change this but not sure where it exists
@@ -428,8 +430,6 @@ select: !select
             POSTGRES_PASSWORD: secretpassword
           volumes:
             - var_lib_postgres:/var/lib/postgresql/data
-          ports:
-            - 5432:5432
         adminer:
           # log in to the coldfront_db above with username postgres and password above
           image: adminer

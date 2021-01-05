@@ -10,8 +10,8 @@ Deprecated notes from the initial setup.
 
 ~~~
 # ca 2020.06.06 deploying the cluster (notes cleaned from factory.md)
-# stop everything if you are in development
-for i in slurmctld accounts c1 slurmdbd mysql; do docker stop $i; docker kill $i; docker rm $i; done
+# stop everything if you are in development (added new names here as we added containers)
+for i in slurmctld accounts c1 slurmdbd mysql adminer ldap ldap_admin postgres; do docker stop $i; docker kill $i; docker rm $i; done
 docker volume ls
 docker system prune
 docker volume rm etc_munge etc_slurm slurm_jobdir var_lib_mysql var_log_slurm
@@ -266,3 +266,102 @@ Ongoing development should answer the question of user management along with ass
 As of 2020.09.23 development of the portal itself has moved to a [private repository for our site](https://github.com/marcc-hpc/portal). The factory code will remain here for testing purposes, specifically as we populate an LDAP database to simulate a production environment. Further testing instructions will be tracked in this readme until this code is added to integration tests for the final product.
 
 *The instructions [above](#setup-latest) will help you set up the development environment for the portal until we move it to the cluster itself. Changes to the factory required for testing should go to Ryan Bradley or we can fork this repo later. 
+
+## Return to development for backups
+
+After starting deployment on the `rockfish` branch on a coldfront VM on the new cluster, we returned to this development environment to handle backups and testing. We switched to the `rockfish` branch in our local development environment (instead of using the `dev` branch) and added postgresql to the compose orchestration. 
+
+### Onetime setup
+
+The following was required for one-time setup.
+
+~~~
+# step 1: run the server automatically for usability 
+# made an entrypoint that starts slurmd and the coldfront server instead of doing this manually with docker exec
+# however note that you might want to do development the usual way by changing the command for the accounts container in testcluster_combo
+# if you introduce a syntax error the container will crash out so sometimes manually starting the server is better
+# when setting this up we edited the script in the container
+docker run -it --rm -v opt_accounts:/opt centos:centos7 bash
+vi /opt/coldfront_app/portal/coldfront/config/dev_entry.sh
+# step 2: update the container with postgres
+# see changes to marcc-hpc.yaml at commit: [bluecrab 749ab65] added postgresql
+# if you run coldfront here then you will experience the pg_config error
+# normally I would rebuild the container here, but we would have to add an entire postgresql server
+#   and this would defeat the entire purpose of having it in a docker
+#   instead I switched to the binary version in pip since the backup system does not care about performance
+# make a new requirements file and change to psycopg2-binary
+docker run -it --rm -v opt_accounts:/opt marcc-hpc:testcluster bash
+cd /opt/coldfront_app/portal/
+source ../venv/bin/activate
+# save the current docker requirements in case we break them
+cp requirements.txt requirements_dev.txt
+pip freeze > requirements_2021.01.04.0730_dev.txt
+pip install -r requirements_dev.txt
+pip freeze > requirements_2021.01.04.0740_dev.txt
+~~~
+
+### Starting the development server
+
+After onetime configuration, start up the development and backup system with the following procedure. Added a new `COLDFRONT_MODE` variable to set the settings files.
+
+~~~
+# ryan laptop
+cd ~/worker/dev/factory
+# make sure you have the correct branch for this
+git checkout bluecrab
+# start everything up
+make docker specs/slurm-docker/marcc-hpc.yaml testcluster_combo
+# for manual development change the command for the accounts container to slurmd from dev_entry.sh in marcc-hpc.yaml
+# if this command uses the dev_entry script then the server should be ready without these steps
+docker exec -it accounts bash
+cd /opt/coldfront_app/portal/
+source ../venv/bin/activate
+COLDFRONT_MODE=dev python manage.py runserver 0.0.0.0:5000 
+~~~
+
+### Resetting the development server
+
+Use these instructions to reset the dev server and restore the initial data set. Portions of this instruction set can be used in production.
+
+~~~
+# follow the instructions above to start everything up
+# option: totally nuke postgres
+make down testcluster_combo  
+docker volume ls
+# remove all stopped containers
+docker rm $(docker ps -a -q)
+docker volume rm var_lib_postgres
+docker volume create --name=var_lib_postgres
+# step 1: delete things inside of postgres
+# make sure everything is started per above
+docker exec -it postgres bash
+su postgres
+dropdb coldfront_prime
+psql -c "drop role if exists coldfront;"
+createdb coldfront_prime
+psql -c "CREATE ROLE coldfront WITH LOGIN PASSWORD 'rockfishnewcluster'; GRANT ALL PRIVILEGES ON DATABASE coldfront_prime TO coldfront;"
+# exit and populate things for django
+# step 2: kickstart django
+docker exec -it accounts bash
+cd /opt/coldfront_app/portal/
+source ../venv/bin/activate
+export COLDFRONT_MODE=dev
+# setup the database
+python manage.py initial_setup
+# load the initial data (if desired)
+python manage.py load_test_data
+# start the application
+COLDFRONT_MODE=dev python manage.py runserver 0.0.0.0:5000
+# step 3: dump everything to postgresql
+docker exec -it postgres bash
+# dump the data into the postgresql volume
+su - postgres -c "pg_dump coldfront_prime" > /var/lib/postgresql/data/initial_eg_database.psql
+# step 4: load this data (or data from the production server)
+docker exec -it postgres bash
+su postgres
+dropdb coldfront_prime
+psql -c "drop role if exists coldfront;"
+createdb coldfront_prime
+psql -c "CREATE ROLE coldfront WITH LOGIN PASSWORD 'rockfishnewcluster'; GRANT ALL PRIVILEGES ON DATABASE coldfront_prime TO coldfront;"
+psql coldfront_prime < /var/lib/postgresql/data/initial_eg_database.psql
+~~~
