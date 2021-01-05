@@ -339,6 +339,7 @@ su postgres
 dropdb coldfront_prime
 psql -c "drop role if exists coldfront;"
 createdb coldfront_prime
+# note here and below we are recommending a password that will be committed to github; the real one should be stored in the secrets file
 psql -c "CREATE ROLE coldfront WITH LOGIN PASSWORD 'rockfishnewcluster'; GRANT ALL PRIVILEGES ON DATABASE coldfront_prime TO coldfront;"
 # exit and populate things for django
 # step 2: kickstart django
@@ -364,4 +365,10 @@ psql -c "drop role if exists coldfront;"
 createdb coldfront_prime
 psql -c "CREATE ROLE coldfront WITH LOGIN PASSWORD 'rockfishnewcluster'; GRANT ALL PRIVILEGES ON DATABASE coldfront_prime TO coldfront;"
 psql coldfront_prime < /var/lib/postgresql/data/initial_eg_database.psql
+# some of this may be redundant if you already ran initial_setup above, but if you have extra data it will slurp it up
 ~~~
+
+### Superuser
+
+In production we will avoid using the example data. Admins will first login via LDAP but we need a method for promoting them to superusers. Make a single secret superuser here. Use `python manage.py createsuperuser`.
+
