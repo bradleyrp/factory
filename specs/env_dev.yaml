@@ -6,7 +6,8 @@ dependencies:
   - pyyaml
   - conda-forge::ipdb
   - conda-forge::jupyterlab
-  - nbconvert
+  #! https://github.com/ipython-contrib/jupyter_contrib_nbextensions/issues/1529
+  - nbconvert=5.6.1
   - r::r-base==3.5
   - r::r-irkernel
   - pip
@@ -56,3 +57,4 @@ dependencies:
     - awsebcli
     # general use
     - beautifulsoup4
+    - jupyter-require
