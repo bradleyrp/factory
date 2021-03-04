@@ -706,7 +706,7 @@ class SpackEnvItem(Handler):
 			target = os.path.join(base,name,version)
 			if hash_s: target += '-%s'%hash_s
 			# step 1: remove the complicated tree from 
-			# move the targets (anythin in the e.g. python/3.8.6 directory) to an alt location 
+			# move the targets (anything in the e.g. python/3.8.6 directory) to an alt location 
 			# note that this does not move python/3.8.6.lua which remains in the main tree
 			dest_this = os.path.join(dest,name_out)
 			# real name in case decoy
@@ -789,6 +789,10 @@ class SpackEnvItem(Handler):
 				# note that the nesting is created by a view projection in spack to enable 
 				#   this separation between supporting modules
 				text_out = re.sub('"%s\/%s\/'%(name,version),'"',text_out,flags=re.M+re.DOTALL)
+				#! highly redundant. should probably use name_out, version_out above in the prereq
+				if is_mpi:
+					text_out = re.sub('prereq\("%s/%s"\)'%(name,version),
+						'prereq("%s/%s")'%(name_out,version_out),text_out)
 				with open(fn,'w') as fp: fp.write(text_out)
 	def copy(self,source,prefix_subpath):
 		"""
