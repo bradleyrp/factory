@@ -826,9 +826,12 @@ class SpackEnvItem(Handler):
 				'lmod tree at %s'%decoy['lmod_decoy'])
 			decoy_dn,real_dn = [os.path.join(decoy[k],'') for k in ['lmod_decoy','lmod_real']]
 			alt_dn = re.sub('lmod','backup-lmod',real_dn)
-			print('status we recommend the following backup, deployment (and rescue) procedure:')
+			print('status we recommend the following backup, deployment procedure:')
 			cmd = 'sudo rsync -arivP --delete %s %s'
-			lines = [cmd%(real_dn,alt_dn)+' && '+cmd%(decoy_dn,real_dn),cmd%(alt_dn,real_dn)]
+			lines = [cmd%(real_dn,alt_dn)+' && '+cmd%(decoy_dn,real_dn)]
+			for line in lines: print(' '+line)
+			print('status and if something goes pear-shaped you can rescue:')
+			lines = [cmd%(alt_dn,real_dn)]
 			for line in lines: print(' '+line)
 			print('warning you should check your work before deploying in production')
 	def renviron_hpc_mods(self,env,specs,reps,rprofile_coda=None,renviron_mods=None):
