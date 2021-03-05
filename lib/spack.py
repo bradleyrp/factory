@@ -299,7 +299,7 @@ class SpackLmodHooks(Handler):
 			prefix_lmod_real = lmod_decoy['lmod_real']
 		else: prefix_lmod = prefix_lmod_real = os.path.join(prefix,'lmod')
 		return prefix,prefix_lmod,prefix_lmod_real
-	def copy_lua_file(self,custom_modulefile,destination,arch_val,repl=None):
+	def copy_lua_file(self,custom_modulefile,destination,arch_val,repl=None,regex_check=None):
 		"""Copy a local lua file into the tree."""
 		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
 		recipes = ortho.conf.get('spack_recipes',None)
@@ -327,6 +327,19 @@ class SpackLmodHooks(Handler):
 		print('status writing %s'%destination)
 		if not os.path.isdir(os.path.dirname(dest)):
 			os.makedirs(os.path.dirname(dest))
+		# check for a hash in the replaced modulefile to make sure the custom one applies.
+		#   this was created when we had to change the use of $USER in a modulefile
+		#   to a lua call to os.getenv so that there are user-specific paths. rather than
+		#   automate this immediately, I added this check to make sure that if we update 
+		#   hashes, then we do not replace with a deprecated modulefile 
+		if regex_check:
+			print('status checking regex "%s" in %s'%(regex_check,dest))
+			if not os.path.isfile(dest):
+				raise Exception('cannot find %s for regex_check'%dest)
+			with open(dest,'r') as fp: dest_text = fp.read()
+			if not re.findall(regex_check,dest_text):
+				raise Exception(
+					'failed to pass regex_check: cannot find %s in %s'%(regex_check,dest))
 		with open(dest,'w') as fp: fp.write(text)
 	def intel_parallel_studio_move(self,arch_val,src,dest,clean,modulepath):
 		"""Reform the module tree for intel-parallel-studio."""
