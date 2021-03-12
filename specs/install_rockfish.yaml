@@ -3,5 +3,5 @@ automacs: !ortho_sync
   spack:
     spot: "./rockfish"
     # deprecated: address: https://github.com/marcc-hpc/rockfish
-    address: 'git@github.com:jhu-arch/rockfish.git'
+    address: https://github.com/jhu-arch/rockfish.git
     branch: dev
