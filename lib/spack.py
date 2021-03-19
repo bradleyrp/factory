@@ -839,11 +839,12 @@ class SpackEnvItem(Handler):
 				'lmod tree at %s'%decoy['lmod_decoy'])
 			decoy_dn,real_dn = [os.path.join(decoy[k],'') for k in ['lmod_decoy','lmod_real']]
 			alt_dn = re.sub('lmod','backup-lmod',real_dn)
-			print('status we recommend the following backup, deployment procedure:')
+			print('status DEPLOY STEP: we recommend the following Lmod backup and deployment method:')
 			cmd = 'sudo rsync -arivP --delete %s %s'
 			lines = [cmd%(real_dn,alt_dn)+' && '+cmd%(decoy_dn,real_dn)]
 			for line in lines: print(' '+line)
-			print('status and if something goes pear-shaped you can rescue:')
+			print('status RECOVERY ONLY: do NOT run this unless things go pear-shaped! '
+				'rescue the last lmod tree with this command:')
 			lines = [cmd%(alt_dn,real_dn)]
 			for line in lines: print(' '+line)
 			print('warning you should check your work before deploying in production')
@@ -892,14 +893,15 @@ class SpackEnvItem(Handler):
 			lines.append(' sudo find %s -name Renviron -type f -exec chmod u+w {} \;'%item)
 			lines.append(' sudo find %s -name Rprofile -type f -exec chmod u+w {} \;'%item)
 		print('warning do not install packages as admin')
+		print('status DEPLOY STEP: correct the R paths:')
 		print('\n'.join(lines))
 		print('warning use the chmod commands above to protect R libs paths')
 	def instruct_custom(self,instruct_custom):
 		"""Print generic instructions."""
-		print('status generic instructions')
+		print('status DEPLOY STEP: instructions:')
 		for item in instruct_custom:
 			print(' %s'%str(item))
-		print('warning see generic instructions above')
+		print('warning see generic instructions from the recipe written above')
 
 def spack_env_maker(what):
 	"""
