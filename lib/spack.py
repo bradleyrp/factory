@@ -378,15 +378,19 @@ class SpackLmodHooks(Handler):
 		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
 		base_dn = os.path.join(prefix_lmod,arch_val)
 		shutil.move(os.path.join(base_dn,lmod_fn_src),os.path.join(base_dn,lmod_fn_dest))	
-	def lmod_sub(self,arch_val,lmod_fn,subs):
-		#!!! check this before executing it in production 
-		#! see warnings above. make a backup of /data/apps/lmod beforehand
+	def lmod_sub(self,arch_val,lmod_fn,subs=None,extra=None):
 		prefix,prefix_lmod,prefix_lmod_real = self._get_prefix()
 		base_dn = os.path.join(prefix_lmod,arch_val)
 		target = os.path.join(base_dn,lmod_fn)
 		with open(target) as fp: text = fp.read()
-		for item in subs:
-			text = re.sub(item['k'],item['v'],text,flags=re.M+re.DOTALL)
+		if subs:
+			for item in subs:
+				text = re.sub(item['k'],item['v'],text,flags=re.M+re.DOTALL)
+		if extra:
+			if not isinstance(extra,(tuple,list)):
+				extra = [extra]
+			for item in extra:
+				text += item + '\n'
 		with open(target,'w') as fp: fp.write(text)
 	def alias_lmod(self,arch_val,target,lmod_alias,hidden=False):
 		#!!! check this before executing it in production 
