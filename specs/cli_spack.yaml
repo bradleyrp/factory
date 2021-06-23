@@ -8,4 +8,4 @@ config:
     rf: 
       function: lib.spack.spack_hpc_shortcut
       kwargs: 
-        spec: specs/rockfish.yaml
+        spec: specs/spack_router.yaml

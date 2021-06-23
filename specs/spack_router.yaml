@@ -19,6 +19,7 @@ select: !select
         spec: *spec
         # cli argument to select the environment name in the spec
         do: !cli do
+        target: *prefix
 
   # RECIPE: build with cache
   # usage: make spack specs/spack_router.yaml cache do=<name>
@@ -28,6 +29,7 @@ select: !select
         spec: *spec
         # cli argument to select the environment name in the spec
         do: !cli do
+        target: *prefix
     - !!python/object/apply:lib.spack.spack_env_cache
       kwds:
         spec: *spec
@@ -76,6 +78,7 @@ select: !select
         spec: *spec
         # cli argument to select the environment name in the spec
         do: !cli do
+        target: *prefix
     # create the build cache
     - !!python/object/apply:lib.spack.spack_env_cache
       kwds:
