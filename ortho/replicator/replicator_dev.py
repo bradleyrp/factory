@@ -118,6 +118,8 @@ class DockerFileMaker(Handler):
 		"""Construct a dockerfile from a set of components."""
 		dockerfile = []
 		for item in series:
+			if not dockerfiles_index:
+				raise Exception('no dockerfiles so we cannot get %s'%item)
 			item_lookup = dockerfiles_index.get(item,None)
 			if not item_lookup:
 				raise Exception('cannot find dockerfile: %s'%item)
@@ -139,8 +141,8 @@ class DockerContainer(Handler):
 		try: repo,name = re.match('^(.+):(.+)$',name).groups()
 		except: 
 			raise Exception(
-				'docker container name must be <repo>:<tag> but we got: %s:%s'%
-				name)
+				'docker container name must be <repo>:<tag> but we got: %s'%
+				str(name))
 		print('status checking containers')
 		containers = bash(
 			'docker images --format "{{.Repository}} {{.Tag}}"',
@@ -403,14 +405,19 @@ class ReplicateCore(Handler):
 		else: raise Exception('invalid mode: %s'%mode)
 		requires_python_check('yaml')
 		import yaml
-		if not dockerfile or not compose:
-			raise Exception('we require dockerfile and compose arguments')
+		if not compose:
+			raise Exception('we require a compose arguments')
 		#! account for self.spot['docker_args'] possible collision with compose
 		# run compose build in a temorary location
 		dn = tempfile.mkdtemp()
 		# build the Dockerfile
-		dockerfile_obj = DockerFileMaker(dockerfiles_index=dockerfiles_index,
-			**dockerfile)
+		if dockerfile:
+			dockerfile_obj = DockerFileMaker(
+				dockerfiles_index=dockerfiles_index,
+				**dockerfile)
+		# if no dockerfile we pull the image
+		elif 'image' in compose:
+			bash('docker pull %s'%compose['image'],scroll=True,v=True)		
 		# add extra volumes
 		if compose_volumes:
 			# ensure only one container
@@ -419,24 +426,27 @@ class ReplicateCore(Handler):
 				#! previous exception: 
 				#!   cannot attach volumes for multiple containers
 				print('warning multiple services')
-			service_name = list(services.keys())[0]
-			compose_service = compose['services'][service_name]
-			extra_vols = compose_volumes.get('volumes',[])
-			if extra_vols and not compose_service.get('volumes',[]):
-				compose_service['volumes'] = []
-			for i,j in extra_vols:
-				item = '%s:%s'%(i,j)
-				if item in compose_service['volumes']:
-					raise Exception('collision: %s'%item)
-				compose_service['volumes'].append(item)
-			workdir = compose_volumes.get('workdir',None)
-			if workdir: compose_service['working_dir'] = workdir
+			elif len(services.keys())==0: pass
+			else:
+				service_name = list(services.keys())[0]
+				compose_service = compose['services'][service_name]
+				extra_vols = compose_volumes.get('volumes',[])
+				if extra_vols and not compose_service.get('volumes',[]):
+					compose_service['volumes'] = []
+				for i,j in extra_vols:
+					item = '%s:%s'%(i,j)
+					if item in compose_service['volumes']:
+						raise Exception('collision: %s'%item)
+					compose_service['volumes'].append(item)
+				workdir = compose_volumes.get('workdir',None)
+				if workdir: compose_service['working_dir'] = workdir
 		# run compose from the temporary location
 		try:
 			print('status compose from %s'%dn)
 			#! link here instead with ln_name? in case you are visiting?
-			with open(os.path.join(dn,'Dockerfile'),'w') as fp:
-				fp.write(dockerfile_obj.dockerfile)
+			if dockerfile:
+				with open(os.path.join(dn,'Dockerfile'),'w') as fp:
+					fp.write(dockerfile_obj.dockerfile)
 			with open(os.path.join(dn,'docker-compose.yml'),'w') as fp:
 				yaml.dump(compose,fp)
 			# copy files
@@ -477,7 +487,10 @@ class ReplicateCore(Handler):
 			# note that the user must ensure that the image name in the compose 
 			#   file matches the image_name in the recipe. docker handles the rest
 			# the following serves as a check that the image was created
-			return DockerContainer(name=image).solve
+			# if we are not building the image from a dockerfile this
+			#   should only return the image from compose
+			if not image and not 'image' in compose: return None
+			return DockerContainer(name=image if image else compose['image']).solve
 		# if not cleaning up we return the temporary directory
 		else: return dn
 
@@ -506,7 +519,9 @@ class ReplicateCore(Handler):
 		compose_vols = self.spot.get('compose_volumes',{})
 
 		# step 2: locate the container
-		self.container = DockerContainer(name=image).solve
+		if image: 
+			self.container = DockerContainer(name=image).solve
+		else: self.container = None
 		# if no container we redirect to _docker_compose if we are visiting
 		#   because a visit will create a manual docker command
 		if (not self.container or rebuild) and mode=='visit':

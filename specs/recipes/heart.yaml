@@ -579,7 +579,7 @@ select: !select
     mods: {compose: {services: {deploy: {devices: []}}}}
 
   # central location of the carpentry license file
-  carpentry_license: &carpentry_license "/home/rpb/work/hearts-code/license.bin"
+  carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2021.06.24-license-carp/license.bin"
 
   # EXECUTE: VERTIGO vXX example
   vertigo_vXX:
@@ -608,11 +608,11 @@ select: !select
               target: /usr/local/carp-1.1/license.bin
               type: bind
               # MODIFY: add the path to the data here
-            - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
+            - source: /home/rpb/work/data/2020.02.03-test-4surf-atria-f-M15_400
               target: /home/user/spot/data
               type: bind
               # MODIFY: add the path to the code here
-            - source: /home/rpb/work/hearts-code/vertigo
+            - source: /home/rpb/work/code/vertigo
               target: /home/user/spot/vertigo
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix

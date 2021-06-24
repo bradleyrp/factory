@@ -34,7 +34,8 @@ def feedback_args_to_command(*args,**kwargs):
 	return cmd
 
 class ReplicateWrap(Handler):
-	def std(self,args,image_name,compose,dockerfile,
+
+	def std(self,args,compose,dockerfile=None,image_name=None,
 		site=None,command=None,notes=None,script=None,visit=False,
 		#! note that there is kwargs bloat here
 		# user-facing meta-level arguments
