@@ -32,6 +32,27 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - carp_license
     - vertigo_lein_user
 
+dockerfile_carp_meshalyzer_opencarp: &dockerfile_carp_meshalyzer_opencarp
+  # note that this cannot coexist with Carpentry or you get errors downstream
+  series:
+    - bionic
+    - ubuntu_build
+    - carp_meshalyzer_reqs
+    - emacs26
+    - jdk-14
+    - clojure
+    - godot
+    - ubuntu_mkl
+    # video rendering requirements follow
+    - ffmpeg
+    - parallel
+    - xvfb
+    - vtk820
+    # insert this before user
+    - opencarp_v6_deb
+    - user_sudo_ubuntu
+    - vertigo_lein_user
+
 dockerfile_carp_mesh_basic_bionic: &dockerfile_carp_mesh_basic_bionic
   series:
     - bionic
@@ -616,3 +637,72 @@ select: !select
               target: /home/user/spot/vertigo
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
+
+  opencarp:
+    notes: this is specific to the vertigo_opencarp_vXX below
+    #! prevent this from running directly
+    #! confirm linux
+    image_name: &image_name_ubuntu_compare heartland:carp_compare
+    command: docker-compose up deploy
+    dockerfile: *dockerfile_carp_meshalyzer_opencarp
+    #! using volumes instead of: site: local, spot, darwin_ok
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: opencarp_visit
+          entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *image_name_ubuntu_compare
+          ports:
+            - 9011:9011
+            - 9012:9012
+          environment:
+            - DISPLAY=$DISPLAY
+          devices:
+            - /dev/dri 
+            - /dev/snd
+            - /dev/nvidia0
+
+  # EXECUTE: VERTIGO vXX comparison with CARPentry and openCARP
+  vertigo_opencarp_vXX:
+    notes: |
+      In this example we attempt to swap openCARP in for CARPentry.
+    via: opencarp
+    mods: 
+      dockerfile: *dockerfile_carp_meshalyzer_opencarp
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            devices: []
+            container_name: opencarp_visit
+            # the following will automatically point to paths above
+            #! this is not overwriting the original recipe!!!
+            entrypoint: >-
+              /bin/bash -lic 'cd ~/spot/vertigo &&
+              time lein run -- -n block01 runargs docker-v01 expt-comp-general'
+            environment:
+              - VERTIGO_REF_NAME=atria_f
+              - VERTIGO_TARGET_NAME=M15_400
+            volumes: 
+              # MODIFY: set the carpentry_license path in a variable
+            - source: *carpentry_license
+              target: /usr/local/carp-1.1/license.bin
+              type: bind
+              # MODIFY: add the path to the data here
+            - source: /home/rpb/work/data/2020.02.03-test-4surf-atria-f-M15_400
+              target: /home/user/spot/data
+              type: bind
+              # MODIFY: add the path to the code here
+            - source: /home/rpb/work/code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+
+  vertigo_opencarp_vXX_visit:
+    via: vertigo_opencarp_vXX
+    mods:
+      command: /usr/local/bin/docker-compose run --service-ports deploy
+      compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
+      visit: true

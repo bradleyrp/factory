@@ -35,7 +35,7 @@ dockerfiles: !merge_spec
       RUN chown user:users /usr/local/carp-1.1/license.bin
       USER user
     emacs26: |
-      RUN apt-get install -y software-properties-common
+      RUN apt-get update && apt-get install -y software-properties-common
       RUN add-apt-repository -y ppa:kelleyk/emacs
       RUN apt-get install -y emacs26
     jdk-13: |
@@ -77,6 +77,8 @@ dockerfiles: !merge_spec
       # Install clojure 1.10.1 so users don't have to download it every time
       RUN echo '(defproject dummy "" :dependencies [[org.clojure/clojure "1.10.1"]])' > project.clj \
         && lein deps && rm project.clj
+    vtk82: |
+      RUN apt-get update && apt-get install vtk
     godot: |
       RUN apt-get install -y unzip
       RUN apt-get install -y mesa-utils libgl1-mesa-glx
@@ -97,6 +99,17 @@ dockerfiles: !merge_spec
         echo "/opt/intel/mkl/lib/intel64" >> /etc/ld.so.conf.d/intel.conf && \
         ldconfig && \
         echo "source /opt/intel/mkl/bin/mklvars.sh intel64" >> /etc/bash.bashrc
+    vtk820: |
+      WORKDIR /tmp
+      ENV JAVA_HOME=/usr/lib/jvm/java-16-oracle
+      RUN apt-get update --fix-missing && apt-get -y install cmake && \
+          wget https://www.vtk.org/files/release/8.2/VTK-8.2.0.tar.gz && \
+          tar xvf VTK* && cd VTK*/ && mkdir build && cd build && \
+          cmake -DVTK_WRAP_JAVA:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
+          -DVTK_JAVA_SOURCE_VERSION:STRING=1.8 -DVTK_JAVA_TARGET_VERSION:STRING=1.8 .. && \
+          make -j && make install && \
+          rm -rf /tmp/*VTK*
+    #! note the following may be redundant with an actual project.clj
     vertigo_lein_user: |
       WORKDIR /tmp
       RUN mkdir vertigo_lein_user && cd vertigo_lein_user && echo '(defproject vertigo "0.1.0-SNAPSHOT" :plugins [[lein-git-deps "0.0.1-SNAPSHOT"] [lein-with-env-vars "0.2.0"] [cider/cider-nrepl "0.23.0"]] :git-dependencies [["https://github.com/bmillare/dj3.git"]] :dependencies [[org.clojure/clojure "1.10.0"] [org.bmillare/dj.core "0.2.0"] [com.cemerick/pomegranate "1.1.0"] [org.bmillare/dj.treefn "0.2.0"] [uncomplicate/neanderthal "0.26.1"] [nrepl "0.6.0"] [clojure-complete "0.2.5"]])' > project.clj && cat project.clj && lein install
@@ -117,3 +130,8 @@ dockerfiles: !merge_spec
       RUN apt-get -y update && apt-get install -y parallel bc
     xvfb:
       RUN apt-get -y update && apt-get install -y xvfb
+    opencarp_v6_deb: |
+      WORKDIR /tmp 
+      RUN wget https://opencarp.org/deb/opencarp-v6.0.deb
+      RUN apt-get -y update && apt-get -y install ./opencarp-v6.0.deb && rm /tmp/opencarp-v6.0.deb
+   
