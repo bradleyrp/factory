@@ -28,6 +28,7 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - ffmpeg
     - parallel
     - xvfb
+    - vtk820
     - user_sudo_ubuntu
     - carp_license
     - vertigo_lein_user
@@ -49,7 +50,7 @@ dockerfile_carp_meshalyzer_opencarp: &dockerfile_carp_meshalyzer_opencarp
     - xvfb
     - vtk820
     # insert this before user
-    - opencarp_v6_deb
+    - opencarp_v7_deb
     - user_sudo_ubuntu
     - vertigo_lein_user
 
@@ -132,6 +133,11 @@ workdir: &workdir /Users/rpb/worker
 hearts_code: &directed-graph-code
   !!python/object/apply:os.path.join [*workdir,
   "hearts-code/directed-graph-rotor-analysis"]
+  
+# central location of the carpentry license file
+carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2021.06.24-license-carp/license.bin"
+#! carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2020.08.20-license-carp/license.bin"
+#! carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2020.01.03-license-carp/license.bin"
 
 # RECIPE SELECTION
 # select recipe: `make docker specs/recipes/heart.yaml name=<name>`
@@ -259,7 +265,7 @@ select: !select
             - source: /home/rpb/work/hearts-data/2020.01.25-vertigo-v03
               target: /home/user/spot/data
               type: bind
-            - source: /home/rpb/work/hearts-code/vertigo
+            - source: /home/rpb/work/code/vertigo
               target: /home/user/spot/vertigo
               type: bind
 
@@ -278,7 +284,7 @@ select: !select
             - source: /home/rpb/work/hearts-data/2020.01.25-vertigo-v03
               target: /home/user/spot/data
               type: bind
-            - source: /home/rpb/work/hearts-code/vertigo
+            - source: /home/rpb/work/code/vertigo
               target: /home/user/spot/vertigo
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
@@ -316,7 +322,7 @@ select: !select
             - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
               target: /home/user/spot/data
               type: bind
-            - source: /home/rpb/work/hearts-code/vertigo
+            - source: /home/rpb/work/code/vertigo
               target: /home/user/spot/vertigo
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
@@ -402,13 +408,16 @@ select: !select
           deploy:
             container_name: carp_visit
             volumes: 
-            - source: /home/rpb/work/hearts-data/2020.02.03-test-4surf-atria-f-M15_400
+            - source: /home/rpb/work/data/2020.02.03-test-4surf-atria-f-M15_400 
               target: /home/user/spot/data
               type: bind
-            - source: /home/rpb/work/hearts-code/vertigo
+            - source: /home/rpb/work/code/vertigo
               target: /home/user/spot/vertigo
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
+            - source: *carpentry_license
+              target: /usr/local/carp-1.1/license.bin
+              type: bind
             entrypoint: >-
               /bin/bash -lic 'cd ~/spot/vertigo &&
               time lein run -- -n block01 runargs docker-v01 expt-v02'
@@ -599,9 +608,6 @@ select: !select
     via: carp
     mods: {compose: {services: {deploy: {devices: []}}}}
 
-  # central location of the carpentry license file
-  carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2021.06.24-license-carp/license.bin"
-
   # EXECUTE: VERTIGO vXX example
   vertigo_vXX:
     notes: |
@@ -620,6 +626,75 @@ select: !select
             entrypoint: >-
               /bin/bash -lic 'cd ~/spot/vertigo &&
               time lein run -- -n block01 runargs docker-v01 expt-general'
+            environment:
+              - VERTIGO_REF_NAME=atria_f
+              - VERTIGO_TARGET_NAME=M15_400
+            volumes: 
+              # MODIFY: set the carpentry_license path in a variable
+            - source: *carpentry_license
+              target: /usr/local/carp-1.1/license.bin
+              type: bind
+              # MODIFY: add the path to the data here
+            - source: /home/rpb/work/data/2020.02.03-test-4surf-atria-f-M15_400
+              target: /home/user/spot/data
+              type: bind
+              # MODIFY: add the path to the code here
+            - source: /home/rpb/work/code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+
+  # EXECUTE: VERTIGO vXX example
+  vertigo_v10:
+    notes: |
+      The following is an example recipe. You should copy the entire block 
+      and update the paths below, and replace XX with a number. Then run:
+        make docker specs/recipes/heart.yaml name=vertigo_vXX
+      See the vertigo_v04_visit and vertigo_v04_inspect recipes for debugging.
+    via: carp_nogpu
+    mods: 
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            # the following will automatically point to paths above
+            entrypoint: >-
+              /bin/bash -lic 'cd ~/spot/vertigo && export LD_LIBRARY_PATH=/usr/java/packages/lib:/usr/lib/jvm/java-16-oracle/lib/:$LD_LIBRARY_PATH && source /usr/local/carp-1.1/config.sh && time lein run -- -n block01 runargs docker-v01 expt-general'
+            environment:
+              - VERTIGO_REF_NAME=DTMRI_LA_1_RA_avg
+              - VERTIGO_TARGET_NAME=P6
+            volumes: 
+              # MODIFY: set the carpentry_license path in a variable
+            - source: *carpentry_license
+              target: /usr/local/carp-1.1/license.bin
+              type: bind
+              # MODIFY: add the path to the data here
+            - source: /home/rpb/work/data/2021.07.22-uac2-test/test-4surf-DTMRI-P6.igb-reader
+              target: /home/user/spot/data
+              type: bind
+              # MODIFY: add the path to the code here
+            - source: /home/rpb/work/code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+
+  vertigo_v11:
+    notes: |
+      The following is an example recipe. You should copy the entire block 
+      and update the paths below, and replace XX with a number. Then run:
+        make docker specs/recipes/heart.yaml name=vertigo_vXX
+      See the vertigo_v04_visit and vertigo_v04_inspect recipes for debugging.
+    via: carp_nogpu
+    mods: 
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            container_name: carp_visit
+            # the following will automatically point to paths above
+            entrypoint: >-
+              /bin/bash -lic 'cd ~/spot/vertigo && export LD_LIBRARY_PATH=/usr/java/packages/lib:/usr/lib/jvm/java-16-oracle/lib/:$LD_LIBRARY_PATH && source /usr/local/carp-1.1/config.sh && time lein run -- -n block01 runargs docker-v01 expt-general'
             environment:
               - VERTIGO_REF_NAME=atria_f
               - VERTIGO_TARGET_NAME=M15_400
@@ -706,3 +781,4 @@ select: !select
       command: /usr/local/bin/docker-compose run --service-ports deploy
       compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
       visit: true
+

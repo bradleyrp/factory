@@ -99,21 +99,29 @@ dockerfiles: !merge_spec
         echo "/opt/intel/mkl/lib/intel64" >> /etc/ld.so.conf.d/intel.conf && \
         ldconfig && \
         echo "source /opt/intel/mkl/bin/mklvars.sh intel64" >> /etc/bash.bashrc
+    # we are installing into /usr/java/packages because we cannot figure out the classpath in lein
+    # possibly due to this bug: https://github.com/technomancy/leiningen/issues/2447
     vtk820: |
       WORKDIR /tmp
       ENV JAVA_HOME=/usr/lib/jvm/java-16-oracle
-      RUN apt-get update --fix-missing && apt-get -y install cmake && \
+      RUN apt-get update && apt-get -y install cmake && \
           wget https://www.vtk.org/files/release/8.2/VTK-8.2.0.tar.gz && \
           tar xvf VTK* && cd VTK*/ && mkdir build && cd build && \
-          cmake -DVTK_WRAP_JAVA:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
+          cmake -DCMAKE_INSTALL_PREFIX=/usr/java/packages -DVTK_WRAP_JAVA:BOOL=ON -DCMAKE_BUILD_TYPE:STRING=Release \
           -DVTK_JAVA_SOURCE_VERSION:STRING=1.8 -DVTK_JAVA_TARGET_VERSION:STRING=1.8 .. && \
           make -j && make install && \
           rm -rf /tmp/*VTK*
     #! note the following may be redundant with an actual project.clj
-    vertigo_lein_user: |
+    vertigo_lein_user: | #_retired_2021.07.22: |
       WORKDIR /tmp
       RUN mkdir vertigo_lein_user && cd vertigo_lein_user && echo '(defproject vertigo "0.1.0-SNAPSHOT" :plugins [[lein-git-deps "0.0.1-SNAPSHOT"] [lein-with-env-vars "0.2.0"] [cider/cider-nrepl "0.23.0"]] :git-dependencies [["https://github.com/bmillare/dj3.git"]] :dependencies [[org.clojure/clojure "1.10.0"] [org.bmillare/dj.core "0.2.0"] [com.cemerick/pomegranate "1.1.0"] [org.bmillare/dj.treefn "0.2.0"] [uncomplicate/neanderthal "0.26.1"] [nrepl "0.6.0"] [clojure-complete "0.2.5"]])' > project.clj && cat project.clj && lein install
       WORKDIR /home/user
+    # UPDATE the following so the container has the leiningen-installed packages that match project.clj
+    # which is necessary otherwise every time we start the container it installs them
+    # note that you can get the oneliner with: cat ~/work/code/vertigo/project.clj | sed ':a;N;$!ba;s/\n/ /g' | tr -s ' ' # https://stackoverflow.com/a/1252191
+    vertigo_lein_user_new: |
+      WORKDIR /tmp
+      RUN mkdir vertigo_lein_user && cd vertigo_lein_user && echo '(defproject vertigo "0.1.0-SNAPSHOT" :description "FIXME: write description" :url "http://example.com/FIXME" :license { :name "EPL-2.0 OR GPL-2.0-or-later WITH Classpath-exception-2.0" :url "https://www.eclipse.org/legal/epl-2.0/"} :plugins [ [lein-git-deps "0.0.1-SNAPSHOT"] [lein-with-env-vars "0.2.0"] [cider/cider-nrepl "0.23.0"]] :git-dependencies [["https://github.com/bmillare/dj3.git"]] :dependencies [ [org.clojure/clojure "1.10.0"] [org.bmillare/dj.core "0.2.0"] [com.cemerick/pomegranate "1.1.0"] [org.bmillare/dj.treefn "0.2.0"] [uncomplicate/neanderthal "0.26.1"] [nrepl "0.6.0"] [clojure-complete "0.2.5"] [org.clojure/tools.cli "0.4.2"] [org.clojure/data.priority-map "1.0.0"]] :main ^:skip-aot cli :target-path "target/%s" :profiles {:uberjar {:aot :all}} :jvm-opts ["--add-opens=java.base/jdk.internal.ref=ALL-UNNAMED" "-Xmx26G"] :resource-paths ["/usr/local/lib/vtk.jar"] )' > project.clj && cat project.clj && lein install
     x11: |
       RUN apt-get -y install x11-apps
     grace_gnuplot: |
@@ -134,4 +142,8 @@ dockerfiles: !merge_spec
       WORKDIR /tmp 
       RUN wget https://opencarp.org/deb/opencarp-v6.0.deb
       RUN apt-get -y update && apt-get -y install ./opencarp-v6.0.deb && rm /tmp/opencarp-v6.0.deb
+    opencarp_v7_deb: |
+      WORKDIR /tmp 
+      RUN wget https://opencarp.org/deb/opencarp-v7.0.deb
+      RUN apt-get -y update && apt-get -y install ./opencarp-v7.0.deb && rm /tmp/opencarp-v7.0.deb
    
