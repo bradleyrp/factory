@@ -461,7 +461,7 @@ class SpackEnvItem(Handler):
 		# install_tree sets the target location to install the packages
 		install_tree = self.meta.get('supra',{}).get(
 			'install_tree',None)
-		# install_tree sets the target location to install the packages
+		# the lmod_spot sets the modulefiles location and is paired with install_tree everywhere
 		lmod_spot = self.meta.get('supra',{}).get(
 			'lmod_spot',None)
 
@@ -477,7 +477,7 @@ class SpackEnvItem(Handler):
 				if not 'lmod' in modules_enable:
 					delveset(mods,'modules','enable',
 						value=list(modules_enable)+['lmod'])
-			except: 
+			except Exception as e: 
 				delveset(mods,'modules','enable',value=['lmod'])
 			delveset(mods,'config','module_roots','lmod',
 				value=lmod_spot)
@@ -1343,9 +1343,11 @@ def conda_shared(reqs,target_ortho_key):
 	bash('source %s && conda env update --file %s -p %s'%(
 		init_sh,reqs,env_path),announce=True)
 
-def spack_env_install(spec,do,target=None):
+def spack_env_install(spec,do,target=None,modules=None):
+	if not modules and target:
+		modules = os.path.join(target,'lmod')
 	print('status building environment %s from %s'%(do,spec))
-	spack_tree(what=spec,name=do,install_tree=target)
+	spack_tree(what=spec,name=do,install_tree=target,lmod_spot=modules)
 
 def spack_env_concretize(spec,do,target=None,visit=False):
 	print('status building environment %s from %s'%(do,spec))
