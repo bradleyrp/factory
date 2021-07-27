@@ -33,6 +33,7 @@ select: !select
     - !!python/object/apply:lib.spack.spack_env_cache
       kwds:
         spec: *spec
+        target: *prefix
         cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
           kwds: *mirror
         # cli argument to select the environment name in the spec
@@ -45,6 +46,7 @@ select: !select
     - !!python/object/apply:lib.spack.spack_env_cache
       kwds:
         spec: *spec
+        target: *prefix
         cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
           kwds: *mirror
         # cli argument to select the environment name in the spec
@@ -83,6 +85,7 @@ select: !select
     - !!python/object/apply:lib.spack.spack_env_cache
       kwds:
         spec: *spec
+        target: *prefix
         cache_mirror: !!python/object/apply:lib.spack.SpackMirror 
           kwds: *mirror
         # cli argument to select the environment name in the spec
@@ -101,6 +104,7 @@ select: !select
     - !!python/object/apply:lib.spack.spack_env_concretize
       kwds:
         spec: *spec
+        target: *prefix
         # cli argument to select the environment name in the spec
         do: !cli do
         visit: !cli [visit, true]

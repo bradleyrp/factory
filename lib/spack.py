@@ -481,6 +481,13 @@ class SpackEnvItem(Handler):
 				delveset(mods,'modules','enable',value=['lmod'])
 			delveset(mods,'config','module_roots','lmod',
 				value=lmod_spot)
+		if not install_tree or not lmod_spot:
+			# not using debug_out because it has the whitelist and specs 
+			debug_out = pprint.pformat(dict(name=name,specs=specs,mods=mods,via=via,
+				cache_only=cache_only,cache_mirror=cache_mirror))
+			# the spack_router.yaml is set up so that we always have an install prefix
+			#   however this has been a site of several errors caused by incomplete coverage
+			print('warning install_tree={}, lmod_spot={}'.format(install_tree,lmod_spot))
 		# end of customizations
 
 		# typically use a Handler here but we need meta so simplifying
@@ -652,8 +659,8 @@ class SpackEnvItem(Handler):
 			spot_abs = 'file://%s'%spot_dn
 			if mirrors[mirror_name]!=spot_abs:
 				#! add html options
-				raise Exception('mirror %s exists but we cannot confirm it is '
-					'located at is at %s'%(mirror_name,spot_abs))
+				raise Exception('mirror named %s at %s exists but we cannot confirm it is '
+					'located at is at %s'%(mirror_name,mirrors[mirror_name],spot_abs))
 		return True
 	def make_mirror(self,mirror_name,spot):
 		#! no spot checking so you cannot change the spot and thereby move it
@@ -1306,6 +1313,7 @@ def spack_router(spec,sub,debug=False,slurm=False,**kwargs):
 		raise Exception('cannot find %s'%spec)
 	print('status received kwargs: %s'%kwargs)
 	# reformulate incomming command line arguments
+	print('status spack_router calls yaml (name: "%s") at: %s'%(sub,spec))
 	yaml_do_select(
 		# standard arguments
 		what=spec,name=sub,debug=debug,
@@ -1344,14 +1352,18 @@ def conda_shared(reqs,target_ortho_key):
 		init_sh,reqs,env_path),announce=True)
 
 def spack_env_install(spec,do,target=None,modules=None):
+	# modules always follow the target
 	if not modules and target:
 		modules = os.path.join(target,'lmod')
 	print('status building environment %s from %s'%(do,spec))
 	spack_tree(what=spec,name=do,install_tree=target,lmod_spot=modules)
 
-def spack_env_concretize(spec,do,target=None,visit=False):
+def spack_env_concretize(spec,do,target=None,visit=False,modules=None):
 	print('status building environment %s from %s'%(do,spec))
-	tree = spack_tree(what=spec,name=do,install_tree=target,live=True)
+	if not modules and target:
+		modules = os.path.join(target,'lmod')
+	tree = spack_tree(what=spec,name=do,
+		install_tree=target,lmod_spot=modules,live=True)
 	#!! dev: hack to get the environment from globals. note that we need
 	#!!   a minor refactor to make this more elegant
 	if '_LAST_SPACK_ENV' in globals():
@@ -1359,13 +1371,20 @@ def spack_env_concretize(spec,do,target=None,visit=False):
 		print('status spack environment spot: %s'%_LAST_SPACK_ENV)
 
 @incoming_handlers
-def spack_env_cache(spec,do,cache_mirror=None):
+def spack_env_cache(spec,do,cache_mirror=None,target=None,modules=None):
 	print('status making buildcache for environment %s from %s'%(do,spec))
+	print(f'target is {target}')
+	if not target:
+		raise Excepetion('!!!')
 	#! the following is clumsy
 	if not cache_mirror: raise Exception('needs cache_mirror')
+	if not modules and target:
+		modules = os.path.join(target,'lmod')
 	spack_tree(what=spec,name=do,
 		# custom supra-meta arguments
-		cache_mirror=cache_mirror)
+		cache_mirror=cache_mirror,
+		# crucial name change here
+		install_tree=target,lmod_spot=modules)
 
 def spack_install_cache(spec,do,target,modules=None):
 	"""Deploy the code to another tree from a build cache."""
