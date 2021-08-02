@@ -132,7 +132,8 @@ hearts_code: &directed-graph-code
   "hearts-code/directed-graph-rotor-analysis"]
   
 # central location of the carpentry license file
-carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2021.06.24-license-carp/license.bin"
+carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2021.07.00-license-carp/trayanova_license_07_2021.bin"
+#! carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2021.06.24-license-carp/license.bin"
 #! carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2020.08.20-license-carp/license.bin"
 #! carpentry_license: &carpentry_license "/home/rpb/work/cardcat/2020.01.03-license-carp/license.bin"
 
