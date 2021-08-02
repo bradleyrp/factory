@@ -29,6 +29,7 @@ dockerfile_carp_meshalyzer: &dockerfile_carp_meshalyzer
     - parallel
     - xvfb
     - vtk820
+    - python-numpy
     - user_sudo_ubuntu
     - carp_license
     - vertigo_lein_user
@@ -116,10 +117,6 @@ dockerfile_cgal: &dockerfile_cgal
     - geomview
     - meshlab
     - user_sudo_ubuntu
-
-#! https://hub.docker.com/r/kitware/paraview
-#! dockerfile_paraview: &dockerfile_paraview
-#!   pull: docker pull kitware/paraview:pvw-v5.8.0-osmesa-py3
 
 ### SETTINGS
 
@@ -392,7 +389,6 @@ select: !select
 
   # EXECUTE: VERTIGO v04
   # vertigo_v04 and children run atrial_af
-  #! developing a better wrapper
   vertigo_v04:
     notes: |
       Tested on 2020.02.05 on heartland (a desktop) via:
@@ -644,13 +640,7 @@ select: !select
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
 
-  # EXECUTE: VERTIGO vXX example
   vertigo_v10:
-    notes: |
-      The following is an example recipe. You should copy the entire block 
-      and update the paths below, and replace XX with a number. Then run:
-        make docker specs/recipes/heart.yaml name=vertigo_vXX
-      See the vertigo_v04_visit and vertigo_v04_inspect recipes for debugging.
     via: carp_nogpu
     mods: 
       command: docker-compose run --service-ports deploy
@@ -660,7 +650,10 @@ select: !select
             container_name: carp_visit
             # the following will automatically point to paths above
             entrypoint: >-
-              /bin/bash -lic 'cd ~/spot/vertigo && export LD_LIBRARY_PATH=/usr/java/packages/lib:/usr/lib/jvm/java-16-oracle/lib/:$LD_LIBRARY_PATH && source /usr/local/carp-1.1/config.sh && time lein run -- -n block01 runargs docker-v01 expt-general'
+              /bin/bash -lic 'cd ~/spot/vertigo && export 
+              LD_LIBRARY_PATH=/usr/java/packages/lib:/usr/lib/jvm/java-16-oracle/lib/:$LD_LIBRARY_PATH && 
+              source /usr/local/carp-1.1/config.sh && 
+              time lein run -- -n block01 runargs docker-v01 expt-general'
             environment:
               - VERTIGO_REF_NAME=DTMRI_LA_1_RA_avg
               - VERTIGO_TARGET_NAME=P6
@@ -678,13 +671,16 @@ select: !select
               target: /home/user/spot/vertigo
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
+  vertigo_v10_inspect:
+    via: vertigo_v10
+    mods: 
+      visit: true
+      compose: 
+        services:
+          deploy:
+            entrypoint: /bin/bash -il
 
   vertigo_v11:
-    notes: |
-      The following is an example recipe. You should copy the entire block 
-      and update the paths below, and replace XX with a number. Then run:
-        make docker specs/recipes/heart.yaml name=vertigo_vXX
-      See the vertigo_v04_visit and vertigo_v04_inspect recipes for debugging.
     via: carp_nogpu
     mods: 
       command: docker-compose run --service-ports deploy
@@ -694,7 +690,10 @@ select: !select
             container_name: carp_visit
             # the following will automatically point to paths above
             entrypoint: >-
-              /bin/bash -lic 'cd ~/spot/vertigo && export LD_LIBRARY_PATH=/usr/java/packages/lib:/usr/lib/jvm/java-16-oracle/lib/:$LD_LIBRARY_PATH && source /usr/local/carp-1.1/config.sh && time lein run -- -n block01 runargs docker-v01 expt-general'
+              /bin/bash -lic 'cd ~/spot/vertigo && export 
+              LD_LIBRARY_PATH=/usr/java/packages/lib:/usr/lib/jvm/java-16-oracle/lib/:$LD_LIBRARY_PATH && 
+              source /usr/local/carp-1.1/config.sh && 
+              time lein run -- -n block01 runargs docker-v01 expt-general'
             environment:
               - VERTIGO_REF_NAME=atria_f
               - VERTIGO_TARGET_NAME=M15_400
