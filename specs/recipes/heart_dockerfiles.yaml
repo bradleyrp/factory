@@ -18,13 +18,26 @@ dockerfiles: !merge_spec
       RUN apt-get install -y g++ gfortran 
       RUN apt-get install -y swig gengetopt zlib1g-dev liblapack-dev
       RUN apt-get install -y cmake 
-    carp_meshalyzer: |
+    carp_meshalyzer_download: |
       RUN cd /tmp && \
           mkdir -p ./build-carp && \
           mkdir /usr/local/carp-1.1 && \
           cd ./build-carp && \
           wget https://carp.medunigraz.at/carpentry/cme.linux.tar.gz && \
           tar xvf cme.linux.tar.gz && \
+          cd cme-1.1-linux && \
+          echo "/usr/local/carp-1.1\ny\ny\ny\n" \
+          | ./install_linux.sh
+      RUN ln -s /usr/local/carp-1.1/meshalyzer/src/meshalyzer /usr/bin/meshalyzer
+      RUN echo "source /usr/local/carp-1.1/config.sh" >> /etc/bash.bashrc
+    # link the source locally: ln -s ~/worker/heart/sources/cme.linux.tar.gz 
+    carp_meshalyzer: |
+      COPY cme.linux.tar.gz /cme.linux.tar.gz
+      RUN cd /tmp && \
+          mkdir -p ./build-carp && \
+          mkdir /usr/local/carp-1.1 && \
+          cd ./build-carp && \
+          tar xvf /cme.linux.tar.gz && \
           cd cme-1.1-linux && \
           echo "/usr/local/carp-1.1\ny\ny\ny\n" \
           | ./install_linux.sh
@@ -146,4 +159,3 @@ dockerfiles: !merge_spec
       WORKDIR /tmp 
       RUN wget https://opencarp.org/deb/opencarp-v7.0.deb
       RUN apt-get -y update && apt-get -y install ./opencarp-v7.0.deb && rm /tmp/opencarp-v7.0.deb
-   

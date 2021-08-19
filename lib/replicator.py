@@ -40,7 +40,7 @@ class ReplicateWrap(Handler):
 		#! note that there is kwargs bloat here
 		# user-facing meta-level arguments
 		nickname=None,rebuild=False,unlink=False,tour=False,
-		macos_gui=False):
+		macos_gui=False,files=None):
 		"""Standard method for translating a recipe into a ReplicateCore."""
 		if args and command:
 			raise Exception(
@@ -78,7 +78,7 @@ class ReplicateWrap(Handler):
 			# arguments from the yaml follow
 			visit=visit,macos_gui=macos_gui,
 			volume=site,image=image_name,line=command,
-			compose_bundle=compose_bundle,meta=ref)
+			compose_bundle=compose_bundle,meta=ref,files=files)
 
 	def via(self,via,args=None,mods=None,notes=None,
 		# user-facing meta-level arguments

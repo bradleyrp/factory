@@ -514,6 +514,31 @@ select: !select
           build: .
           image: *carpentry_basic
           devices: []
+          # onetime mount the binary to install
+          volumes:
+    files:
+      - /Users/rpb/worker/heart/sources/cme.linux.tar.gz
+
+  meshalyzer_review_20210810:
+    via: carpentry_mac
+    mods:
+      compose:
+        services:
+          deploy:
+            working_dir: '/home/user/data'
+            entrypoint: ['/bin/bash','-l']
+            volumes:
+              - source: /Users/rpb/worker/heart/2021.08.10-uac2-opencarp-compare
+                target: /home/user/data
+                type: bind
+            deploy:
+              resources:
+                limits:
+                  cpus: "4.0"
+                  memory: 40G
+                reservations:
+                  cpus: "4.0"
+                  memory: 40G
 
   ###
   ### CGAL Containers
