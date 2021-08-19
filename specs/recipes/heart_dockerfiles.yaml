@@ -159,3 +159,7 @@ dockerfiles: !merge_spec
       WORKDIR /tmp 
       RUN wget https://opencarp.org/deb/opencarp-v7.0.deb
       RUN apt-get -y update && apt-get -y install ./opencarp-v7.0.deb && rm /tmp/opencarp-v7.0.deb
+    #! looked into paraview: https://hub.docker.com/r/kitware/paraview 
+    #!   via: docker pull kitware/paraview:pvw-v5.8.0-osmesa-py
+    python-numpy: |
+      RUN apt-get -y update && apt-get install -y python3-pip && pip3 install numpy
