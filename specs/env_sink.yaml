@@ -1,0 +1,30 @@
+# everything but the kitchen sink
+# must rebuild every time due to editable mayavi below
+dependencies:
+  - python==3.8.3
+  - scipy
+  - conda-forge::paraview
+  - ipdb
+  - h5py
+  - scikit-learn
+  - scikit-image
+  - pip
+  - pip:
+    - numpy
+    - meshio
+    - pillow
+    - scikit-learn
+    - matplotlib
+    - networkx
+    - "--editable=git+https://github.com/enthought/mayavi#egg=mayavi"
+    - sqlalchemy
+    - sphinx
+    - recommonmark
+    - numpydoc
+    - joblib
+    - nibabel
+    - pynrrd
+    - open3d
+    - itk
+    - simpleitk
+    - psutil 
