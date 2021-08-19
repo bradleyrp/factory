@@ -713,6 +713,47 @@ select: !select
               type: bind
             - /tmp/.X11-unix:/tmp/.X11-unix
 
+  vertigo_v12:
+    via: carp_nogpu
+    mods: 
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            deploy:
+              resources:
+                limits:
+                  cpus: "4.0"
+                  memory: 40G
+                reservations:
+                  cpus: "4.0"
+                  memory: 40G
+            container_name: carp_visit
+            # the following will automatically point to paths above
+            entrypoint: >-
+              /bin/bash -lic 'cd ~/spot/vertigo && export 
+              LD_LIBRARY_PATH=/usr/java/packages/lib:/usr/lib/jvm/java-16-oracle/lib/:$LD_LIBRARY_PATH && 
+              source /usr/local/carp-1.1/config.sh && 
+              time lein run -- -n block01 runargs docker-v01 expt-general'
+            environment:
+              - VERTIGO_REF_NAME=DTMRI_LA_1_RA_avg
+              - VERTIGO_TARGET_NAME=P324
+            volumes: 
+              # MODIFY: set the carpentry_license path in a variable
+            - source: *carpentry_license
+              target: /usr/local/carp-1.1/license.bin
+              type: bind
+              # MODIFY: add the path to the data here
+              # via: rsync -e 'ssh -p 58020' -arivP rbradle8@utz.icm.jhu.edu:/xanadu/data/sali46/UAC2-example-tutorial/FINAL-test-4surf-DTMRI-P324/ 2021.08.03-test-vertigo/
+            - source: /home/rpb/work/data/2021.08.03-test-vertigo
+              target: /home/user/spot/data
+              type: bind
+              # MODIFY: add the path to the code here
+            - source: /home/rpb/work/code/vertigo
+              target: /home/user/spot/vertigo
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+
   opencarp:
     notes: this is specific to the vertigo_opencarp_vXX below
     #! prevent this from running directly
