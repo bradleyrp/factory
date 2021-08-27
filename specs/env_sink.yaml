@@ -1,12 +1,19 @@
 # everything but the kitchen sink
 # must rebuild every time due to editable mayavi below
+# note that this is the macos equivalent of the nix env at env_dev_pv11.yaml
+# we keep this in factory/specs/env_sink.yaml and also maintain a nix version
 name: sink
 dependencies:
   - python==3.8.3
+  # python_abi=3.8=2_cp38
+  # python=3.8.3=h26836e1_2
   - scipy
   - conda-forge::paraview
+  # paraview=5.9.1=he89ca0a_102_qt
   - ipdb
-  - h5py
+  - h5py 
+  # h5py=3.2.1=py38h90fc2a2_0
+  # hdf5=1.10.6=nompi_hc5d9132_1114
   - scikit-learn
   - scikit-image
   - pip
@@ -27,5 +34,8 @@ dependencies:
     - pynrrd
     - open3d
     - itk
+    # itk==5.2.0.post3
     - simpleitk
     - psutil 
+    # manually installed vtk somehow? vtk==9.0.3
+    - seaborn

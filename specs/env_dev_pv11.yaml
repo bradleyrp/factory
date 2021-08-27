@@ -1,11 +1,20 @@
-# WARNING: you absolutely need to rebuild the environment every time you add to it for some reason
+# must rebuild every time due to editable mayavi below
+# see below where vtk is probably installed manually
+# beware major issues with understanding mayavi dependencies
+# see also coderev/demo-image-interp/reqs.yaml for the macos version
+# note that this is the nix equivalent to the macos env in env_sink.yaml
 name: dev_heart_11
 dependencies:
   - python==3.8.3
+  # python=3.8.3=h26836e1_2
+  # python_abi=3.8=1_cp38
   - scipy
   - conda-forge::paraview
+  # paraview=5.8.1=py38h021f63e_1
   - ipdb
   - h5py
+  # h5py=2.10.0=py38h0601b69_1
+  # hdf5=1.10.6=nompi_haae91d6_101
   - pip
   - pip:
     - numpy
@@ -23,3 +32,4 @@ dependencies:
     - psutil
     # added on 2020.10.26
     - nibabel
+    # manually installed vtk somehow? vtk==9.0.3
