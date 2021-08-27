@@ -1,5 +1,6 @@
 # everything but the kitchen sink
 # must rebuild every time due to editable mayavi below
+name: sink
 dependencies:
   - python==3.8.3
   - scipy
