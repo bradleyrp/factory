@@ -1,5 +1,5 @@
-# must rebuild every time due to editable mayavi below
-# see below where vtk is probably installed manually
+# previously you had to rebuild every time due to editable mayavi below
+# see below where vtk comes from 
 # beware major issues with understanding mayavi dependencies
 # see also coderev/demo-image-interp/reqs.yaml for the macos version
 # note that this is the nix equivalent to the macos env in env_sink.yaml
