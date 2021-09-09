@@ -848,3 +848,29 @@ select: !select
       compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
       visit: true
 
+  # opencarp MWE v01
+  vertigo_opencarp_mwe_v01:
+    notes: |
+      circa 2021.09.09 testing opencarp MWE for the interface to the solver
+    via: opencarp
+    mods: 
+      dockerfile: *dockerfile_carp_meshalyzer_opencarp
+      command: docker-compose run --service-ports deploy
+      compose:
+        services:
+          deploy:
+            devices: []
+            container_name: opencarp_visit
+            entrypoint: /bin/bash -l
+            volumes: 
+            - source: /home/rpb/work/data/2021.09.09-mwe-uac2/
+              target: /home/user/spot/data
+              type: bind
+            - /tmp/.X11-unix:/tmp/.X11-unix
+  vertigo_opencarp_mwe_v01_visit:
+    via: vertigo_opencarp_mwe_v01
+    mods:
+      command: /usr/local/bin/docker-compose run --service-ports deploy
+      compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
+      visit: true
+
