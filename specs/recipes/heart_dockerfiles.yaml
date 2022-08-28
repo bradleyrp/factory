@@ -163,3 +163,78 @@ dockerfiles: !merge_spec
     #!   via: docker pull kitware/paraview:pvw-v5.8.0-osmesa-py
     python-numpy: |
       RUN apt-get -y update && apt-get install -y python3-pip && pip3 install numpy
+    vmtk_reqs: |
+      RUN apt-get -y update --fix-missing && apt-get upgrade -y
+      RUN apt-get install -y gcc
+      RUN apt-get install -y cmake
+      RUN apt-get install -y cmake-curses-gui
+      RUN apt-get install -y git
+      RUN apt-get install -y libgsl-dev      
+      RUN apt-get install -y libeigen3-dev
+      RUN apt-get install -y libxt-dev
+      RUN apt-get install -y libgl1-mesa-glx
+      RUN apt-get install -y libgl1-mesa-dev
+      RUN apt-get install -y libglapi-mesa
+      RUN apt-get install -y libosmesa-dev
+      RUN apt-get install -y build-essential
+      RUN apt-get install -y libtbb2
+      RUN apt-get install -y libtbb-dev
+    # via https://fabiorosado.dev/blog/install-conda-in-docker/
+    # note that the anaconda instructions include apt-get clean
+    #   use this elsewhere?
+    # anaconda requires prelim and build
+    # dev: cannot use $USER or $HOME in ENV but it works in RUN if you set USER
+    anaconda: |
+      USER user
+      ENV CONDA_DIR /home/user/conda
+      RUN wget --quiet \
+        https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh \
+        -O ~/miniconda.sh && \
+        /bin/bash ~/miniconda.sh -b -p ${CONDA_DIR}
+      ENV PATH=${CONDA_DIR}/bin:$PATH
+    # deprecated because I cannot source things in dockerfiles, see below
+    vmtk_prep_conda: |
+      SHELL ["/bin/bash", "-c"]
+      ENV VMTK_CONDA_ENV vmtk
+      RUN conda install anaconda-client
+      RUN conda update conda anaconda-client
+      RUN conda config --set restore_free_channel true
+      RUN conda create -n ${VMTK_CONDA_ENV} python=3.6 numpy joblib
+      RUN conda init bash
+    # instead of anaconda we install our desired python and libraries
+    #   however it is impossible to match python versions with ubuntu, hence
+    #   anaconda is strictly necessary hence this is DEPRECATED
+    vmtk_prep_python: |
+      RUN apt-get install -y software-properties-common && \
+        add-apt-repository ppa:deadsnakes/ppa && \
+        apt-get install -y build-essential python3.6 python3.6-dev python3-pip && \
+        curl -O https://bootstrap.pypa.io/get-pip.py && \
+        python3.6 get-pip.py && \
+        pip install numpy joblib
+    # notes on vmtk_install:
+    # - we have great difficulty getting Python 3.6 in ubuntu 20.04
+    # - hence we stick with anaconda per the install scripts
+    # - we use conda run in the dockerfile to install
+    # - there is a spurious conda init warning from conda activate
+    #   in the vmtk_install.sh script. you cannot activate conda in a
+    #   Dockerfile, so we set the SHELL first and hence the entire 
+    #   install script happens in the environment
+    vmtk_install: |
+      SHELL ["/bin/bash", "-c"]
+      # tell git to use https when cloning ITK and VTK later
+      RUN git config --global url."https://".insteadOf git://
+      # get the install script
+      WORKDIR /home/user
+      # randomly stops running: RUN /bin/bash -c 'source install_vmtk.sh'
+      # port: https://github.com/marco-fedele/vmtk/wiki/files/install_vmtk.sh
+      SHELL ["conda", "run", "-p", "/home/user/conda/envs/vmtk", "--no-capture-output", "/bin/bash", "-c"]
+      RUN \
+        wget \
+        https://github.com/marco-fedele/vmtk/wiki/files/install_vmtk.sh && \
+        sed -i \
+        's/git clone git@github.com:/git clone https:\/\/github.com\//g' \
+        install_vmtk.sh && /bin/bash -c 'source install_vmtk.sh'
+    vmtk_loader: |
+      RUN echo "loadvmtk" >> ~/.bashrc
+
+      

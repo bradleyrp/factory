@@ -118,6 +118,20 @@ dockerfile_cgal: &dockerfile_cgal
     - meshlab
     - user_sudo_ubuntu
 
+dockerfile_vmtk: &dockerfile_vmtk
+  series:
+    - focal
+    - prelim
+    - ubuntu_build
+    - vmtk_reqs
+    - x11
+    - cleanup
+    - user_sudo_ubuntu
+    - anaconda
+    - vmtk_prep_conda
+    - vmtk_install
+    - vmtk_loader
+
 ### SETTINGS
 
 # method for running GUI apps on macos
@@ -848,3 +862,59 @@ select: !select
       compose: {services: {deploy: {entrypoint: '/bin/bash -l'}}}
       visit: true
 
+  ###
+  ### VMTK
+  ###
+
+  vmtk_base:
+    image_name: &image_name_vmtk heartland:vmtk
+    #! command: docker-compose up deploy
+    #! use run if yo uare also using visit!
+    #! use -e for display
+    #! command: docker-compose run --service-ports deploy
+    #! command: docker-compose run -e DISPLAY=docker.for.mac.host.internal:0 --service-ports deploy
+    command: docker-compose run -e DISPLAY=host.docker.internal:0 --service-ports deploy
+    #! beware you need to use run if you are doing a visit
+    dockerfile: *dockerfile_vmtk
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: vmtk
+          #! entrypoint: ['/bin/bash','-l']
+          build: .
+          image: *image_name_vmtk
+          ports:
+            - 9011:9011
+            - 9012:9012
+          environment:
+            - DISPLAY=$DISPLAY
+          # nvidia only:
+          # devices:
+          #   - /dev/dri 
+          #   - /dev/snd
+          #   - /dev/nvidia0
+
+  vmtk:
+    via: vmtk_base
+    mods:
+      # this uses a gui on macos machines via socat
+      macos_gui: true
+      visit: true
+        #! restart the laptop after setting "Allow connections from network clients" (not sure that restart is needed but it seems decisive)
+        #! after restart, use "xhost +" if you are okay with the security implications
+        #!  > access control disabled, clients can connect from any host
+        #! then you can run xeyes from the factory per usual
+        #! note that socat may be necessary for tunneling an X11 connection from a desktop
+      compose:
+        services:
+          deploy:
+            devices: []
+            #! environment:
+            #!   - *macos_docker_display
+            volumes: 
+            # ...!!! do not forget this
+            - /tmp/.X11-unix:/tmp/.X11-unix
+            - source: /Users/rpb/tmp-vmtk-test
+              target: /home/user/data
+              type: bind

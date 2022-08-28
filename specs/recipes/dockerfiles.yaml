@@ -3,11 +3,14 @@ dockerfiles:
     FROM ubuntu:bionic
   focal: |
     FROM ubuntu:focal
+  # ALWAYS RUN PRELIM! consider using cleanup as well
+  prelim: |
+    RUN apt-get -y update --fix-missing && apt-get upgrade -y
+  # added clean and other features to 
   ubuntu_build: |
     # section: basic requirements
     ENV DEBIAN_FRONTEND noninteractive
-    RUN apt-get -y clean
-    RUN apt-get -y update
+    RUN apt-get -y update --fix-missing && apt-get upgrade -y
     RUN apt-get install -y --no-install-recommends apt-utils
     RUN apt-get install -y build-essential
     RUN apt-get install -y git
@@ -18,6 +21,8 @@ dockerfiles:
     RUN apt-get install -y jq
     RUN apt-get install -y libssl-dev
     RUN apt-get install -y screen
+  cleanup: |
+    RUN apt-get clean && rm -rf /var/lib/apt/lists/*
   ubuntu_python_latest: |
     # section: latest python3
     RUN apt-get install -y python3
