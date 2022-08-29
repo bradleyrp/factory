@@ -236,5 +236,3 @@ dockerfiles: !merge_spec
         install_vmtk.sh && /bin/bash -c 'source install_vmtk.sh'
     vmtk_loader: |
       RUN echo "loadvmtk" >> ~/.bashrc
-
-      

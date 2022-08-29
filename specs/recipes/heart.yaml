@@ -936,10 +936,10 @@ select: !select
         services:
           deploy:
             devices: []
+            #! socat might be required for X11 over the network
             #! environment:
             #!   - *macos_docker_display
             volumes: 
-            # ...!!! do not forget this
             - /tmp/.X11-unix:/tmp/.X11-unix
             - source: /Users/rpb/tmp-vmtk-test
               target: /home/user/data
