@@ -236,3 +236,42 @@ dockerfiles: !merge_spec
         install_vmtk.sh && /bin/bash -c 'source install_vmtk.sh'
     vmtk_loader: |
       RUN echo "loadvmtk" >> ~/.bashrc
+    atgizmo_install_root: |
+      # ensure ssh keys https://stackoverflow.com/a/18138352
+      RUN  echo "    IdentityFile ~/.ssh/id_rsa" >> /etc/ssh/ssh_config
+      #! RUN mkdir ~/code && python -m venv ~/code/venv-atgizmo
+      #! RUN source ~/code/venv-atgizmo/bin/activate && \
+      #!     git clone git@gitlab.com:natalia-trayanova/atgizmo
+      RUN apt-get install -y python python-dev python3.8-venv
+      # we need libGL.so or when we import vtk, we get ImportError: libGL.so.1: cannot open shared object file: No such file or directory
+      RUN apt-get install -y libgl1-mesa-glx libxrender1
+    # pending a solution for using ssh in docker builds otherwise this fails and you have to complete the test manually
+    atgizmo_install_user: |
+      RUN --mount=type=ssh git clone git@gitlab.com:natalia-trayanova/atgizmo
+
+#! mkdir -p ~/code
+#! # on rockfish you need to use these modules but on a workstation you do not
+#! ml python/3.9.0 py-setuptools py-pip
+#! python -m venv ~/code/venv-atgizmo
+#! source ~/code/venv-atgizmo/bin/activate
+#! # we update pip if we get errors related to setup.py
+#! pip install -U pip
+#! # step 2: clone atgizmo (make sure you set an SSH key in gitlab) to any location you want
+#! cd ~/code
+#! git clone git@gitlab.com:natalia-trayanova/atgizmo
+#! cd atgizmo
+#! # step 3: install the development code
+#! # by default on rockfish we add a helper script called "atgo" to ~/.bash_profile
+#! # to use an alternate profile script (i.e. on ubuntu), before installing, run:
+#! export _USE_PROFILE=~/.bashrc
+#! # or if you are on macos use:
+#! export _USE_PROFILE=~/.zshrc
+#! # from inside a virtual environment, install the development copy
+#! make develop
+# on rockfish only, we have to add the following module command before the source command in the atgizmo script, add this: ml python/3.9.0 py-setuptools py-pip
+#! vim ~/.entry_atgizmo.sh 
+# after installation you will need a new terminal before you can 
+# everytime we log on, we can use our shortcut
+#! atgo
+# whenever we want to refresh the code we run the refresh shortcut
+#! atgizmo_refresh

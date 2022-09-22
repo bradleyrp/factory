@@ -132,6 +132,13 @@ dockerfile_vmtk: &dockerfile_vmtk
     - vmtk_install
     - vmtk_loader
 
+dockerfile_atgizmo_test: &dockerfile_atgizmo_test
+  series:
+    - focal
+    - ubuntu_build
+    - ubuntu_python_latest
+    - atgizmo_install_root 
+
 ### SETTINGS
 
 # method for running GUI apps on macos
@@ -944,3 +951,33 @@ select: !select
             - source: /Users/rpb/tmp-vmtk-test
               target: /home/user/data
               type: bind
+
+  ###
+  ### Atgizmo
+  ### 
+
+  # opencarp MWE v01
+  atgizmo_test:
+    notes: |
+      circa 2022.09.20 testing atgizmo installation after numerous issues
+    image_name: &image_name_atgizmo_test heartland:atgizmo_test
+    command: /usr/local/bin/docker-compose run --service-ports deploy
+    dockerfile: *dockerfile_atgizmo_test
+    visit: true
+    compose:
+      version: '3.7'
+      services:
+        deploy:
+          container_name: atgizmo_test
+          entrypoint: ['/bin/bash','-l']
+          build: 
+            context: .
+            ssh: ["default"]
+          image: *image_name_atgizmo_test
+          volumes:
+            - type: bind
+              source: /run/host-services/ssh-auth.sock
+              target: /run/host-services/ssh-auth.sock
+          environment:
+            SSH_AUTH_SOCK: /run/host-services/ssh-auth.sock
+
